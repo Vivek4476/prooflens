@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProofLens — How a photo is scored</title>
+<style>
+  /* ============================================================
+     ProofLens pipeline explainer — single self-contained file.
+     No frameworks, no CDN, no build step. System fonts only.
+     ============================================================ */
+
+  :root {
+    --red:    #C8102E;   /* ABSLI deep red (primary) */
+    --red-dk: #9c0c24;
+    --gold:   #F4A623;   /* Sun Life gold (accent)   */
+    --cream:  #FBF7EF;   /* page background          */
+    --card:   #FFFFFF;
+    --ink:    #2a2320;
+    --muted:  #6f6760;
+    --line:   #e7ddcb;
+    --green:  #2e8b57;   /* Clear    */
+    --amber:  #E8920C;   /* Doubtful */
+    --rose:   #C8102E;   /* Suspect  */
+    --shadow: 0 6px 22px rgba(45,30,20,.10);
+    --shadow-hero: 0 14px 40px rgba(200,16,46,.22);
+    --radius: 16px;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { margin: 0; }
+
+  body {
+    font-family: var(--sans);
+    color: var(--ink);
+    background: var(--cream);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px 20px 56px;
+  }
+
+  /* ---------- Header ---------- */
+  header.masthead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 6px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+  }
+  .logo {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--red), var(--red-dk));
+    display: grid; place-items: center;
+    box-shadow: var(--shadow);
+    flex: none;
+  }
+  .logo svg { width: 26px; height: 26px; }
+  .brand h1 {
+    margin: 0;
+    font-size: clamp(1.35rem, 2.6vw, 1.9rem);
+    letter-spacing: -.02em;
+  }
+  .brand .sub {
+    margin: 2px 0 0;
+    color: var(--muted);
+    font-size: .92rem;
+  }
+
+  /* ---------- Controls ---------- */
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  button.ctl {
+    font: inherit;
+    font-size: .9rem;
+    font-weight: 600;
+    color: var(--ink);
+    background: #fff;
+    border: 1.5px solid var(--line);
+    border-radius: 999px;
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: background .15s, border-color .15s, transform .05s;
+    display: inline-flex; align-items: center; gap: 7px;
+  }
+  button.ctl:hover { border-color: var(--red); }
+  button.ctl:active { transform: translateY(1px); }
+  button.ctl[aria-pressed="true"] {
+    background: var(--red);
+    border-color: var(--red);
+    color: #fff;
+  }
+  .dot-ic { width: 9px; height: 9px; border-radius: 50%; background: currentColor; flex: none; }
+
+  /* Visible keyboard focus on every control */
+  button.ctl:focus-visible,
+  .switch:focus-within,
+  a:focus-visible {
+    outline: 3px solid var(--gold);
+    outline-offset: 2px;
+  }
+
+  /* Toggle switch ("Under the hood") */
+  .switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    font-size: .9rem;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    padding: 6px 4px;
+  }
+  .switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .track {
+    width: 40px; height: 22px;
+    background: #d9cfbe;
+    border-radius: 999px;
+    position: relative;
+    transition: background .2s;
+    flex: none;
+  }
+  .track::after {
+    content: "";
+    position: absolute; top: 2px; left: 2px;
+    width: 18px; height: 18px;
+    background: #fff; border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,.25);
+    transition: transform .2s;
+  }
+  .switch input:checked + .track { background: var(--gold); }
+  .switch input:checked + .track::after { transform: translateX(18px); }
+
+  /* ---------- Status strip ---------- */
+  .statusbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 20px;
+    margin: 18px 0 26px;
+    padding: 12px 18px;
+    background: #fff;
+    border: 1.5px solid var(--line);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+  }
+  .counter {
+    font-size: .95rem;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .counter b { color: var(--red); font-variant-numeric: tabular-nums; }
+  .counter .flags { color: var(--amber); }
+  .progress-rail {
+    flex: 1 1 200px;
+    height: 7px;
+    min-width: 140px;
+    background: var(--line);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--red), var(--gold));
+    border-radius: 999px;
+    transition: width .5s ease;
+  }
+  .legend {
+    display: flex; gap: 14px; flex-wrap: wrap;
+    font-size: .82rem; color: var(--muted);
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .chip { width: 11px; height: 11px; border-radius: 3px; flex: none; }
+
+  /* ---------- Pipeline ---------- */
+  .pipeline {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 14px;
+    align-items: stretch;
+  }
+  .step { position: relative; }
+
+  /* Connector between cards (horizontal layout) */
+  .step:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    top: 38px;
+    right: -14px;
+    width: 14px;
+    height: 0;
+    border-top: 3px dotted var(--line);
+    z-index: 0;
+  }
+  .step.lit:not(:last-child)::after { border-top-color: var(--gold); }
+
+  .card {
+    position: relative;
+    height: 100%;
+    background: var(--card);
+    border: 1.5px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px 14px 14px;
+    box-shadow: var(--shadow);
+    opacity: .45;
+    transform: translateY(10px);
+    transition: opacity .55s ease, transform .55s ease, box-shadow .4s, border-color .4s;
+    display: flex;
+    flex-direction: column;
+  }
+  .step.lit .card {
+    opacity: 1;
+    transform: translateY(0);
+    border-color: #efe4d0;
+  }
+  .step.active .card {
+    border-color: var(--red);
+    box-shadow: 0 10px 28px rgba(200,16,46,.18);
+  }
+
+  .badge {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: var(--red);
+    color: #fff;
+    font-weight: 800;
+    font-size: 1rem;
+    display: grid; place-items: center;
+    box-shadow: 0 3px 8px rgba(200,16,46,.35);
+    margin-bottom: 10px;
+    position: relative;
+    flex: none;
+  }
+  .step.active .badge { animation: pop .5s ease; }
+  @keyframes pop { 0%{transform:scale(.7)} 60%{transform:scale(1.12)} 100%{transform:scale(1)} }
+
+  .card h3 {
+    margin: 0 0 9px;
+    font-size: 1.02rem;
+    letter-spacing: -.01em;
+    line-height: 1.25;
+  }
+
+  .lines { margin-top: auto; }
+  .line {
+    font-size: .82rem;
+    line-height: 1.4;
+    margin: 7px 0;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity .45s ease, transform .45s ease;
+  }
+  .step.lit .line { opacity: 1; transform: none; }
+  .line .lab {
+    display: inline-block;
+    font-weight: 800;
+    font-size: .66rem;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    padding: 1px 6px;
+    border-radius: 5px;
+    margin-right: 5px;
+    vertical-align: 1px;
+  }
+  .line.ans .lab { background: rgba(46,139,87,.14); color: var(--green); }
+  .line.blind .lab { background: rgba(200,16,46,.10); color: var(--red); }
+  .line.blind { color: var(--muted); }
+
+  /* Star (hero) card — step 5 */
+  .step.star .card {
+    border-color: var(--gold);
+    background:
+      radial-gradient(120% 90% at 50% -10%, rgba(244,166,35,.16), rgba(255,255,255,0) 60%),
+      var(--card);
+  }
+  .step.star.lit .card { box-shadow: var(--shadow-hero); }
+  .step.star .badge {
+    background: linear-gradient(135deg, var(--gold), #e08b0c);
+    box-shadow: 0 4px 12px rgba(244,166,35,.5);
+  }
+  .star-tag {
+    position: absolute;
+    top: -11px; right: 10px;
+    background: linear-gradient(135deg, var(--gold), #e08b0c);
+    color: #4a2d00;
+    font-size: .64rem;
+    font-weight: 800;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    padding: 4px 9px;
+    border-radius: 999px;
+    box-shadow: 0 3px 9px rgba(244,166,35,.45);
+    display: inline-flex; align-items: center; gap: 4px;
+    z-index: 2;
+  }
+  .star-tag svg { width: 11px; height: 11px; }
+  .star-sub {
+    font-size: .74rem;
+    color: var(--muted);
+    margin: -3px 0 6px;
+    font-style: italic;
+  }
+
+  /* Per-card flag pill (when a check raises a flag in the demo) */
+  .flagpill {
+    align-self: flex-start;
+    margin-top: 10px;
+    font-size: .68rem;
+    font-weight: 700;
+    color: var(--amber);
+    background: rgba(232,146,12,.12);
+    border: 1px solid rgba(232,146,12,.35);
+    border-radius: 999px;
+    padding: 2px 9px;
+    opacity: 0;
+    transform: scale(.9);
+    transition: opacity .4s, transform .4s;
+  }
+  .step.flagged .flagpill { opacity: 1; transform: none; }
+  .passpill {
+    align-self: flex-start;
+    margin-top: 10px;
+    font-size: .68rem;
+    font-weight: 700;
+    color: var(--green);
+    background: rgba(46,139,87,.12);
+    border: 1px solid rgba(46,139,87,.3);
+    border-radius: 999px;
+    padding: 2px 9px;
+    opacity: 0;
+    transition: opacity .4s;
+  }
+  .step.lit:not(.flagged) .passpill { opacity: 1; }
+
+  /* Under-the-hood tags */
+  .hood {
+    margin-top: 11px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--line);
+    display: none;
+  }
+  body.hood-on .hood { display: block; }
+  .hood .tech {
+    font-family: var(--mono);
+    font-size: .68rem;
+    color: var(--ink);
+    background: #f6efe2;
+    border-radius: 6px;
+    padding: 5px 7px;
+    line-height: 1.35;
+    word-break: break-word;
+  }
+  .hood .cost {
+    margin-top: 6px;
+    font-size: .68rem;
+    font-weight: 700;
+  }
+  .cost.free { color: var(--green); }
+  .cost.paid { color: var(--red); }
+
+  /* ---------- Verdict panel ---------- */
+  .verdict {
+    margin-top: 30px;
+    background: #fff;
+    border: 1.5px solid var(--line);
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+    padding: 26px 24px;
+    display: grid;
+    grid-template-columns: minmax(190px, 240px) 1fr;
+    gap: 28px;
+    align-items: center;
+    opacity: .5;
+    transition: opacity .6s ease, box-shadow .6s ease;
+  }
+  .verdict.lit { opacity: 1; box-shadow: 0 16px 44px rgba(45,30,20,.14); }
+
+  /* Gauge */
+  .gauge-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .gauge { position: relative; width: 200px; max-width: 56vw; }
+  .gauge svg { width: 100%; height: auto; display: block; transform: rotate(-90deg); }
+  .gauge .track-arc { fill: none; stroke: var(--line); stroke-width: 16; }
+  .gauge .val-arc {
+    fill: none;
+    stroke: var(--green);
+    stroke-width: 16;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1.6s cubic-bezier(.22,.61,.36,1), stroke .6s;
+  }
+  .gauge .readout {
+    position: absolute;
+    inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center;
+  }
+  .gauge .score {
+    font-size: 2.9rem;
+    font-weight: 800;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.02em;
+  }
+  .gauge .scoremax { font-size: .85rem; color: var(--muted); font-weight: 600; }
+  .band {
+    font-weight: 800;
+    font-size: 1.05rem;
+    letter-spacing: .02em;
+    padding: 6px 18px;
+    border-radius: 999px;
+    color: #fff;
+    background: var(--green);
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity .5s, transform .5s, background .4s;
+  }
+  .verdict.lit .band { opacity: 1; transform: none; }
+
+  .verdict h2 {
+    margin: 0 0 4px;
+    font-size: 1.35rem;
+    letter-spacing: -.01em;
+  }
+  .verdict .flow {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    margin: 14px 0 6px;
+    font-size: .9rem;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .verdict .flow .pill {
+    background: var(--cream);
+    border: 1.5px solid var(--line);
+    border-radius: 999px;
+    padding: 6px 13px;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+  .verdict .flow .pill.dest { border-color: var(--red); color: var(--red); }
+  .verdict .flow .arrow { color: var(--gold); font-weight: 800; }
+
+  .bands-key { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  .bands-key .b {
+    font-size: .78rem; font-weight: 700;
+    padding: 4px 11px; border-radius: 8px;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .b.clear { background: rgba(46,139,87,.12); color: var(--green); }
+  .b.doubt { background: rgba(232,146,12,.14); color: var(--amber); }
+  .b.susp  { background: rgba(200,16,46,.11); color: var(--rose); }
+  .b .rng { font-weight: 600; opacity: .8; }
+
+  .token-note {
+    display: none;
+    margin-top: 16px;
+    padding: 13px 15px;
+    background: #f6efe2;
+    border: 1px solid #ecdfc6;
+    border-left: 4px solid var(--gold);
+    border-radius: 10px;
+    font-size: .82rem;
+    color: #5a4d3a;
+    line-height: 1.5;
+  }
+  body.hood-on .token-note { display: block; }
+  .token-note b { color: var(--red); }
+  .token-note .mono { font-family: var(--mono); font-size: .78rem; }
+
+  /* ---------- Footer ---------- */
+  footer.honest {
+    margin-top: 30px;
+    padding: 18px 20px;
+    background: linear-gradient(135deg, rgba(200,16,46,.06), rgba(244,166,35,.06));
+    border: 1.5px solid var(--line);
+    border-radius: 14px;
+    text-align: center;
+    font-size: .95rem;
+    color: #5a4d3a;
+    line-height: 1.55;
+  }
+  footer.honest strong { color: var(--red); }
+  .pagefoot {
+    margin-top: 18px;
+    text-align: center;
+    font-size: .78rem;
+    color: var(--muted);
+  }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 960px) {
+    .pipeline { grid-template-columns: repeat(2, 1fr); }
+    .step:not(:last-child)::after { display: none; }
+  }
+  @media (max-width: 720px) {
+    .verdict { grid-template-columns: 1fr; text-align: center; }
+    .verdict .flow, .bands-key { justify-content: center; }
+    .gauge-wrap { order: -1; }
+  }
+  @media (max-width: 560px) {
+    .pipeline { grid-template-columns: 1fr; }
+    /* Vertical connectors when cards stack */
+    .step:not(:last-child)::after {
+      display: block;
+      top: auto; right: auto;
+      bottom: -14px; left: 33px;
+      width: 0; height: 14px;
+      border-top: none;
+      border-left: 3px dotted var(--line);
+    }
+    .step.lit:not(:last-child)::after { border-left-color: var(--gold); border-top-color: transparent; }
+    .wrap { padding: 22px 14px 48px; }
+  }
+
+  /* ---------- Reduced motion ---------- */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      transition-duration: .001ms !important;
+      animation-duration: .001ms !important;
+      animation-iteration-count: 1 !important;
+    }
+  }
+
+  .sr-only {
+    position: absolute; width: 1px; height: 1px;
+    padding: 0; margin: -1px; overflow: hidden;
+    clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ===== Masthead ===== -->
+  <header class="masthead">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="10.5" cy="10.5" r="6.5"></circle>
+          <path d="M15.5 15.5 L21 21"></path>
+          <path d="M8 10.5 l2 2 l3.5 -4" stroke="#F4A623"></path>
+        </svg>
+      </div>
+      <div>
+        <h1>ProofLens</h1>
+        <p class="sub">How a “proof-of-meeting” photo is scored — a guided pipeline</p>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="ctl" id="btnPlay" aria-pressed="false" title="Pause / Resume">
+        <span class="dot-ic" id="playDot" aria-hidden="true"></span>
+        <span id="playLabel">Pause</span>
+      </button>
+      <button class="ctl" id="btnReplay" title="Replay from the start">
+        ↻ Replay
+      </button>
+      <label class="switch" title="Reveal the tech &amp; cost behind each step">
+        <input type="checkbox" id="hoodToggle">
+        <span class="track" aria-hidden="true"></span>
+        <span>Under the hood</span>
+      </label>
+    </div>
+  </header>
+
+  <!-- ===== Status strip ===== -->
+  <div class="statusbar">
+    <div class="counter" aria-live="polite">
+      Checks run: <b><span id="cChecks">0</span> / 6</b>
+      &nbsp;·&nbsp; flags raised: <span class="flags"><span id="cFlags">0</span></span>
+    </div>
+    <div class="progress-rail" aria-hidden="true"><div class="progress-fill" id="progFill"></div></div>
+    <div class="legend" aria-hidden="true">
+      <span><i class="chip" style="background:var(--green)"></i>Clear</span>
+      <span><i class="chip" style="background:var(--amber)"></i>Doubtful</span>
+      <span><i class="chip" style="background:var(--rose)"></i>Suspect</span>
+    </div>
+  </div>
+
+  <!-- ===== Pipeline ===== -->
+  <section class="pipeline" id="pipeline" aria-label="ProofLens checks, in order">
+
+    <!-- 1 -->
+    <div class="step" data-step="1">
+      <div class="card">
+        <div class="badge">1</div>
+        <h3>Shot live, now?</h3>
+        <div class="lines">
+          <p class="line ans"><span class="lab">Answers</span>Was this taken live on the camera — not pulled from the gallery?</p>
+          <p class="line blind"><span class="lab">Blind to</span>A live photo pointed at the wrong thing, or at another screen.</p>
+        </div>
+        <span class="passpill">✓ passed</span>
+        <span class="flagpill">⚑ flag</span>
+        <div class="hood">
+          <div class="tech">LeadSquared · live-camera only</div>
+          <div class="cost free">● free</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2 -->
+    <div class="step" data-step="2">
+      <div class="card">
+        <div class="badge">2</div>
+        <h3>Sharp enough?</h3>
+        <div class="lines">
+          <p class="line ans"><span class="lab">Answers</span>Is the image clear enough to actually read?</p>
+          <p class="line blind"><span class="lab">Blind to</span>A perfectly sharp photo of completely the wrong scene.</p>
+        </div>
+        <span class="passpill">✓ passed</span>
+        <span class="flagpill">⚑ flag</span>
+        <div class="hood">
+          <div class="tech">OpenCV · Laplacian variance</div>
+          <div class="cost free">● free</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3 -->
+    <div class="step" data-step="3">
+      <div class="card">
+        <div class="badge">3</div>
+        <h3>Anyone there?</h3>
+        <div class="lines">
+          <p class="line ans"><span class="lab">Answers</span>Is there a human in frame at all?</p>
+          <p class="line blind"><span class="lab">Blind to</span>Who they are, or whether a real meeting is happening. Detection, not recognition — no identity stored.</p>
+        </div>
+        <span class="passpill">✓ passed</span>
+        <span class="flagpill">⚑ flag</span>
+        <div class="hood">
+          <div class="tech">OpenCV · person detection</div>
+          <div class="cost free">● free</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4 -->
+    <div class="step" data-step="4">
+      <div class="card">
+        <div class="badge">4</div>
+        <h3>Seen before?</h3>
+        <div class="lines">
+          <p class="line ans"><span class="lab">Answers</span>Have we received this exact image before?</p>
+          <p class="line blind"><span class="lab">Blind to</span>A brand-new photo of a road — unique, but irrelevant.</p>
+        </div>
+        <span class="passpill">✓ passed</span>
+        <span class="flagpill">⚑ flag</span>
+        <div class="hood">
+          <div class="tech">imagehash · dHash</div>
+          <div class="cost free">● free</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5 — STAR -->
+    <div class="step star" data-step="5">
+      <div class="card">
+        <span class="star-tag">
+          <svg viewBox="0 0 24 24" fill="#4a2d00"><path d="M12 2l2.9 6.1 6.6.9-4.8 4.6 1.2 6.6L12 17.8 6.1 20.2l1.2-6.6L2.5 9l6.6-.9z"/></svg>
+          The star
+        </span>
+        <div class="badge">5</div>
+        <h3>The right thing?</h3>
+        <p class="star-sub">The one judgment that actually looks at the scene.</p>
+        <div class="lines">
+          <p class="line ans"><span class="lab">Answers</span>Is this a real meeting scene — and not a photo of a screen, a shopfront, a meme or a street?</p>
+          <p class="line blind"><span class="lab">Blind to</span>Two real people staged who aren’t actually meeting.</p>
+        </div>
+        <span class="passpill">✓ passed</span>
+        <span class="flagpill">⚑ flag</span>
+        <div class="hood">
+          <div class="tech">Vision model (Haiku) + OpenCV moiré / glare<br>Two jobs: recapture physics (moiré/glare/bezel) runs <b>free</b>; the “right scene?” judgment is the only step that spends a token.</div>
+          <div class="cost paid">◆ ~$0.002 / ₹0.2 per photo · only on survivors</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6 -->
+    <div class="step" data-step="6">
+      <div class="card">
+        <div class="badge">6</div>
+        <h3>Backstop <span style="font-weight:500;color:var(--muted);font-size:.8rem">(optional)</span></h3>
+        <div class="lines">
+          <p class="line ans"><span class="lab">Answers</span>Where / when / how was it captured? (EXIF)</p>
+          <p class="line blind"><span class="lab">Blind to</span>A clean live-camera shot of the wrong thing. Mostly redundant under the camera lock.</p>
+        </div>
+        <span class="passpill">✓ passed</span>
+        <span class="flagpill">⚑ flag</span>
+        <div class="hood">
+          <div class="tech">EXIF · only if camera-lock isn’t airtight</div>
+          <div class="cost free">● free</div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ===== Verdict ===== -->
+  <section class="verdict" id="verdict" aria-label="Final verdict">
+    <div class="gauge-wrap">
+      <div class="gauge">
+        <svg viewBox="0 0 120 120" role="img" aria-label="Score gauge">
+          <circle class="track-arc" cx="60" cy="60" r="52"></circle>
+          <circle class="val-arc" id="valArc" cx="60" cy="60" r="52"></circle>
+        </svg>
+        <div class="readout">
+          <div class="score" id="scoreNum">0</div>
+          <div class="scoremax">/ 100</div>
+        </div>
+      </div>
+      <div class="band" id="bandPill">Clear</div>
+    </div>
+
+    <div>
+      <h2>The verdict</h2>
+      <div class="flow" aria-label="How the verdict is produced">
+        <span class="pill">Fuse all signals</span>
+        <span class="arrow">→</span>
+        <span class="pill">Score 0–100</span>
+        <span class="arrow">→</span>
+        <span class="pill">Band it</span>
+        <span class="arrow">→</span>
+        <span class="pill dest">Written back to LeadSquared</span>
+      </div>
+      <p style="margin:6px 0 0;color:var(--muted);font-size:.9rem">
+        Doubtful &amp; Suspect are sent to a <strong style="color:var(--red)">review log</strong> — nothing is ever blocked.
+      </p>
+
+      <div class="bands-key">
+        <span class="b clear">Clear <span class="rng">67–100</span></span>
+        <span class="b doubt">Doubtful <span class="rng">34–66</span></span>
+        <span class="b susp">Suspect <span class="rng">0–33</span></span>
+      </div>
+
+      <div class="token-note">
+        <b>What costs a token?</b> Steps&nbsp;1–4 and&nbsp;6 are deterministic and run <b>free</b> on our server.
+        Only step&nbsp;5’s “right scene?” judgment spends a token — and only on photos that survive the free gates:
+        about <span class="mono">1,500 input + 150 output tokens</span>, ~$0.002 (~₹0.2) per photo,
+        ~$20 per 10,000 — before prompt-caching and the Batch API bring it lower.
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Honest footer ===== -->
+  <footer class="honest">
+    <strong>ProofLens scores and flags — it never blocks an upload.</strong>
+    It raises the cost of faking and catches the lazy majority;
+    it cannot prove a meeting happened.
+  </footer>
+
+  <p class="pagefoot">ABSLI · ProofLens pipeline explainer — illustrative demo, no real image processing.</p>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var steps   = Array.prototype.slice.call(document.querySelectorAll(".step"));
+  var verdict = document.getElementById("verdict");
+  var cChecks = document.getElementById("cChecks");
+  var cFlags  = document.getElementById("cFlags");
+  var progFill= document.getElementById("progFill");
+  var scoreNum= document.getElementById("scoreNum");
+  var valArc  = document.getElementById("valArc");
+  var bandPill= document.getElementById("bandPill");
+
+  var btnPlay   = document.getElementById("btnPlay");
+  var playLabel = document.getElementById("playLabel");
+  var playDot   = document.getElementById("playDot");
+  var btnReplay = document.getElementById("btnReplay");
+  var hoodToggle= document.getElementById("hoodToggle");
+
+  // Demo script: which steps raise a flag. A "Clear" run flags none.
+  // (The star check carries the most weight; here everything passes → ~82, Clear.)
+  var FLAGGED = {};              // e.g. {3:true} would flag step 3
+  var TARGET_SCORE = 82;
+
+  // Gauge geometry
+  var R = 52, C = 2 * Math.PI * R;
+  valArc.style.strokeDasharray = C;
+  valArc.style.strokeDashoffset = C;        // empty
+
+  var timers = [];
+  var playing = false;
+  var checksDone = 0;
+  var flagsRaised = 0;
+
+  function clearTimers() {
+    timers.forEach(clearTimeout);
+    timers = [];
+  }
+  function after(ms, fn) {
+    var id = setTimeout(fn, ms);
+    timers.push(id);
+    return id;
+  }
+
+  function setBand(score) {
+    var label, color;
+    if (score >= 67)      { label = "Clear";    color = "var(--green)"; }
+    else if (score >= 34) { label = "Doubtful"; color = "var(--amber)"; }
+    else                  { label = "Suspect";  color = "var(--rose)";  }
+    bandPill.textContent = label;
+    bandPill.style.background = color;
+    valArc.style.stroke = color;
+  }
+
+  function reset() {
+    clearTimers();
+    checksDone = 0;
+    flagsRaised = 0;
+    cChecks.textContent = "0";
+    cFlags.textContent = "0";
+    progFill.style.width = "0%";
+    scoreNum.textContent = "0";
+    valArc.style.strokeDashoffset = C;
+    verdict.classList.remove("lit");
+    steps.forEach(function (s) {
+      s.classList.remove("lit", "active", "flagged");
+    });
+  }
+
+  function lightStep(idx, onDone) {
+    var s = steps[idx];
+    var num = idx + 1;
+    s.classList.add("lit", "active");
+    if (FLAGGED[num]) {
+      s.classList.add("flagged");
+      flagsRaised++;
+      cFlags.textContent = String(flagsRaised);
+    }
+    checksDone++;
+    cChecks.textContent = String(checksDone);
+    progFill.style.width = (checksDone / steps.length * 100) + "%";
+
+    // de-activate (keep lit) shortly after, so only one card "pulses" at a time
+    after(reduceMotion ? 1 : 650, function () { s.classList.remove("active"); });
+    after(reduceMotion ? 1 : 850, onDone);
+  }
+
+  function revealVerdict() {
+    verdict.classList.add("lit");
+    setBand(TARGET_SCORE);
+
+    // Fill arc
+    var offset = C * (1 - TARGET_SCORE / 100);
+    // force reflow so transition runs even right after reset
+    void valArc.getBoundingClientRect();
+    valArc.style.strokeDashoffset = offset;
+
+    // Count the number up
+    if (reduceMotion) {
+      scoreNum.textContent = String(TARGET_SCORE);
+      playing = false;
+      updatePlayBtn();
+      return;
+    }
+    var dur = 1500, start = null;
+    function tick(ts) {
+      if (start === null) start = ts;
+      var t = Math.min(1, (ts - start) / dur);
+      var eased = 1 - Math.pow(1 - t, 3);
+      scoreNum.textContent = String(Math.round(eased * TARGET_SCORE));
+      if (t < 1) {
+        rafId = requestAnimationFrame(tick);
+      } else {
+        scoreNum.textContent = String(TARGET_SCORE);
+        playing = false;
+        updatePlayBtn();
+      }
+    }
+    rafId = requestAnimationFrame(tick);
+  }
+
+  var rafId = null;
+
+  // ---- Pause / Resume (lightweight: pause stops scheduling further reveals) ----
+  // We implement pause by tracking remaining steps and re-scheduling from current point.
+  var paused = false;
+
+  function updatePlayBtn() {
+    if (paused) {
+      btnPlay.setAttribute("aria-pressed", "true");
+      playLabel.textContent = "Resume";
+      playDot.style.background = "currentColor";
+    } else {
+      btnPlay.setAttribute("aria-pressed", "false");
+      playLabel.textContent = playing ? "Pause" : "Replay";
+    }
+  }
+
+  // Simpler robust model: track an index and a stepper using a single recurring timer.
+  var seqIndex = 0;
+  var verdictShown = false;
+
+  function stepNext() {
+    if (paused) return;
+    if (seqIndex < steps.length) {
+      lightStep(seqIndex, null);
+      seqIndex++;
+      after(reduceMotion ? 1 : 1050, stepNext);
+    } else if (!verdictShown) {
+      verdictShown = true;
+      after(reduceMotion ? 1 : 350, function () {
+        revealVerdict();
+      });
+    }
+  }
+
+  function startFresh() {
+    if (rafId) cancelAnimationFrame(rafId);
+    reset();
+    seqIndex = 0;
+    verdictShown = false;
+    paused = false;
+    playing = true;
+    updatePlayBtn();
+    after(reduceMotion ? 1 : 250, stepNext);
+  }
+
+  function togglePause() {
+    // If finished, the button acts as Replay.
+    if (verdictShown && !playing && seqIndex >= steps.length) {
+      startFresh();
+      return;
+    }
+    paused = !paused;
+    if (!paused) {
+      // resume
+      playing = true;
+      stepNext();
+    } else {
+      playing = false;
+      clearTimers();
+      if (rafId) cancelAnimationFrame(rafId);
+    }
+    updatePlayBtn();
+  }
+
+  btnPlay.addEventListener("click", togglePause);
+  btnReplay.addEventListener("click", startFresh);
+
+  hoodToggle.addEventListener("change", function () {
+    document.body.classList.toggle("hood-on", hoodToggle.checked);
+  });
+
+  // Kick off on load
+  startFresh();
+})();
+</script>
+</body>
+</html>
