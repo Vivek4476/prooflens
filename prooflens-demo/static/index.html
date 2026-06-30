@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProofLens — score a photo</title>
+<style>
+  /* ProofLens demo UI — single static file, vanilla JS, ABSLI palette. */
+  :root {
+    --red:#C8102E; --red-dk:#9c0c24; --gold:#F4A623; --cream:#FBF7EF;
+    --card:#FFFFFF; --ink:#2a2320; --muted:#6f6760; --line:#e7ddcb;
+    --green:#2e8b57; --amber:#E8920C; --rose:#C8102E;
+    --shadow:0 6px 22px rgba(45,30,20,.10);
+    --radius:16px;
+    --mono:ui-monospace,"SF Mono","Cascadia Code",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; }
+  body { font-family:var(--sans); color:var(--ink); background:var(--cream); line-height:1.5; -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:1080px; margin:0 auto; padding:28px 20px 56px; }
+
+  /* Header */
+  header.masthead { display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:18px; }
+  .brand { display:flex; align-items:center; gap:13px; }
+  .logo { width:44px; height:44px; border-radius:12px; background:linear-gradient(135deg,var(--red),var(--red-dk)); display:grid; place-items:center; box-shadow:var(--shadow); flex:none; }
+  .logo svg { width:26px; height:26px; }
+  .brand h1 { margin:0; font-size:clamp(1.35rem,2.6vw,1.9rem); letter-spacing:-.02em; }
+  .brand .sub { margin:2px 0 0; color:var(--muted); font-size:.92rem; }
+  .backend-tag { font-size:.8rem; font-weight:700; padding:6px 13px; border-radius:999px; border:1.5px solid var(--line); background:#fff; color:var(--muted); white-space:nowrap; }
+  .backend-tag b { color:var(--red); }
+  .backend-tag.stub { border-color:var(--amber); color:#7a5400; background:rgba(244,166,35,.12); }
+
+  /* Layout */
+  .grid { display:grid; grid-template-columns:minmax(280px,400px) 1fr; gap:22px; align-items:start; }
+  @media (max-width:820px) { .grid { grid-template-columns:1fr; } }
+
+  .panel { background:#fff; border:1.5px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:20px; }
+  .panel h2 { margin:0 0 14px; font-size:1.05rem; letter-spacing:-.01em; }
+
+  /* Dropzone */
+  .drop { border:2px dashed var(--line); border-radius:14px; padding:26px 18px; text-align:center; cursor:pointer; transition:border-color .15s, background .15s; color:var(--muted); }
+  .drop:hover, .drop.over { border-color:var(--red); background:rgba(200,16,46,.03); }
+  .drop svg { width:38px; height:38px; stroke:var(--red); margin-bottom:8px; }
+  .drop .big { font-weight:700; color:var(--ink); font-size:.98rem; }
+  .drop .small { font-size:.82rem; margin-top:4px; }
+  #fileInput { display:none; }
+
+  .preview-wrap { margin-top:16px; display:none; }
+  .preview-wrap.show { display:block; }
+  .preview-wrap img { width:100%; border-radius:12px; border:1.5px solid var(--line); display:block; }
+  .filemeta { font-size:.8rem; color:var(--muted); margin-top:8px; word-break:break-all; }
+
+  .runrow { display:flex; gap:10px; margin-top:16px; }
+  button.run { flex:1; font:inherit; font-weight:700; font-size:.98rem; color:#fff; background:var(--red); border:none; border-radius:999px; padding:13px 18px; cursor:pointer; transition:background .15s, transform .05s; display:inline-flex; align-items:center; justify-content:center; gap:8px; }
+  button.run:hover { background:var(--red-dk); }
+  button.run:active { transform:translateY(1px); }
+  button.run:disabled { background:#cbb; cursor:not-allowed; opacity:.7; }
+  button.ghost { font:inherit; font-weight:600; font-size:.9rem; color:var(--ink); background:#fff; border:1.5px solid var(--line); border-radius:999px; padding:13px 18px; cursor:pointer; }
+  button.ghost:hover { border-color:var(--red); }
+
+  .spinner { width:16px; height:16px; border:2.5px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* Results */
+  #results { display:none; }
+  #results.show { display:block; }
+  .placeholder { color:var(--muted); font-size:.92rem; text-align:center; padding:40px 10px; }
+
+  .verdict-head { display:flex; align-items:center; gap:22px; flex-wrap:wrap; }
+  .gauge { position:relative; width:150px; flex:none; }
+  .gauge svg { width:100%; height:auto; display:block; transform:rotate(-90deg); }
+  .gauge .track-arc { fill:none; stroke:var(--line); stroke-width:14; }
+  .gauge .val-arc { fill:none; stroke:var(--green); stroke-width:14; stroke-linecap:round; transition:stroke-dashoffset 1s cubic-bezier(.22,.61,.36,1), stroke .5s; }
+  .gauge .readout { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .gauge .score { font-size:2.3rem; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; }
+  .gauge .scoremax { font-size:.78rem; color:var(--muted); font-weight:600; }
+  .vmeta { flex:1; min-width:180px; }
+  .band { display:inline-block; font-weight:800; font-size:1.05rem; padding:6px 18px; border-radius:999px; color:#fff; background:var(--green); }
+  .band.Doubtful { background:var(--amber); }
+  .band.Suspect { background:var(--rose); }
+  .vmeta .summary { margin:10px 0 0; font-size:.9rem; color:var(--muted); }
+  .gates { margin-top:10px; display:flex; flex-wrap:wrap; gap:6px; }
+  .gate { font-size:.7rem; font-weight:700; color:var(--rose); background:rgba(200,16,46,.1); border:1px solid rgba(200,16,46,.3); border-radius:999px; padding:2px 9px; }
+
+  .checks { margin-top:22px; display:flex; flex-direction:column; gap:10px; }
+  .check { border:1.5px solid var(--line); border-radius:12px; padding:13px 14px; display:grid; grid-template-columns:30px 1fr auto; gap:12px; align-items:start; }
+  .check .ic { width:28px; height:28px; border-radius:8px; display:grid; place-items:center; flex:none; }
+  .check .ic svg { width:17px; height:17px; }
+  .ic.pass { background:rgba(46,139,87,.12); }
+  .ic.pass svg { stroke:var(--green); }
+  .ic.fail { background:rgba(200,16,46,.1); }
+  .ic.fail svg { stroke:var(--rose); }
+  .ic.na { background:rgba(111,103,96,.12); }
+  .ic.na svg { stroke:var(--muted); }
+  .check .body .name { font-weight:700; font-size:.95rem; display:flex; align-items:center; gap:8px; }
+  .check .body .reason { font-size:.86rem; color:var(--ink); margin-top:2px; }
+  .check .body .detail { font-family:var(--mono); font-size:.72rem; color:var(--muted); margin-top:5px; word-break:break-word; }
+  .check .sc { font-weight:800; font-size:1rem; font-variant-numeric:tabular-nums; color:var(--ink); text-align:right; }
+  .tag-real { font-size:.62rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase; padding:1px 6px; border-radius:5px; }
+  .tag-real.real { background:rgba(46,139,87,.14); color:var(--green); }
+  .tag-real.stub { background:rgba(244,166,35,.18); color:#7a5400; }
+  .tag-real.na { background:rgba(111,103,96,.14); color:var(--muted); }
+  .star { font-size:.62rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase; padding:1px 6px; border-radius:5px; background:linear-gradient(135deg,var(--gold),#e08b0c); color:#4a2d00; }
+
+  details.vision { margin-top:18px; border:1.5px solid var(--line); border-radius:12px; padding:0 14px; }
+  details.vision summary { cursor:pointer; font-weight:700; font-size:.9rem; padding:13px 0; }
+  details.vision pre { font-family:var(--mono); font-size:.74rem; background:#f6efe2; border-radius:8px; padding:12px; overflow:auto; margin:0 0 14px; }
+
+  .err { display:none; margin-top:14px; padding:12px 14px; background:rgba(200,16,46,.07); border:1px solid rgba(200,16,46,.3); border-left:4px solid var(--red); border-radius:10px; color:var(--red-dk); font-size:.88rem; }
+  .err.show { display:block; }
+
+  footer.honest { margin-top:26px; padding:16px 20px; background:linear-gradient(135deg,rgba(200,16,46,.06),rgba(244,166,35,.06)); border:1.5px solid var(--line); border-radius:14px; text-align:center; font-size:.9rem; color:#5a4d3a; line-height:1.55; }
+  footer.honest strong { color:var(--red); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="10.5" cy="10.5" r="6.5"></circle>
+          <path d="M15.5 15.5 L21 21"></path>
+          <path d="M8 10.5 l2 2 l3.5 -4" stroke="#F4A623"></path>
+        </svg>
+      </div>
+      <div>
+        <h1>ProofLens</h1>
+        <p class="sub">Upload a photo — get a 0–100 trust score, band, and per-check reasons.</p>
+      </div>
+    </div>
+    <div class="backend-tag" id="backendTag">vision: <b>…</b></div>
+  </header>
+
+  <div class="grid">
+    <!-- Left: upload -->
+    <div class="panel">
+      <h2>1 · Choose a photo</h2>
+      <div class="drop" id="drop" tabindex="0" role="button" aria-label="Upload an image">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <path d="M12 3v13"></path>
+          <path d="M7 8l5-5 5 5"></path>
+        </svg>
+        <div class="big">Drop an image here</div>
+        <div class="small">or click to browse · JPG / PNG / WebP</div>
+      </div>
+      <input type="file" id="fileInput" accept="image/*">
+
+      <div class="preview-wrap" id="previewWrap">
+        <img id="preview" alt="preview">
+        <div class="filemeta" id="filemeta"></div>
+      </div>
+
+      <div class="runrow">
+        <button class="run" id="runBtn" disabled>
+          <span id="runLabel">Run checks</span>
+        </button>
+        <button class="ghost" id="clearBtn" type="button">Clear</button>
+      </div>
+      <div class="err" id="err"></div>
+    </div>
+
+    <!-- Right: results -->
+    <div class="panel">
+      <h2>2 · Result</h2>
+      <div class="placeholder" id="placeholder">Run a photo to see its score and the per-check breakdown.</div>
+
+      <div id="results">
+        <div class="verdict-head">
+          <div class="gauge">
+            <svg viewBox="0 0 120 120" role="img" aria-label="Score gauge">
+              <circle class="track-arc" cx="60" cy="60" r="52"></circle>
+              <circle class="val-arc" id="valArc" cx="60" cy="60" r="52"></circle>
+            </svg>
+            <div class="readout">
+              <div class="score" id="scoreNum">0</div>
+              <div class="scoremax">/ 100</div>
+            </div>
+          </div>
+          <div class="vmeta">
+            <span class="band" id="bandPill">—</span>
+            <p class="summary" id="summary"></p>
+            <div class="gates" id="gates"></div>
+          </div>
+        </div>
+
+        <div class="checks" id="checks"></div>
+
+        <details class="vision">
+          <summary>Raw vision verdict (JSON)</summary>
+          <pre id="visionJson"></pre>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <footer class="honest">
+    <strong>ProofLens scores and flags — it never blocks an upload.</strong>
+    Deterministic checks (sharpness, uniqueness, person, EXIF) run for real on the server.
+    The content check is a real vision-model call — unless the backend is <b>stub</b>, which is labelled below each check.
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var fileInput = document.getElementById("fileInput");
+  var drop      = document.getElementById("drop");
+  var preview   = document.getElementById("preview");
+  var previewWrap = document.getElementById("previewWrap");
+  var filemeta  = document.getElementById("filemeta");
+  var runBtn    = document.getElementById("runBtn");
+  var runLabel  = document.getElementById("runLabel");
+  var clearBtn  = document.getElementById("clearBtn");
+  var errBox    = document.getElementById("err");
+  var placeholder = document.getElementById("placeholder");
+  var results   = document.getElementById("results");
+  var backendTag = document.getElementById("backendTag");
+
+  var valArc   = document.getElementById("valArc");
+  var scoreNum = document.getElementById("scoreNum");
+  var bandPill = document.getElementById("bandPill");
+  var summary  = document.getElementById("summary");
+  var gatesBox = document.getElementById("gates");
+  var checksBox= document.getElementById("checks");
+  var visionJson = document.getElementById("visionJson");
+
+  var R = 52, C = 2 * Math.PI * R;
+  valArc.style.strokeDasharray = C;
+  valArc.style.strokeDashoffset = C;
+
+  var currentFile = null;
+
+  // Friendly check names + which are deterministic vs the star.
+  var META = {
+    content_relevance: { label: "The right thing? (content)", star: true },
+    sharpness:         { label: "Sharp enough?" },
+    person_presence:   { label: "Anyone there?" },
+    uniqueness:        { label: "Seen before?" },
+    metadata:          { label: "Metadata backstop" }
+  };
+
+  function showErr(msg) { errBox.textContent = msg; errBox.classList.add("show"); }
+  function clearErr() { errBox.classList.remove("show"); errBox.textContent = ""; }
+
+  // Backend badge
+  fetch("/health").then(function (r) { return r.json(); }).then(function (h) {
+    backendTag.innerHTML = "vision: <b>" + h.vision_backend + "</b>";
+    if (h.vision_backend === "stub") backendTag.classList.add("stub");
+  }).catch(function () {});
+
+  function setFile(file) {
+    if (!file || !/^image\//.test(file.type)) { showErr("Please choose an image file."); return; }
+    clearErr();
+    currentFile = file;
+    var url = URL.createObjectURL(file);
+    preview.src = url;
+    previewWrap.classList.add("show");
+    filemeta.textContent = file.name + " · " + Math.round(file.size / 1024) + " KB";
+    runBtn.disabled = false;
+  }
+
+  drop.addEventListener("click", function () { fileInput.click(); });
+  drop.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInput.click(); } });
+  fileInput.addEventListener("change", function () { if (fileInput.files[0]) setFile(fileInput.files[0]); });
+
+  ["dragenter", "dragover"].forEach(function (ev) {
+    drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add("over"); });
+  });
+  ["dragleave", "drop"].forEach(function (ev) {
+    drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove("over"); });
+  });
+  drop.addEventListener("drop", function (e) {
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+  });
+
+  clearBtn.addEventListener("click", function () {
+    currentFile = null;
+    fileInput.value = "";
+    previewWrap.classList.remove("show");
+    runBtn.disabled = true;
+    results.classList.remove("show");
+    placeholder.style.display = "";
+    clearErr();
+  });
+
+  function iconCheck(cls) {
+    if (cls === "pass") return '<svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
+    if (cls === "fail") return '<svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+    return '<svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/></svg>';
+  }
+
+  function render(data) {
+    placeholder.style.display = "none";
+    results.classList.add("show");
+
+    // Band + colour
+    var band = data.band;
+    bandPill.textContent = band;
+    bandPill.className = "band " + band;
+    var color = band === "Clear" ? "var(--green)" : (band === "Doubtful" ? "var(--amber)" : "var(--rose)");
+    valArc.style.stroke = color;
+
+    // Gauge fill + count up
+    var target = data.score;
+    var offset = C * (1 - target / 100);
+    void valArc.getBoundingClientRect();
+    valArc.style.strokeDashoffset = offset;
+    var start = null, dur = 900;
+    function tick(ts) {
+      if (start === null) start = ts;
+      var t = Math.min(1, (ts - start) / dur);
+      var eased = 1 - Math.pow(1 - t, 3);
+      scoreNum.textContent = (eased * target).toFixed(0);
+      if (t < 1) requestAnimationFrame(tick); else scoreNum.textContent = target.toFixed(0);
+    }
+    requestAnimationFrame(tick);
+
+    var v = data.vision || {};
+    summary.textContent = v.reason || "";
+
+    // Gates
+    gatesBox.innerHTML = "";
+    (data.gates_fired || []).forEach(function (g) {
+      var el = document.createElement("span");
+      el.className = "gate";
+      el.textContent = "⚑ " + g.replace(/_/g, " ");
+      gatesBox.appendChild(el);
+    });
+
+    // Per-check rows
+    checksBox.innerHTML = "";
+    (data.checks || []).forEach(function (c) {
+      var meta = META[c.name] || { label: c.name };
+      var cls = !c.available ? "na" : (c.pass ? "pass" : "fail");
+      var realTag;
+      if (c.name === "content_relevance") {
+        realTag = data.vision_is_real
+          ? '<span class="tag-real real">real model</span>'
+          : '<span class="tag-real stub">stubbed</span>';
+      } else if (!c.available) {
+        realTag = '<span class="tag-real na">unavailable</span>';
+      } else {
+        realTag = '<span class="tag-real real">real</span>';
+      }
+      var starTag = meta.star ? '<span class="star">★ star</span>' : "";
+
+      var row = document.createElement("div");
+      row.className = "check";
+      row.innerHTML =
+        '<div class="ic ' + cls + '">' + iconCheck(cls) + '</div>' +
+        '<div class="body">' +
+          '<div class="name">' + meta.label + ' ' + starTag + ' ' + realTag + '</div>' +
+          '<div class="reason">' + (c.reason || "") + '</div>' +
+          (c.detail ? '<div class="detail">' + c.detail + '</div>' : '') +
+        '</div>' +
+        '<div class="sc">' + (c.available ? Math.round(c.score) : "–") + '</div>';
+      checksBox.appendChild(row);
+    });
+
+    visionJson.textContent = JSON.stringify(v, null, 2);
+  }
+
+  runBtn.addEventListener("click", function () {
+    if (!currentFile) return;
+    clearErr();
+    runBtn.disabled = true;
+    runLabel.textContent = "Scoring…";
+    var sp = document.createElement("span");
+    sp.className = "spinner";
+    runBtn.insertBefore(sp, runBtn.firstChild);
+
+    var fd = new FormData();
+    fd.append("image", currentFile, currentFile.name);
+
+    fetch("/score", { method: "POST", body: fd })
+      .then(function (r) {
+        if (!r.ok) return r.json().then(function (j) { throw new Error(j.detail || ("HTTP " + r.status)); });
+        return r.json();
+      })
+      .then(render)
+      .catch(function (e) { showErr("Scoring failed: " + e.message); })
+      .finally(function () {
+        runBtn.disabled = false;
+        runLabel.textContent = "Run checks";
+        if (sp.parentNode) sp.parentNode.removeChild(sp);
+      });
+  });
+})();
+</script>
+</body>
+</html>
