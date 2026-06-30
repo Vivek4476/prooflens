@@ -1,0 +1,16 @@
+# Secrets
+.env
+
+# SQLite store (hashes only — but still local state)
+*.db
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# OS
+.DS_Store

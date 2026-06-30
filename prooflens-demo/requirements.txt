@@ -1,0 +1,16 @@
+# --- Core (needed to run the app with the stub backend) ---
+fastapi>=0.110
+uvicorn[standard]>=0.27
+python-multipart>=0.0.9        # required by FastAPI for file uploads
+python-dotenv>=1.0            # optional .env loading
+
+# --- Deterministic checks ---
+Pillow>=10.0                  # EXIF + image decode/resize
+imagehash>=4.3               # dHash uniqueness
+numpy>=1.24
+opencv-python-headless>=4.8  # sharpness + person detection
+
+# --- Vision backends (install only the one(s) you use) ---
+anthropic>=0.40              # VISION_BACKEND=anthropic
+google-genai>=0.3            # VISION_BACKEND=gemini
+openai>=1.30                 # VISION_BACKEND=openai or =local
