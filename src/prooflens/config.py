@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     queue_backoff_max_seconds: int = Field(default=900, alias="QUEUE_BACKOFF_MAX_SECONDS")
     worker_poll_interval_seconds: float = Field(default=2.0, alias="WORKER_POLL_INTERVAL_SECONDS")
     worker_batch_size: int = Field(default=5, alias="WORKER_BATCH_SIZE")
+    # The worker exposes its own Prometheus endpoint (its counters live in its
+    # own process, separate from the API's). 0 disables it.
+    worker_metrics_port: int = Field(default=9100, alias="WORKER_METRICS_PORT")
 
     @property
     def secret_key_is_dev(self) -> bool:

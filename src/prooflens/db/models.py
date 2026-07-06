@@ -80,7 +80,11 @@ class Job(Base):
     event_id: Mapped[str] = mapped_column(String(200))
 
     status: Mapped[JobStatus] = mapped_column(
-        Enum(JobStatus, name="job_status"), default=JobStatus.QUEUED, index=True
+        # Persist the enum VALUES ("queued", ...) not the member names ("QUEUED"),
+        # matching the Postgres enum created by the migration.
+        Enum(JobStatus, name="job_status", values_callable=lambda e: [m.value for m in e]),
+        default=JobStatus.QUEUED,
+        index=True,
     )
     payload: Mapped[dict] = mapped_column(JSONB, default=dict)
 

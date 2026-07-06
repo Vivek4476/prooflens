@@ -80,6 +80,13 @@ def _default_lsq() -> LSQClient:
 def main() -> None:
     settings = get_settings()
     configure_logging(settings.log_level)
+    if settings.worker_metrics_port:
+        # The worker's counters (band mix, latency, vision failures) live in this
+        # process; expose them on their own port for Prometheus to scrape.
+        from prometheus_client import start_http_server
+
+        start_http_server(settings.worker_metrics_port)
+        get_logger().info("worker.metrics_server", port=settings.worker_metrics_port)
     run_forever(_postgres_repo_factory, _default_lsq(), settings)
 
 

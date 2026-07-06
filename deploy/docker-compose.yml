@@ -59,6 +59,8 @@ services:
     command: python -m prooflens.worker
     environment:
       <<: *app-env
+    ports:
+      - "9100:9100"   # worker's own Prometheus endpoint (band mix, latency, ...)
     depends_on:
       migrate:
         condition: service_completed_successfully

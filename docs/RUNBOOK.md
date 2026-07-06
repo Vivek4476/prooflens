@@ -47,7 +47,11 @@ carried end-to-end.
 
 ## Monitoring (the four signals)
 
-Scrape `/metrics`:
+Two scrape targets — each process exposes its own counters:
+- **api** — `:8000/metrics` (queue depth).
+- **worker** — `:9100/metrics` (band distribution, per-check latency, vision
+  failures, jobs processed). The worker's counters live in the worker process,
+  so Prometheus must scrape both.
 
 | Metric | What it tells you |
 |---|---|
