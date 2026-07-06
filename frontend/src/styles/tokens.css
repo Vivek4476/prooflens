@@ -1,0 +1,84 @@
+/* ==========================================================================
+   ProofLens design tokens — SINGLE SOURCE OF TRUTH.
+   Brand: Aditya Birla Capital — Life Insurance.
+   Rules (enforced by the design system):
+   - Brand crimson: masthead/sidebar header + primary buttons ONLY. Accent <=10%.
+   - Verdict green/amber/red: Clear/Doubtful/Suspect ONLY, always with the word.
+   - Gold rule: 2px underline under the masthead logo, nowhere else.
+   ========================================================================== */
+
+:root {
+  /* Brand (do not use as generic UI chrome) */
+  --brand-crimson: #c8102e;
+  --brand-crimson-hover: #a80d26;
+  --brand-gold: #f4a623;
+
+  /* Verdict semantics (always paired with the word) */
+  --verdict-clear: #1f9d57;
+  --verdict-doubtful: #e08a00;
+  --verdict-suspect: #c8102e;
+  --verdict-clear-bg: #e7f4ec;
+  --verdict-doubtful-bg: #fbefdb;
+  --verdict-suspect-bg: #fbe7ea;
+  --verdict-clear-fg: #14713e;
+  --verdict-doubtful-fg: #8a5300;
+  --verdict-suspect-fg: #9c0c23;
+
+  /* Neutral canvas — warm grays on near-white (light mode) */
+  --canvas: #fafaf8;
+  --surface: #ffffff;
+  --surface-2: #f4f3f0;
+  --surface-3: #ecebe6;
+  --border: #e6e4de;
+  --border-strong: #d4d1c9;
+  --text: #1a1a18;
+  --text-secondary: #56534d;
+  --text-muted: #8a867e;
+  --ring: #3a3a38;
+
+  /* Elevation (max 2 levels; subtle) */
+  --shadow-1: 0 1px 2px rgba(20, 20, 18, 0.05), 0 1px 3px rgba(20, 20, 18, 0.04);
+  --shadow-2: 0 4px 12px rgba(20, 20, 18, 0.08), 0 2px 4px rgba(20, 20, 18, 0.04);
+
+  /* Radius / spacing rhythm */
+  --radius: 10px;
+  --radius-sm: 7px;
+
+  --ok: #1f9d57;
+  --warn: #e08a00;
+  --danger: #c8102e;
+}
+
+.dark {
+  --brand-crimson: #e64157; /* lifted for contrast on dark, brand-scoped only */
+  --brand-crimson-hover: #f05467;
+  --brand-gold: #f4a623;
+
+  --verdict-clear: #35c47e;
+  --verdict-doubtful: #f0a83c;
+  --verdict-suspect: #f0596e;
+  --verdict-clear-bg: #16281f;
+  --verdict-doubtful-bg: #2b2113;
+  --verdict-suspect-bg: #2c1519;
+  --verdict-clear-fg: #58d493;
+  --verdict-doubtful-fg: #f4bd6a;
+  --verdict-suspect-fg: #f57e8e;
+
+  --canvas: #101012;
+  --surface: #17171a;
+  --surface-2: #1e1e22;
+  --surface-3: #26262b;
+  --border: #2a2a2f;
+  --border-strong: #3a3a41;
+  --text: #f4f3f0;
+  --text-secondary: #b3b1ab;
+  --text-muted: #7e7c77;
+  --ring: #c9c7c0;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 6px 20px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.4);
+
+  --ok: #35c47e;
+  --warn: #f0a83c;
+  --danger: #f0596e;
+}
