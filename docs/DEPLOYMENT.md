@@ -43,7 +43,11 @@ its URL). Secrets are **not** in the repo — you set them in each dashboard.
 2. **Set Root Directory to `frontend`** (important — the app lives in a
    subfolder). Framework auto-detects as Next.js.
 3. Add **Environment Variables**:
-   - `NEXT_PUBLIC_API_URL` = your Render API URL (e.g. `https://prooflens-api.onrender.com`)
+   - `NEXT_PUBLIC_API_URL` = your Render API URL (e.g. `https://prooflens-api.onrender.com`).
+     Already pinned in `frontend/.env.production`; only set this in the dashboard
+     to point at a *different* API. A dashboard value overrides the file — if the
+     Analyze page can't reach the backend, make sure any dashboard override is
+     correct (or remove it) and redeploy, since `NEXT_PUBLIC_*` is inlined at build time.
    - `NEXT_PUBLIC_ADMIN_TOKEN` = the `PROOFLENS_ADMIN_TOKEN` from Render (for the Settings page)
 4. Deploy. You get a URL like `https://prooflens.vercel.app`.
 
