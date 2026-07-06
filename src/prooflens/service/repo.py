@@ -8,11 +8,17 @@ storage-agnostic and testable fully offline.
 from __future__ import annotations
 
 import itertools
+from datetime import UTC, datetime
 from typing import Protocol, runtime_checkable
 
 from ..engine.hashstore import InMemoryHashStore
 from ..engine.types import HashStore, Verdict
-from .views import JobView, TenantView
+from .views import JobView, ResultView, TenantView
+
+
+def processing_ms(verdict: Verdict) -> float:
+    """Total wall-clock across all checks the pipeline ran (for the metric)."""
+    return round(sum((c.latency_ms or 0.0) for c in verdict.checks), 1)
 
 
 @runtime_checkable
@@ -29,7 +35,25 @@ class Repo(Protocol):
     def claim_batch(self, limit: int) -> list[JobView]: ...
     def complete(self, job_id: str) -> None: ...
     def fail(self, job_id: str, error: Exception) -> None: ...
-    def record_result(self, tenant_id: str, job_id: str, verdict: Verdict) -> None: ...
+
+    def record_result(
+        self,
+        tenant_id: str,
+        job_id: str | None,
+        verdict: Verdict,
+        *,
+        opportunity_id: str | None = None,
+        rep_id: str | None = None,
+    ) -> str:
+        """Persist a result and return its id. job_id None => a direct /v1/score."""
+        ...
+
+    def list_results(
+        self, *, limit: int = 50, offset: int = 0, band: str | None = None
+    ) -> tuple[list[ResultView], int]:
+        """Newest-first page of results + total matching count."""
+        ...
+
     def commit(self) -> None: ...
     def rollback(self) -> None: ...
 
@@ -45,7 +69,7 @@ class InMemoryRepo:
         self._by_event: dict[tuple[str, str], str] = {}
         self._queued: list[str] = []
         self._status: dict[str, str] = {}
-        self.results: list[tuple[str, str, Verdict]] = []
+        self.results: list[ResultView] = []
         self._ids = itertools.count(1)
 
     def add_tenant(self, tenant: TenantView) -> None:
@@ -92,8 +116,41 @@ class InMemoryRepo:
             self._status[job_id] = "queued"
             self._queued.append(job_id)  # immediate re-queue (no backoff in-memory)
 
-    def record_result(self, tenant_id: str, job_id: str, verdict: Verdict) -> None:
-        self.results.append((tenant_id, job_id, verdict))
+    def record_result(
+        self,
+        tenant_id: str,
+        job_id: str | None,
+        verdict: Verdict,
+        *,
+        opportunity_id: str | None = None,
+        rep_id: str | None = None,
+    ) -> str:
+        rid = str(next(self._ids))
+        self.results.append(
+            ResultView(
+                id=rid,
+                created_at=datetime.now(UTC).isoformat(),
+                tenant_id=tenant_id,
+                band=verdict.band,
+                score=verdict.score,
+                reason=verdict.reason,
+                reason_code=verdict.reason_code,
+                rubric_version=verdict.rubric_version,
+                checks=[c.to_dict() for c in verdict.checks],
+                processing_ms=processing_ms(verdict),
+                source="webhook" if job_id else "direct",
+                opportunity_id=opportunity_id,
+                rep_id=rep_id,
+            )
+        )
+        return rid
+
+    def list_results(
+        self, *, limit: int = 50, offset: int = 0, band: str | None = None
+    ) -> tuple[list[ResultView], int]:
+        rows = [r for r in self.results if band is None or r.band == band]
+        rows = list(reversed(rows))  # newest first
+        return rows[offset : offset + limit], len(rows)
 
     def commit(self) -> None:  # no-op in memory
         pass

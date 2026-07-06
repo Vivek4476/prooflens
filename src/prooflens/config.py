@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     # Admin API bearer token (X-Admin-Token). Staging/prod MUST override.
     admin_token: str = Field(default="dev-admin-token", alias="PROOFLENS_ADMIN_TOKEN")
 
+    # CORS origins for the frontend (comma-separated). Dev default = Next.js.
+    cors_origins: str = Field(
+        default="http://localhost:3000,http://127.0.0.1:3000", alias="CORS_ORIGINS"
+    )
+
     database_url: str = Field(
         default="postgresql+psycopg://prooflens:prooflens@localhost:5432/prooflens",
         alias="DATABASE_URL",
@@ -87,6 +92,10 @@ class Settings(BaseSettings):
     @property
     def secret_key_is_dev(self) -> bool:
         return self.secret_key in ("", _DEV_SECRET_KEY)
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     def build_vision_backend(self, name: str | None = None) -> VisionBackend:
         """Construct the configured vision backend. Defaults to the stub."""

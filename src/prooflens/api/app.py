@@ -11,44 +11,33 @@ testable offline with an InMemoryRepo; production yields a PostgresRepo.
 from __future__ import annotations
 
 import json
-from collections.abc import Iterator
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 
 from ..config import get_settings
 from ..service.repo import Repo
 from ..telemetry import configure_logging
 from ..telemetry import metrics as m
 from .admin import router as admin_router
+from .deps import get_repo
 from .schemas import WebhookAck, WebhookPayload
+from .scoring import router as scoring_router
 from .security import SIGNATURE_HEADER, verify
 
 
-def get_repo() -> Iterator[Repo]:
-    """Production dependency: a Postgres-backed repo, committed per request.
-
-    Imports the DB layer lazily so the API module is import-safe without psycopg,
-    and so tests (which override this dependency) never touch the database.
-    """
-    from ..db.base import session_scope
-    from ..db.repo import PostgresRepo
-
-    session = session_scope()
-    repo = PostgresRepo(session)
-    try:
-        yield repo
-        repo.commit()
-    except Exception:
-        repo.rollback()
-        raise
-    finally:
-        session.close()
-
-
 def create_app() -> FastAPI:
-    configure_logging(get_settings().log_level)
+    settings = get_settings()
+    configure_logging(settings.log_level)
     app = FastAPI(title="ProofLens", version="0.1.0")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins_list,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     app.include_router(admin_router)
+    app.include_router(scoring_router)
 
     @app.get("/healthz")
     def healthz() -> dict:

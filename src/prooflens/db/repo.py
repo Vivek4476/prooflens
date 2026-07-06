@@ -11,7 +11,7 @@ import uuid
 
 from ..engine.types import Verdict
 from ..queue import queue as q
-from ..service.views import JobView, TenantView
+from ..service.views import JobView, ResultView, TenantView
 from ..tenants.service import resolve_scoring
 from .hashstore import PostgresHashStore
 from .models import Job, Result, Tenant
@@ -79,20 +79,70 @@ class PostgresRepo:
         job = self._session.get(Job, uuid.UUID(job_id))
         q.fail(self._session, job, error)
 
-    def record_result(self, tenant_id: str, job_id: str, verdict: Verdict) -> None:
-        self._session.add(
-            Result(
-                tenant_id=uuid.UUID(tenant_id),
-                job_id=uuid.UUID(job_id),
-                band=verdict.band,
-                score=int(round(verdict.score)),
-                reason=verdict.reason,
-                reason_code=verdict.reason_code,
-                rubric_version=verdict.rubric_version,
-                checks=[c.to_dict() for c in verdict.checks],
-            )
+    def record_result(
+        self,
+        tenant_id: str,
+        job_id: str | None,
+        verdict: Verdict,
+        *,
+        opportunity_id: str | None = None,
+        rep_id: str | None = None,
+    ) -> str:
+        row = Result(
+            tenant_id=uuid.UUID(tenant_id),
+            job_id=uuid.UUID(job_id) if job_id else None,
+            band=verdict.band,
+            score=int(round(verdict.score)),
+            reason=verdict.reason,
+            reason_code=verdict.reason_code,
+            rubric_version=verdict.rubric_version,
+            checks=[c.to_dict() for c in verdict.checks],
         )
+        self._session.add(row)
         self._session.flush()
+        return str(row.id)
+
+    def list_results(
+        self, *, limit: int = 50, offset: int = 0, band: str | None = None
+    ) -> tuple[list[ResultView], int]:
+        query = self._session.query(Result)
+        if band:
+            query = query.filter(Result.band == band)
+        total = query.count()
+        rows = (
+            query.order_by(Result.created_at.desc()).offset(offset).limit(limit).all()
+        )
+        # Pull the trail (rep/opportunity) from the originating job when present.
+        job_ids = [r.job_id for r in rows if r.job_id is not None]
+        jobs = (
+            {j.id: j for j in self._session.query(Job).filter(Job.id.in_(job_ids)).all()}
+            if job_ids
+            else {}
+        )
+        views: list[ResultView] = []
+        for r in rows:
+            job = jobs.get(r.job_id) if r.job_id else None
+            payload = (job.payload or {}) if job else {}
+            views.append(
+                ResultView(
+                    id=str(r.id),
+                    created_at=r.created_at.isoformat() if r.created_at else "",
+                    tenant_id=str(r.tenant_id),
+                    band=r.band,
+                    score=float(r.score),
+                    reason=r.reason,
+                    reason_code=r.reason_code,
+                    rubric_version=r.rubric_version,
+                    checks=list(r.checks or []),
+                    processing_ms=round(
+                        sum(float(c.get("latency_ms") or 0.0) for c in (r.checks or [])), 1
+                    ),
+                    source="webhook" if r.job_id else "direct",
+                    opportunity_id=payload.get("opportunity_id"),
+                    rep_id=payload.get("rep_id"),
+                )
+            )
+        return views, total
 
     def commit(self) -> None:
         self._session.commit()

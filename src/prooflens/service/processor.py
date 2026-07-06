@@ -65,7 +65,13 @@ def process_job(job: JobView, *, repo: Repo, lsq: LSQClient, settings: Settings)
     if opportunity_id:
         lsq.update_custom_fields(opportunity_id, _ordered_updates(tenant, verdict))
 
-    repo.record_result(tenant.id, job.id, verdict)
+    repo.record_result(
+        tenant.id,
+        job.id,
+        verdict,
+        opportunity_id=job.payload.get("opportunity_id"),
+        rep_id=job.payload.get("rep_id"),
+    )
     # A verdict is always producible (fail-open): NO_CONTENT_ANALYSIS is a valid
     # outcome, not an error.
     assert verdict.reason_code in {r.value for r in Reason}
