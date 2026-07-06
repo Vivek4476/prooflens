@@ -19,8 +19,10 @@ services:
     dockerfilePath: ./deploy/Dockerfile
     dockerContext: .
     healthCheckPath: /healthz
-    # Run migrations + seed a dev tenant on boot, then serve on Render's $PORT.
-    dockerCommand: sh -c "alembic upgrade head && python scripts/seed_dev_tenant.py && uvicorn prooflens.api.app:app --host 0.0.0.0 --port $PORT"
+    # Migrate + seed + serve on Render's $PORT. Kept as a script so the command
+    # is simple and quote-free (Render doesn't run dockerCommand through a shell,
+    # so inline &&/quotes/$PORT would be treated as one literal command).
+    dockerCommand: sh scripts/start-api.sh
     envVars:
       - key: DATABASE_URL
         fromDatabase:
