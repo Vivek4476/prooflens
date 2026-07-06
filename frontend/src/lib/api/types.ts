@@ -81,6 +81,20 @@ export interface AnalyticsSummary {
   series: DaySeries[];
 }
 
+export interface ScoringConfig {
+  weights: { content: number; sharpness: number; uniqueness: number; metadata: number };
+  thresholds: {
+    blur_floor: number;
+    sharp_ok: number;
+    dup_exact: number;
+    dup_near: number;
+    unique_distance: number;
+    plausibility_gate: number;
+  };
+  bands: { clear: number; doubtful: number };
+  caps: Record<string, number>;
+}
+
 export interface Tenant {
   id: string;
   slug: string;
@@ -89,6 +103,9 @@ export interface Tenant {
   vision_backend: string;
   field_map: Record<string, string>;
   has_lsq_credentials: boolean;
+  scoring: ScoringConfig;
 }
+
+export type ReviewDecision = "approve" | "reject" | "false_positive";
 
 export type HealthState = "ok" | "degraded" | "down" | "loading";

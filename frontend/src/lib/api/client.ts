@@ -4,6 +4,7 @@ import axios from "axios";
 import type {
   AnalyticsSummary,
   ResultsPage,
+  ReviewDecision,
   ScoreResponse,
   Tenant,
 } from "./types";
@@ -55,6 +56,14 @@ export const api = {
     const { data } = await http.get("/admin/tenants", {
       headers: { "X-Admin-Token": ADMIN_TOKEN },
     });
+    return data;
+  },
+
+  // Review decisions — endpoint NOT yet implemented (see BACKEND_REQUIREMENTS.md).
+  // This calls the real (documented) endpoint; the UI handles its absence
+  // honestly rather than mocking a response.
+  async reviewDecision(id: string, decision: ReviewDecision, note?: string): Promise<unknown> {
+    const { data } = await http.post(`/v1/results/${id}/review`, { decision, note });
     return data;
   },
 };

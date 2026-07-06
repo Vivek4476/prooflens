@@ -67,13 +67,18 @@ class TenantOut(BaseModel):
     vision_backend: str
     field_map: dict[str, str]
     has_lsq_credentials: bool
+    # Effective scoring config (defaults deep-merged with this tenant's overrides).
+    scoring: dict
 
 
 def _out(t) -> TenantOut:
+    from ..tenants.service import resolve_scoring
+
     return TenantOut(
         id=str(t.id), slug=t.slug, name=t.name, active=t.active,
         vision_backend=t.vision_backend, field_map=dict(t.field_map or {}),
         has_lsq_credentials=t.lsq_credentials_encrypted is not None,
+        scoring=resolve_scoring(t).model_dump(),
     )
 
 
