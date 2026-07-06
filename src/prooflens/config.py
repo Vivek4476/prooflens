@@ -68,7 +68,7 @@ class Settings(BaseSettings):
     # OpenRouter (free ":free" vision models; email signup, no card).
     openrouter_api_key: str = Field(default="", alias="OPENROUTER_API_KEY")
     openrouter_model: str = Field(
-        default="meta-llama/llama-3.2-11b-vision-instruct:free", alias="OPENROUTER_MODEL"
+        default="nvidia/nemotron-nano-12b-v2-vl:free", alias="OPENROUTER_MODEL"
     )
     openrouter_base_url: str = Field(
         default="https://openrouter.ai/api/v1", alias="OPENROUTER_BASE_URL"
