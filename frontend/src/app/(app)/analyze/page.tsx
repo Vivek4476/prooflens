@@ -21,17 +21,31 @@ import { PIPELINE_STAGES, bandState, checkState } from "@/lib/verdict";
 
 const REVEAL_MS = 260;
 
+/** Pull the backend's exact reason (FastAPI `detail`) out of an axios error, so
+ * operators see e.g. "Live AI (openrouter) is unavailable: … 429 …" not a generic
+ * message. Falls back to the transport error text. */
+function errorDetail(err: unknown): string | null {
+  const e = err as { response?: { data?: { detail?: unknown } }; message?: string };
+  const detail = e?.response?.data?.detail;
+  if (typeof detail === "string" && detail.trim()) return detail;
+  return e?.message ?? null;
+}
+
 export default function AnalyzePage() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(-1); // -1 => not revealing yet
-  // Live AI is the default so demos show a real model judgement, not the stub.
-  const [model, setModel] = useState<"stub" | "openrouter">("openrouter");
+  // "live" => let the server pick its configured provider (VISION_BACKEND); "stub"
+  // => force the deterministic Demo model. Live AI is the default so demos show a
+  // real model judgement.
+  const [model, setModel] = useState<"stub" | "live">("live");
 
   const mutation = useMutation({
-    mutationFn: (f: File) => api.score(f, { backend: model }),
+    // backend omitted for "live" so the server resolves its configured provider.
+    mutationFn: ({ f, backend }: { f: File; backend?: string }) => api.score(f, { backend }),
     onSuccess: () => setRevealed(-1),
   });
+  const liveBackend = (m: "stub" | "live"): string | undefined => (m === "stub" ? "stub" : undefined);
   const result = mutation.data;
 
   // Object URL lifecycle for the preview.
@@ -118,7 +132,7 @@ export default function AnalyzePage() {
               {(
                 [
                   { key: "stub", label: "Demo model", hint: "instant" },
-                  { key: "openrouter", label: "Live AI", hint: "real · slower" },
+                  { key: "live", label: "Live AI", hint: "real · slower" },
                 ] as const
               ).map((opt) => (
                 <button
@@ -142,7 +156,7 @@ export default function AnalyzePage() {
             <Button
               variant="primary"
               disabled={!file || mutation.isPending}
-              onClick={() => file && mutation.mutate(file)}
+              onClick={() => file && mutation.mutate({ f: file, backend: liveBackend(model) })}
               className="flex-1"
             >
               <Sparkles size={16} />
@@ -164,15 +178,41 @@ export default function AnalyzePage() {
               <div className="flex items-start gap-3">
                 <AlertCircle size={18} className="mt-0.5 text-danger" />
                 <div className="flex-1">
-                  <p className="text-body-sm font-medium text-text">Could not score the image</p>
-                  <p className="mt-1 text-caption text-text-secondary">
-                    The scoring service did not respond. ProofLens never blocks an upload — you
-                    can retry.
+                  <p className="text-body-sm font-medium text-text">
+                    {model === "live"
+                      ? "Live AI is currently unavailable"
+                      : "Could not score the image"}
                   </p>
-                  <Button variant="secondary" className="mt-3" onClick={() => file && mutation.mutate(file)}>
-                    <RotateCcw size={15} />
-                    Retry
-                  </Button>
+                  <p className="mt-1 text-caption text-text-secondary">
+                    {model === "live"
+                      ? "Please check the AI provider configuration or try again later — or switch to the Demo model to keep scoring."
+                      : "The scoring service did not respond. ProofLens never blocks an upload — you can retry."}
+                  </p>
+                  {errorDetail(mutation.error) && (
+                    <p className="mt-2 break-words rounded bg-surface-2 px-2 py-1.5 font-mono text-caption text-text-muted">
+                      {errorDetail(mutation.error)}
+                    </p>
+                  )}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button
+                      variant="secondary"
+                      onClick={() => file && mutation.mutate({ f: file, backend: liveBackend(model) })}
+                    >
+                      <RotateCcw size={15} />
+                      Retry
+                    </Button>
+                    {model === "live" && file && (
+                      <Button
+                        variant="ghost"
+                        onClick={() => {
+                          setModel("stub");
+                          mutation.mutate({ f: file, backend: "stub" });
+                        }}
+                      >
+                        Use Demo model
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             </Card>

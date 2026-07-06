@@ -15,9 +15,11 @@ from collections import Counter
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi.concurrency import run_in_threadpool
 
 from ..config import get_settings
 from ..engine import EngineContext, score
+from ..engine.types import Verdict
 from ..engine.verdicts import REASON_TEXT, Reason
 from ..service.repo import Repo, processing_ms
 from .deps import get_repo
@@ -37,7 +39,14 @@ async def score_image(
     data = await image.read()
     if not data:
         raise HTTPException(status_code=400, detail="empty image")
+    # Offload the whole blocking pipeline — including the synchronous vision HTTP
+    # call — to a worker thread. On a single-worker server, running it on the
+    # event loop blocked health-check probes during a multi-second inference, so
+    # the platform killed the instance mid-request (the 502s we saw on Render).
+    return await run_in_threadpool(_score_direct, data, tenant, backend, repo)
 
+
+def _score_direct(data: bytes, tenant: str, backend: str | None, repo: Repo) -> dict:
     tenant_view = repo.get_tenant_by_slug(tenant)
     if tenant_view is None:
         raise HTTPException(
@@ -45,31 +54,47 @@ async def score_image(
         )
 
     settings = get_settings()
-    # Direct scoring is operator-driven: the request override wins, else the
-    # env VISION_BACKEND (the tenant's own backend governs the async webhook path).
-    #
-    # Fail-open on vision config: an unconfigured or broken real backend (e.g. a
-    # missing OPENROUTER_API_KEY) must never 500 or block an upload. Degrade to
-    # the deterministic stub and tell the caller — the response's backend /
-    # backend_is_real fields already carry the truth, backend_note explains it.
+    # Direct scoring is operator-driven: the request override wins, else the env
+    # VISION_BACKEND. "Demo Model" (stub) always works; anything else is Live AI.
     requested = (backend or settings.vision_backend or "stub").strip().lower()
-    backend_note: str | None = None
+    live_ai = requested != "stub"
+
+    # Build the backend. If Live AI is requested but can't be constructed (e.g. a
+    # missing API key), surface the exact reason — never silently use the stub.
     try:
         vision = settings.build_vision_backend(requested)
-    except Exception as exc:  # noqa: BLE001 — any construction failure degrades, never blocks
-        vision = settings.build_vision_backend("stub")
-        backend_note = (
-            f"Requested vision backend {requested!r} is unavailable "
-            f"({exc}); scored with the deterministic demo model instead."
-        )
+    except Exception as exc:  # noqa: BLE001
+        if not live_ai:
+            raise
+        raise HTTPException(
+            status_code=503, detail=f"Live AI ({requested}) is unavailable: {exc}"
+        ) from exc
 
+    # Defer hash-remembering until we know the verdict is a keeper: a failed Live
+    # AI call must not poison the duplicate store (which would make a retry look
+    # like a duplicate and skip the model entirely).
     ctx = EngineContext(
         tenant_id=tenant_view.id,
         vision=vision,
         hash_store=repo.hash_store,
         scoring=tenant_view.scoring,
+        remember_hash=False,
     )
     verdict = score(data, ctx)
+
+    # If Live AI was explicitly requested but the model call FAILED (as opposed to
+    # being skipped by a cheap hard gate), surface the exact provider error rather
+    # than returning a verdict the model never actually produced.
+    if live_ai:
+        content = next((c for c in verdict.checks if c.name == "content"), None)
+        if content is not None and not content.available and (content.data or {}).get("error"):
+            detail = (content.data or {}).get("detail") or content.summary
+            raise HTTPException(
+                status_code=503, detail=f"Live AI ({vision.name}) is unavailable: {detail}"
+            )
+
+    # Keeper verdict — remember the hash now, then persist.
+    _remember_hash(ctx, verdict)
     result_id = repo.record_result(tenant_view.id, None, verdict)
 
     payload = verdict.to_dict()
@@ -77,8 +102,23 @@ async def score_image(
     payload["processing_ms"] = processing_ms(verdict)
     payload["backend"] = vision.name
     payload["backend_is_real"] = vision.is_real
-    payload["backend_note"] = backend_note
+    payload["backend_note"] = None
     return payload
+
+
+def _remember_hash(ctx: EngineContext, verdict: Verdict) -> None:
+    """Persist this image's dHash after a kept verdict (mirrors the pipeline's own
+    remember step, deferred here via remember_hash=False)."""
+    uniq = next((c for c in verdict.checks if c.name == "uniqueness"), None)
+    dhash = (uniq.data or {}).get("dhash") if uniq else None
+    if dhash:
+        ctx.hash_store.remember(
+            ctx.tenant_id,
+            dhash,
+            rep_id=ctx.rep_id,
+            opportunity_id=ctx.opportunity_id,
+            captured_at=ctx.captured_at,
+        )
 
 
 @router.get("/v1/results")

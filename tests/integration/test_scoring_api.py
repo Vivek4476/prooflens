@@ -72,21 +72,53 @@ def test_get_missing_result_404(client):
     assert client.get("/v1/results/does-not-exist").status_code == 404
 
 
-def test_unconfigured_backend_fails_open_to_stub(client):
-    # Requesting an unavailable/unconfigured backend must NOT 500 or block the
-    # upload — it degrades to the stub and says so (fail-open principle). Uses an
-    # unknown name so the test is deterministic and makes no network call.
+def test_demo_model_always_scores(client):
+    # "Demo Model" (stub) is always available and never surfaces an AI error.
+    with open(IMAGES_DIR / "meeting.jpg", "rb") as fh:
+        r = client.post(
+            "/v1/score",
+            files={"image": ("m.jpg", fh.read(), "image/jpeg")},
+            data={"backend": "stub"},
+        )
+    assert r.status_code == 200
+    assert r.json()["backend"] == "stub"
+
+
+def test_live_ai_unconfigured_surfaces_error_not_stub(client):
+    # Live AI selected but the backend can't be built (unknown/unconfigured) must
+    # NOT fall back to the stub — it surfaces the exact reason as a 503.
     with open(IMAGES_DIR / "meeting.jpg", "rb") as fh:
         r = client.post(
             "/v1/score",
             files={"image": ("m.jpg", fh.read(), "image/jpeg")},
             data={"backend": "not_a_real_backend"},
         )
-    assert r.status_code == 200
-    body = r.json()
-    assert body["backend"] == "stub"
-    assert body["backend_is_real"] is False
-    assert "not_a_real_backend" in body["backend_note"]
+    assert r.status_code == 503
+    detail = r.json()["detail"].lower()
+    assert "not_a_real_backend" in detail and "unavailable" in detail
+
+
+def test_live_ai_call_failure_surfaces_exact_reason(client, monkeypatch):
+    # When the model call itself fails (e.g. 429), surface the provider's exact
+    # reason as a 503 — never a stub verdict, never a generic message.
+    from prooflens.config import Settings
+
+    class Boom:
+        is_real = True
+        name = "openrouter"
+
+        def assess(self, image_bytes):
+            raise RuntimeError("openrouter API error 429: rate limited")
+
+    monkeypatch.setattr(Settings, "build_vision_backend", lambda self, name=None: Boom())
+    with open(IMAGES_DIR / "meeting.jpg", "rb") as fh:
+        r = client.post(
+            "/v1/score",
+            files={"image": ("m.jpg", fh.read(), "image/jpeg")},
+            data={"backend": "openrouter"},
+        )
+    assert r.status_code == 503
+    assert "429" in r.json()["detail"]
 
 
 def test_score_unknown_tenant_404(client):

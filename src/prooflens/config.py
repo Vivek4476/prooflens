@@ -79,6 +79,13 @@ class Settings(BaseSettings):
         default="https://openrouter.ai/api/v1", alias="OPENROUTER_BASE_URL"
     )
 
+    # AI/ML API (aimlapi.com) — OpenAI-compatible aggregator; keys are 32-hex.
+    aimlapi_api_key: str = Field(default="", alias="AIMLAPI_API_KEY")
+    aimlapi_model: str = Field(default="openai/gpt-4o-mini", alias="AIMLAPI_MODEL")
+    aimlapi_base_url: str = Field(
+        default="https://api.aimlapi.com/v1", alias="AIMLAPI_BASE_URL"
+    )
+
     # Queue / worker.
     queue_max_attempts: int = Field(default=5, alias="QUEUE_MAX_ATTEMPTS")
     queue_backoff_base_seconds: int = Field(default=5, alias="QUEUE_BACKOFF_BASE_SECONDS")
@@ -131,6 +138,11 @@ class Settings(BaseSettings):
                 "api_key": self.gemini_api_key,
                 "model": self.gemini_model,
                 "base_url": self.gemini_base_url,
+            },
+            "aimlapi": {
+                "api_key": self.aimlapi_api_key,
+                "model": self.aimlapi_model,
+                "base_url": self.aimlapi_base_url,
             },
             "openrouter": {
                 "api_key": self.openrouter_api_key,

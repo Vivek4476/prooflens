@@ -28,12 +28,14 @@ def run(image_bytes: bytes, *, vision: VisionBackend, thresholds: Thresholds) ->
 
     if assessment is None:
         # Score WITHOUT this check; fusion will surface "scored without content analysis".
+        # Keep the FULL provider error in data so the API can surface the exact
+        # reason (401/402/429/timeout/…) when Live AI was explicitly requested.
         return CheckOutcome(
             NAME,
             available=False,
             score=None,
             summary=f"Vision check unavailable: {last_error[:120]}",
-            data={"error": True},
+            data={"error": True, "detail": last_error},
         )
 
     plaus = assessment.plausibility

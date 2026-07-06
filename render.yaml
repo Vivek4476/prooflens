@@ -32,8 +32,22 @@ services:
         generateValue: true          # Render generates a strong secret
       - key: PROOFLENS_ADMIN_TOKEN
         generateValue: true
+      # --- Live AI (vision) --------------------------------------------------
+      # "Live AI" in the UI uses whatever provider VISION_BACKEND names. Leave it
+      # "stub" for the deterministic demo model; set it to a funded provider below
+      # to enable a real model. Add ONLY the key for the provider you choose.
       - key: VISION_BACKEND
-        value: stub                  # switch to "openrouter" + add OPENROUTER_API_KEY for a real model
+        value: stub                  # stub | openrouter | aimlapi | gemini
+      - key: OPENROUTER_API_KEY
+        sync: false                  # sk-or-v1-… (free models are rate-limited/weak; paid needs credits)
+      - key: OPENROUTER_MODEL
+        sync: false                  # e.g. openai/gpt-4o-mini (with credits) or a *:free model
+      - key: AIMLAPI_API_KEY
+        sync: false                  # 32-hex key from aimlapi.com (needs balance for gpt-4o-mini)
+      - key: AIMLAPI_MODEL
+        sync: false                  # default openai/gpt-4o-mini
+      - key: GEMINI_API_KEY
+        sync: false                  # AIza… from Google AI Studio — genuinely free tier, accurate
       - key: CORS_ORIGINS
         sync: false                  # set to your Vercel URL after the frontend deploys
       - key: PYTHONUNBUFFERED
