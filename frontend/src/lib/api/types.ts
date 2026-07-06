@@ -30,6 +30,9 @@ export interface ScoreResponse extends Verdict {
   processing_ms: number;
   backend: string;
   backend_is_real: boolean;
+  // Set when the requested vision backend was unavailable and scoring fell back
+  // to the stub (fail-open). Null on the normal path.
+  backend_note?: string | null;
 }
 
 export interface ResultItem {

@@ -2,11 +2,13 @@
 
 import { useMutation } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { AlertCircle, Clock, RotateCcw, Sparkles } from "lucide-react";
+import { AlertCircle, ArrowRight, Clock, RotateCcw, Sparkles } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ImageUploader } from "@/components/analyze/ImageUploader";
 import { PipelineStepper, type StageState } from "@/components/analyze/PipelineStepper";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { ChecksList } from "@/components/verdict/ChecksList";
@@ -23,7 +25,8 @@ export default function AnalyzePage() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(-1); // -1 => not revealing yet
-  const [model, setModel] = useState<"stub" | "openrouter">("stub");
+  // Live AI is the default so demos show a real model judgement, not the stub.
+  const [model, setModel] = useState<"stub" | "openrouter">("openrouter");
 
   const mutation = useMutation({
     mutationFn: (f: File) => api.score(f, { backend: model }),
@@ -95,9 +98,10 @@ export default function AnalyzePage() {
 
   return (
     <div className="space-y-6">
-      <p className="text-body-sm text-text-secondary">
-        Score a photo against the live pipeline and see exactly why.
-      </p>
+      <PageHeader
+        title="Analyze a photo"
+        description="Score a photo against the live pipeline and see exactly why — band first, then the evidence behind it."
+      />
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Left: image + action */}
@@ -239,6 +243,20 @@ function ResultPanel({ result }: { result: ScoreResponse }) {
               <span className="font-medium text-text-secondary">{result.backend}</span>
               {result.backend_is_real ? "" : " (deterministic demo model)"}
             </p>
+            {result.backend_note && (
+              <p className="mt-2 flex items-start gap-1.5 text-caption text-warn">
+                <AlertCircle size={13} className="mt-0.5 shrink-0" />
+                {result.backend_note}
+              </p>
+            )}
+            {/* The verdict is persisted — link to its permanent, shareable page. */}
+            <Link
+              href={`/verdict/${result.result_id}`}
+              className="mt-3 inline-flex items-center gap-1 text-caption font-medium text-text-secondary hover:text-text"
+            >
+              View saved report
+              <ArrowRight size={13} />
+            </Link>
           </div>
         </div>
       </Card>

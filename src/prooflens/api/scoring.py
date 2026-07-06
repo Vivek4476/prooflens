@@ -47,8 +47,21 @@ async def score_image(
     settings = get_settings()
     # Direct scoring is operator-driven: the request override wins, else the
     # env VISION_BACKEND (the tenant's own backend governs the async webhook path).
-    chosen = backend or settings.vision_backend
-    vision = settings.build_vision_backend(chosen)
+    #
+    # Fail-open on vision config: an unconfigured or broken real backend (e.g. a
+    # missing OPENROUTER_API_KEY) must never 500 or block an upload. Degrade to
+    # the deterministic stub and tell the caller — the response's backend /
+    # backend_is_real fields already carry the truth, backend_note explains it.
+    requested = (backend or settings.vision_backend or "stub").strip().lower()
+    backend_note: str | None = None
+    try:
+        vision = settings.build_vision_backend(requested)
+    except Exception as exc:  # noqa: BLE001 — any construction failure degrades, never blocks
+        vision = settings.build_vision_backend("stub")
+        backend_note = (
+            f"Requested vision backend {requested!r} is unavailable "
+            f"({exc}); scored with the deterministic demo model instead."
+        )
 
     ctx = EngineContext(
         tenant_id=tenant_view.id,
@@ -64,6 +77,7 @@ async def score_image(
     payload["processing_ms"] = processing_ms(verdict)
     payload["backend"] = vision.name
     payload["backend_is_real"] = vision.is_real
+    payload["backend_note"] = backend_note
     return payload
 
 
@@ -81,6 +95,15 @@ def list_results(
         "limit": limit,
         "offset": offset,
     }
+
+
+@router.get("/v1/results/{result_id}")
+def get_result(result_id: str, repo: Repo = Depends(get_repo)) -> dict:
+    """A single stored verdict with its full evidence — the Verdict Detail view."""
+    result = repo.get_result(result_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"no result {result_id!r}")
+    return result.to_dict()
 
 
 @router.get("/v1/analytics/summary")

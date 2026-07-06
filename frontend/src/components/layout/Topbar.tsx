@@ -1,28 +1,26 @@
 "use client";
 
 import { Search } from "lucide-react";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { HealthDot } from "@/components/HealthDot";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { NAV } from "@/lib/nav";
+import { AccountMenu } from "@/components/layout/AccountMenu";
+import { MobileNav } from "@/components/layout/MobileNav";
 
-function titleFor(pathname: string): string {
-  const match = NAV.find((n) =>
-    n.href === "/" ? pathname === "/" : pathname.startsWith(n.href),
-  );
-  return match?.label ?? "ProofLens";
-}
-
+/**
+ * Global chrome only. The page TITLE now lives in each page's <PageHeader>, so
+ * the header no longer duplicates it — this bar carries navigation (mobile),
+ * search, system health, theme, and account.
+ */
 export function Topbar() {
-  const pathname = usePathname();
   const router = useRouter();
   const [q, setQ] = useState("");
 
   return (
-    <header className="flex h-16 shrink-0 items-center gap-4 border-b border-border bg-surface/90 px-6 backdrop-blur">
-      <h1 className="text-h1 text-text">{titleFor(pathname)}</h1>
+    <header className="flex h-16 shrink-0 items-center gap-3 border-b border-border bg-surface/90 px-4 backdrop-blur md:px-6">
+      <MobileNav />
 
       <form
         className="ml-auto hidden items-center md:flex"
@@ -46,15 +44,10 @@ export function Topbar() {
         </div>
       </form>
 
-      <div className="ml-auto flex items-center gap-2.5 md:ml-0">
+      <div className="ml-auto flex items-center gap-2.5 md:ml-4">
         <HealthDot />
         <ThemeToggle />
-        <div
-          className="grid h-9 w-9 place-items-center rounded-full bg-surface-2 text-caption font-semibold text-text-secondary"
-          title="Demo user"
-        >
-          UA
-        </div>
+        <AccountMenu />
       </div>
     </header>
   );

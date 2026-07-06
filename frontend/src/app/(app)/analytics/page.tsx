@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { ChartCard } from "@/components/ui/ChartCard";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -55,7 +56,7 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      <p className="text-body-sm text-text-secondary">Where is capture risk trending?</p>
+      <PageHeader title="Analytics" description="Where is capture risk trending?" />
 
       {isLoading || !a ? (
         <CardsSkeleton count={4} />

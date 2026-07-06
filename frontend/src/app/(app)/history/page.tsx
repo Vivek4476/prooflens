@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
 
 import { ResultsTable, type SortKey } from "@/components/history/ResultsTable";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -73,9 +74,10 @@ function HistoryInner() {
 
   return (
     <div className="space-y-4">
-      <p className="text-body-sm text-text-secondary">
-        Every scored image, newest first. No thumbnails — the backend never stores images.
-      </p>
+      <PageHeader
+        title="Upload history"
+        description="Every scored image, newest first. No thumbnails — the backend never stores images. Select a row to open its full verdict."
+      />
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative">

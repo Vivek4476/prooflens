@@ -2,6 +2,7 @@
 
 import { Activity, Building2, KeyRound, SlidersHorizontal } from "lucide-react";
 
+import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useHealth, useTenants } from "@/lib/api/hooks";
@@ -41,9 +42,10 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <p className="text-body-sm text-text-secondary">
-        Tenant configuration, scoring policy, and live backend status.
-      </p>
+      <PageHeader
+        title="Settings"
+        description="Tenant configuration, scoring policy, and live backend status."
+      />
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Backend Health */}

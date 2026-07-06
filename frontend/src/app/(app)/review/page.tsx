@@ -5,6 +5,7 @@ import { CheckCircle2, Info } from "lucide-react";
 import { useState } from "react";
 
 import { ReviewCard } from "@/components/review/ReviewCard";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -46,9 +47,10 @@ export default function ReviewPage() {
 
   return (
     <div className="space-y-5">
-      <p className="text-body-sm text-text-secondary">
-        Doubtful and Suspect verdicts queued for a human decision.
-      </p>
+      <PageHeader
+        title="Review queue"
+        description="Doubtful and Suspect verdicts queued for a human decision."
+      />
 
       {/* Honest disclosure — the decision endpoint is not yet implemented. */}
       <Card className="flex items-start gap-3 border-l-2 border-l-brand-gold p-4">

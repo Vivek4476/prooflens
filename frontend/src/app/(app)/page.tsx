@@ -3,6 +3,7 @@
 import { Clock, Copy, Gauge, ImageOff, Images, ScanSearch, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 
+import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -21,17 +22,18 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <p className="text-body-sm text-text-secondary">
-          Is the system healthy, and is risk elevated today?
-        </p>
-        <Link href="/analyze">
-          <Button variant="primary">
-            <ScanSearch size={16} />
-            Analyze Photo
-          </Button>
-        </Link>
-      </div>
+      <PageHeader
+        title="Dashboard"
+        description="Is the system healthy, and is risk elevated today?"
+        actions={
+          <Link href="/analyze">
+            <Button variant="primary">
+              <ScanSearch size={16} />
+              Analyze Photo
+            </Button>
+          </Link>
+        }
+      />
 
       {analytics.isError ? (
         <ApiError onRetry={() => analytics.refetch()} />

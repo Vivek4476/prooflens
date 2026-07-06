@@ -54,6 +54,10 @@ class Repo(Protocol):
         """Newest-first page of results + total matching count."""
         ...
 
+    def get_result(self, result_id: str) -> ResultView | None:
+        """A single stored result by id, or None if it doesn't exist."""
+        ...
+
     def commit(self) -> None: ...
     def rollback(self) -> None: ...
 
@@ -151,6 +155,9 @@ class InMemoryRepo:
         rows = [r for r in self.results if band is None or r.band == band]
         rows = list(reversed(rows))  # newest first
         return rows[offset : offset + limit], len(rows)
+
+    def get_result(self, result_id: str) -> ResultView | None:
+        return next((r for r in self.results if r.id == result_id), None)
 
     def commit(self) -> None:  # no-op in memory
         pass

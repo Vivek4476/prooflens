@@ -38,6 +38,15 @@ export function useResults(params?: { limit?: number; offset?: number; band?: st
   });
 }
 
+export function useResult(id: string | undefined) {
+  return useQuery({
+    queryKey: ["result", id],
+    queryFn: () => api.result(id as string),
+    enabled: !!id,
+    retry: false,
+  });
+}
+
 export function useAnalytics() {
   return useQuery({
     queryKey: ["analytics"],

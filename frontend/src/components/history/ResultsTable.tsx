@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowDown, ArrowUp } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import { VerdictBadge } from "@/components/verdict/VerdictBadge";
 import type { ResultItem } from "@/lib/api/types";
@@ -64,6 +65,7 @@ export function ResultsTable({
   sortDir?: "asc" | "desc";
   onSort?: (k: SortKey) => void;
 }) {
+  const router = useRouter();
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-body-sm">
@@ -81,7 +83,17 @@ export function ResultsTable({
         </thead>
         <tbody>
           {items.map((r) => (
-            <tr key={r.id} className="border-b border-border last:border-0 hover:bg-surface-2/60">
+            <tr
+              key={r.id}
+              onClick={() => router.push(`/verdict/${r.id}`)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") router.push(`/verdict/${r.id}`);
+              }}
+              tabIndex={0}
+              role="link"
+              aria-label={`Open verdict ${r.band}, score ${Math.round(r.score)}`}
+              className="cursor-pointer border-b border-border last:border-0 hover:bg-surface-2/60 focus-visible:bg-surface-2"
+            >
               <td className="px-4 py-3">
                 <VerdictBadge band={r.band} size="sm" />
               </td>

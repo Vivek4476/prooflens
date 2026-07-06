@@ -3,6 +3,7 @@ import axios from "axios";
 
 import type {
   AnalyticsSummary,
+  ResultItem,
   ResultsPage,
   ReviewDecision,
   ScoreResponse,
@@ -44,6 +45,12 @@ export const api = {
     band?: string;
   }): Promise<ResultsPage> {
     const { data } = await http.get("/v1/results", { params });
+    return data;
+  },
+
+  // A single stored verdict with its full evidence — powers the Verdict Detail page.
+  async result(id: string): Promise<ResultItem> {
+    const { data } = await http.get(`/v1/results/${encodeURIComponent(id)}`);
     return data;
   },
 

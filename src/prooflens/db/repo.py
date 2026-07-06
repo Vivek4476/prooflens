@@ -119,30 +119,41 @@ class PostgresRepo:
             if job_ids
             else {}
         )
-        views: list[ResultView] = []
-        for r in rows:
-            job = jobs.get(r.job_id) if r.job_id else None
-            payload = (job.payload or {}) if job else {}
-            views.append(
-                ResultView(
-                    id=str(r.id),
-                    created_at=r.created_at.isoformat() if r.created_at else "",
-                    tenant_id=str(r.tenant_id),
-                    band=r.band,
-                    score=float(r.score),
-                    reason=r.reason,
-                    reason_code=r.reason_code,
-                    rubric_version=r.rubric_version,
-                    checks=list(r.checks or []),
-                    processing_ms=round(
-                        sum(float(c.get("latency_ms") or 0.0) for c in (r.checks or [])), 1
-                    ),
-                    source="webhook" if r.job_id else "direct",
-                    opportunity_id=payload.get("opportunity_id"),
-                    rep_id=payload.get("rep_id"),
-                )
-            )
+        views = [self._to_view(r, jobs.get(r.job_id) if r.job_id else None) for r in rows]
         return views, total
+
+    def get_result(self, result_id: str) -> ResultView | None:
+        try:
+            rid = uuid.UUID(result_id)
+        except (ValueError, AttributeError):
+            return None  # not a valid id => treat as not found, not a 500
+        row = self._session.get(Result, rid)
+        if row is None:
+            return None
+        job = self._session.get(Job, row.job_id) if row.job_id else None
+        return self._to_view(row, job)
+
+    @staticmethod
+    def _to_view(r: Result, job: Job | None) -> ResultView:
+        # The trail (rep/opportunity) rides on the originating job payload.
+        payload = (job.payload or {}) if job else {}
+        return ResultView(
+            id=str(r.id),
+            created_at=r.created_at.isoformat() if r.created_at else "",
+            tenant_id=str(r.tenant_id),
+            band=r.band,
+            score=float(r.score),
+            reason=r.reason,
+            reason_code=r.reason_code,
+            rubric_version=r.rubric_version,
+            checks=list(r.checks or []),
+            processing_ms=round(
+                sum(float(c.get("latency_ms") or 0.0) for c in (r.checks or [])), 1
+            ),
+            source="webhook" if r.job_id else "direct",
+            opportunity_id=payload.get("opportunity_id"),
+            rep_id=payload.get("rep_id"),
+        )
 
     def commit(self) -> None:
         self._session.commit()

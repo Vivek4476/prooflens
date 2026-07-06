@@ -55,6 +55,40 @@ def test_score_returns_real_verdict(client):
     assert body["rubric_version"] == "v1"
 
 
+def test_get_single_result_returns_full_evidence(client):
+    rid = _upload(client, "meeting.jpg").json()["result_id"]
+    r = client.get(f"/v1/results/{rid}")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["id"] == rid
+    assert body["band"] == "Clear"
+    # the detail view carries the full checks[] evidence, not just a summary
+    assert {c["name"] for c in body["checks"]} == {
+        "exif", "sharpness", "uniqueness", "recapture", "content"
+    }
+
+
+def test_get_missing_result_404(client):
+    assert client.get("/v1/results/does-not-exist").status_code == 404
+
+
+def test_unconfigured_backend_fails_open_to_stub(client):
+    # Requesting an unavailable/unconfigured backend must NOT 500 or block the
+    # upload — it degrades to the stub and says so (fail-open principle). Uses an
+    # unknown name so the test is deterministic and makes no network call.
+    with open(IMAGES_DIR / "meeting.jpg", "rb") as fh:
+        r = client.post(
+            "/v1/score",
+            files={"image": ("m.jpg", fh.read(), "image/jpeg")},
+            data={"backend": "not_a_real_backend"},
+        )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["backend"] == "stub"
+    assert body["backend_is_real"] is False
+    assert "not_a_real_backend" in body["backend_note"]
+
+
 def test_score_unknown_tenant_404(client):
     with open(IMAGES_DIR / "meeting.jpg", "rb") as fh:
         r = client.post("/v1/score", files={"image": ("m.jpg", fh.read(), "image/jpeg")},
