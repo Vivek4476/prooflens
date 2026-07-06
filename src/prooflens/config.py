@@ -86,6 +86,15 @@ class Settings(BaseSettings):
         default="https://api.aimlapi.com/v1", alias="AIMLAPI_BASE_URL"
     )
 
+    # Groq (groq.com) — fast (~1s), genuinely free tier, Llama-4 vision; keys gsk_…
+    groq_api_key: str = Field(default="", alias="GROQ_API_KEY")
+    groq_model: str = Field(
+        default="meta-llama/llama-4-scout-17b-16e-instruct", alias="GROQ_MODEL"
+    )
+    groq_base_url: str = Field(
+        default="https://api.groq.com/openai/v1", alias="GROQ_BASE_URL"
+    )
+
     # Queue / worker.
     queue_max_attempts: int = Field(default=5, alias="QUEUE_MAX_ATTEMPTS")
     queue_backoff_base_seconds: int = Field(default=5, alias="QUEUE_BACKOFF_BASE_SECONDS")
@@ -143,6 +152,11 @@ class Settings(BaseSettings):
                 "api_key": self.aimlapi_api_key,
                 "model": self.aimlapi_model,
                 "base_url": self.aimlapi_base_url,
+            },
+            "groq": {
+                "api_key": self.groq_api_key,
+                "model": self.groq_model,
+                "base_url": self.groq_base_url,
             },
             "openrouter": {
                 "api_key": self.openrouter_api_key,

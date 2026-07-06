@@ -34,20 +34,23 @@ services:
         generateValue: true
       # --- Live AI (vision) --------------------------------------------------
       # "Live AI" in the UI uses whatever provider VISION_BACKEND names. Leave it
-      # "stub" for the deterministic demo model; set it to a funded provider below
-      # to enable a real model. Add ONLY the key for the provider you choose.
+      # "stub" for the deterministic demo model; set it to a provider below to
+      # enable a real model. Add ONLY the key for the provider you choose.
+      #
+      # RECOMMENDED: groq — fast (~1s), genuinely free tier, Llama-4 vision.
+      #   set VISION_BACKEND=groq  and  GROQ_API_KEY=gsk_…
       - key: VISION_BACKEND
-        value: stub                  # stub | openrouter | aimlapi | gemini
-      - key: OPENROUTER_API_KEY
-        sync: false                  # sk-or-v1-… (free models are rate-limited/weak; paid needs credits)
-      - key: OPENROUTER_MODEL
-        sync: false                  # e.g. openai/gpt-4o-mini (with credits) or a *:free model
-      - key: AIMLAPI_API_KEY
-        sync: false                  # 32-hex key from aimlapi.com (needs balance for gpt-4o-mini)
-      - key: AIMLAPI_MODEL
-        sync: false                  # default openai/gpt-4o-mini
+        value: stub                  # stub | groq | gemini | openrouter | aimlapi
+      - key: GROQ_API_KEY
+        sync: false                  # gsk_… from groq.com — fast + free tier (recommended)
+      - key: GROQ_MODEL
+        sync: false                  # default meta-llama/llama-4-scout-17b-16e-instruct
       - key: GEMINI_API_KEY
-        sync: false                  # AIza… from Google AI Studio — genuinely free tier, accurate
+        sync: false                  # AIza…/AQ.… from Google AI Studio (free tier; quota-limited)
+      - key: OPENROUTER_API_KEY
+        sync: false                  # sk-or-v1-… (free models are slow/weak; paid needs credits)
+      - key: AIMLAPI_API_KEY
+        sync: false                  # aimlapi.com 32-hex key (needs balance for good models)
       - key: CORS_ORIGINS
         sync: false                  # set to your Vercel URL after the frontend deploys
       - key: PYTHONUNBUFFERED

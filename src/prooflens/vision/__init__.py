@@ -34,8 +34,8 @@ def get_backend(name: str = "stub", **kwargs) -> VisionBackend:
             model=kwargs.get("model", "claude-haiku-4-5"),
             max_edge=kwargs.get("max_edge", 768),
         )
-    # OpenAI-compatible hosted/local endpoints (Gemini, OpenRouter, AI/ML API, ...).
-    if name in ("local_vlm", "gemini", "openrouter", "aimlapi"):
+    # OpenAI-compatible hosted/local endpoints (Gemini, OpenRouter, AI/ML API, Groq, ...).
+    if name in ("local_vlm", "gemini", "openrouter", "aimlapi", "groq"):
         from .openai_compat import OpenAICompatBackend
 
         return OpenAICompatBackend(
