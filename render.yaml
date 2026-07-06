@@ -1,0 +1,38 @@
+# Render Blueprint — deploy the ProofLens API + Postgres from this Git repo.
+# In Render: New → Blueprint → connect this repo. Free-tier friendly.
+#
+# The async worker is intentionally omitted (Render background workers need a
+# paid plan). The UI + /v1/score are fully served by the `api` web service; the
+# worker is only needed for the async LSQ webhook path (see DEPLOYMENT.md).
+
+databases:
+  - name: prooflens-db
+    plan: free
+    databaseName: prooflens
+    user: prooflens
+
+services:
+  - type: web
+    name: prooflens-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./deploy/Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    # Run migrations + seed a dev tenant on boot, then serve on Render's $PORT.
+    dockerCommand: sh -c "alembic upgrade head && python scripts/seed_dev_tenant.py && uvicorn prooflens.api.app:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: prooflens-db
+          property: connectionString
+      - key: PROOFLENS_SECRET_KEY
+        generateValue: true          # Render generates a strong secret
+      - key: PROOFLENS_ADMIN_TOKEN
+        generateValue: true
+      - key: VISION_BACKEND
+        value: stub                  # switch to "openrouter" + add OPENROUTER_API_KEY for a real model
+      - key: CORS_ORIGINS
+        sync: false                  # set to your Vercel URL after the frontend deploys
+      - key: PYTHONUNBUFFERED
+        value: "1"

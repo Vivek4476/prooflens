@@ -94,6 +94,20 @@ class Settings(BaseSettings):
         return self.secret_key in ("", _DEV_SECRET_KEY)
 
     @property
+    def sqlalchemy_url(self) -> str:
+        """DATABASE_URL normalised to the psycopg3 driver.
+
+        Managed hosts (Render, Railway, Heroku) hand out ``postgres://`` or
+        ``postgresql://`` URLs; SQLAlchemy needs the explicit ``+psycopg`` driver.
+        """
+        url = self.database_url
+        if url.startswith("postgres://"):
+            url = "postgresql://" + url[len("postgres://"):]
+        if url.startswith("postgresql://"):
+            url = "postgresql+psycopg://" + url[len("postgresql://"):]
+        return url
+
+    @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 

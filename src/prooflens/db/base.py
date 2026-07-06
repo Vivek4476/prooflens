@@ -21,7 +21,7 @@ class Base(DeclarativeBase):
 @functools.lru_cache(maxsize=1)
 def get_engine():
     settings = get_settings()
-    return create_engine(settings.database_url, pool_pre_ping=True, future=True)
+    return create_engine(settings.sqlalchemy_url, pool_pre_ping=True, future=True)
 
 
 @functools.lru_cache(maxsize=1)
