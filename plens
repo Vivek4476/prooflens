@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# ProofLens launcher — runs the CLI using the repo's own virtualenv and source,
+# with no install step required. Works from any directory.
+#
+#   ./plens score /path/to/photo.jpg --backend openrouter
+#
+set -euo pipefail
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec env PYTHONPATH="$DIR/src" "$DIR/.venv/bin/python" -m prooflens "$@"
