@@ -88,9 +88,11 @@ src/prooflens/
   db/         SQLAlchemy models, Postgres hash store, crypto (queue/tenants/results/audit/DLQ)
   queue/      Postgres job queue: SKIP LOCKED drain, backoff+jitter, DLQ
   tenants/    per-tenant scoring resolution + credentials
+  service/    application seam: Repo (in-memory + Postgres) + per-job processor
+  api/        FastAPI: POST /v1/webhooks/lsq/{tenant_slug} (+ /healthz /readyz)
+  worker.py   queue-draining worker process (python -m prooflens.worker)
+  lsq/        LSQClient protocol + FakeLSQClient (RealLSQClient: Phase 3)
   telemetry/  structured JSON logging (Prometheus /metrics: Phase 3)
-  api/        FastAPI surface (Phase 2/3)
-  lsq/        LeadSquared client (Phase 2/3)
   config.py   pydantic-settings, env-driven
 rubrics/v1.yaml   the vision prompt IS policy — versioned, stamped into every result
 migrations/       Alembic (initial schema: tenants, jobs, image_hashes, results, audit_log)
@@ -117,8 +119,13 @@ Phase 3.
 - **Phase 1 — "spine" (this milestone):** config, migrations, tenant model +
   seed, queue, pure engine + stub backend, CLI, verdict-copy + design docs, unit
   tests, golden set. ✅
-- **Phase 2 — "edges":** webhook (signature + idempotency), worker process,
-  FakeLSQClient write-back, `anthropic` + `local_vlm` backends, golden CI job.
+- **Phase 2 — "edges" (this milestone):** webhook (per-tenant signature +
+  event-id idempotency), worker process, FakeLSQClient ordered write-back
+  (band → score → reason), application seam (in-memory + Postgres repos),
+  dedicated golden CI job. ✅ End-to-end offline: signed webhook → queue →
+  worker → FakeLSQ shows the three fields; a duplicate event id returns 200 and
+  is not reprocessed. The `anthropic`/`local_vlm` backends exist but are **never
+  called** without explicit approval.
 - **Phase 3 — "production skin":** admin API, metrics/logging wiring, Dockerfile
   + docker-compose, runbook + onboarding, `RealLSQClient`.
 

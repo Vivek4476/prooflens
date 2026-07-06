@@ -76,3 +76,6 @@ no_implicit_optional = true
 testpaths = ["tests"]
 pythonpath = ["src", "."]
 addopts = "-q --import-mode=importlib"
+markers = [
+  "golden: golden-set band+reason regression (runs as its own CI gate)",
+]

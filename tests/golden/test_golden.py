@@ -14,6 +14,8 @@ from prooflens.engine import REASON_TEXT, InMemoryHashStore, Reason
 from prooflens.vision import get_backend
 from tests.helpers import IMAGES_DIR, load_labels, score_image
 
+pytestmark = pytest.mark.golden
+
 LABELS = load_labels()
 
 
