@@ -89,9 +89,9 @@ export default function AnalyticsPage() {
                     fontSize: 12,
                   }}
                 />
-                <Bar dataKey="Clear" stackId="b" fill="var(--verdict-clear)" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="Doubtful" stackId="b" fill="var(--verdict-doubtful)" />
-                <Bar dataKey="Suspect" stackId="b" fill="var(--verdict-suspect)" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="Clear" stackId="b" fill="var(--verdict-clear)" maxBarSize={64} />
+                <Bar dataKey="Doubtful" stackId="b" fill="var(--verdict-doubtful)" maxBarSize={64} />
+                <Bar dataKey="Suspect" stackId="b" fill="var(--verdict-suspect)" maxBarSize={64} radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}

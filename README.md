@@ -100,17 +100,40 @@ rubrics/v1.yaml   the vision prompt IS policy — versioned, stamped into every 
 migrations/       Alembic (initial schema: tenants, jobs, image_hashes, results, audit_log)
 tests/{unit,integration,golden}/
 docs/  deploy/  scripts/  .env.example
+frontend/         Next.js 15 enterprise UI (Dashboard/Analyze/History/Review/Analytics/Settings)
+  BACKEND_REQUIREMENTS.md   exact API contract the UI consumes + endpoints still required
 ```
 
-## Run the full stack (Docker)
+## Run the full stack — API + worker + enterprise UI (Docker)
 
 The engine, CLI and tests never need a database. The **service** (api + worker +
-postgres) does — `docker compose` runs migrations on boot and seeds a dev
-tenant:
+postgres + web) does — `docker compose` runs migrations on boot, seeds a dev
+tenant, and serves the frontend:
 
 ```bash
 docker compose -f deploy/docker-compose.yml up --build
+#   db · migrate (schema + seed) · api · worker · web
 
+# UI:      http://localhost:3000        (Dashboard, Analyze, History, Review, Analytics, Settings)
+# API docs: http://localhost:8000/docs
+
+# Populate the demo with REAL verdicts (pushes sample images through /v1/score):
+python scripts/generate_demo_images.py
+cd frontend && npm install && npm run seed:demo
+```
+
+For a real vision model instead of the offline stub, start the stack with
+`VISION_BACKEND=openrouter` and an `OPENROUTER_API_KEY` in `.env` (the free tier
+rate-limits; scoring is fail-open, so a slow/failed model degrades to "scored
+without content analysis" rather than breaking). The Analyze page also has a
+per-request **Demo model / Live AI** switch.
+
+The frontend is a separate Next.js app in `frontend/` (see
+`frontend/BACKEND_REQUIREMENTS.md` for the exact API contract it consumes).
+
+### API only
+
+```bash
 curl -s localhost:8000/healthz    # {"status":"ok"}
 curl -s localhost:8000/readyz     # {"status":"ready"}  (DB reachable)
 curl -s localhost:8000/metrics    # Prometheus: queue depth, band mix, latencies, vision failures

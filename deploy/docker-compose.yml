@@ -71,5 +71,20 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  # Enterprise SaaS frontend (Next.js). Browser reaches the API at the
+  # host-mapped port, so NEXT_PUBLIC_API_URL defaults to localhost:8000.
+  web:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+        NEXT_PUBLIC_ADMIN_TOKEN: ${PROOFLENS_ADMIN_TOKEN:-dev-admin-token}
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_started
+
 volumes:
   pgdata:

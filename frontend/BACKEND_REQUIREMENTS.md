@@ -58,6 +58,11 @@ them); they are `null` for direct/seeded uploads.
 `avg_processing_ms`, `duplicates_caught`, `top_reasons[]` (verbatim reason text),
 `series[]` (per-day count / band mix / avg score).
 
+**`GET /admin/tenants` → `scoring`** — the admin tenant payload now includes the
+resolved `scoring` config (weights, thresholds, caps, bands = defaults deep-merged
+with the tenant's overrides), so the Settings page can display real per-tenant
+thresholds without duplicating backend values.
+
 ## Known trade-offs (by design)
 
 - **No thumbnails.** The backend **never stores images** — only an 8-byte
