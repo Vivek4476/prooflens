@@ -1,0 +1,46 @@
+"""Sharpness check — OpenCV Laplacian variance.
+
+Low variance => few sharp edges => blurred. Unreadable images get a quality
+flag ("retake"), which the fusion layer treats as a weak signal — never a heavy
+score penalty on its own. Maps variance onto 0-100 with a linear ramp between
+``blur_floor`` (unreadable) and ``sharp_ok`` (clearly readable).
+"""
+
+from __future__ import annotations
+
+from ..scoring_config import Thresholds
+from ..types import CheckOutcome
+from ._imaging import CV2_AVAILABLE, load_gray
+
+NAME = "sharpness"
+
+
+def run(image_bytes: bytes, thresholds: Thresholds) -> CheckOutcome:
+    if not CV2_AVAILABLE:  # pragma: no cover
+        return CheckOutcome(NAME, available=False, score=None, summary="OpenCV not installed.")
+
+    gray = load_gray(image_bytes)
+    if gray is None:
+        return CheckOutcome(NAME, available=True, score=0.0, summary="Could not decode image.")
+
+    import cv2  # available here
+
+    variance = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+    floor, ok = thresholds.blur_floor, thresholds.sharp_ok
+
+    if variance <= floor:
+        score, summary = 0.0, "Unreadable — image is too blurred."
+    elif variance >= ok:
+        score, summary = 100.0, "Image is sharp."
+    else:
+        score = (variance - floor) / (ok - floor) * 100.0
+        summary = "Slightly soft but readable."
+
+    return CheckOutcome(
+        NAME,
+        available=True,
+        score=round(score, 1),
+        summary=summary,
+        metric=round(variance, 1),
+        data={"too_blurred": variance <= floor},
+    )

@@ -1,0 +1,8 @@
+filename,expected_band,expected_reason_code,seed_with,note
+meeting.jpg,Clear,clear,,rich real scene with people
+blurred.jpg,Doubtful,too_blurred,,"meeting scene, unreadable"
+landscape.jpg,Suspect,no_people_or_irrelevant,,"outdoor, no people"
+screenshot.jpg,Suspect,designed_graphic,,flat UI mock-up
+screen_recapture.jpg,Suspect,screen_recapture,,photographed off a screen
+duplicate_a.jpg,Clear,clear,,first upload of the pair
+duplicate_b.jpg,Suspect,recycled,duplicate_a.jpg,exact re-upload
