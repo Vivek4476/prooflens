@@ -24,6 +24,7 @@ class CheckOutcome:
     summary: str              # short internal description (NOT shown to reps)
     metric: float | None = None      # raw underlying number, if any
     data: dict[str, Any] = field(default_factory=dict)  # extra structured detail
+    latency_ms: float | None = None  # wall-clock time this check took (set by the pipeline)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

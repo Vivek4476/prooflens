@@ -15,10 +15,21 @@ via EngineContext.
 
 from __future__ import annotations
 
+import time
+from collections.abc import Callable
+
 from ..vision.rubric import RUBRIC_VERSION
 from .checks import blur, exif, recapture, relevance, uniqueness
 from .fusion import fuse
 from .types import CheckOutcome, EngineContext, Verdict
+
+
+def _timed(fn: Callable[[], CheckOutcome]) -> CheckOutcome:
+    """Run a check and stamp its wall-clock latency (for the /metrics histogram)."""
+    start = time.perf_counter()
+    out = fn()
+    out.latency_ms = round((time.perf_counter() - start) * 1000, 2)
+    return out
 
 
 def _free_hard_gate_fired(outcomes: list[CheckOutcome]) -> bool:
@@ -38,15 +49,15 @@ def score(image_bytes: bytes, context: EngineContext) -> Verdict:
     """Score one image. ``engine.score(image_bytes, context) -> Verdict``."""
     cfg = context.scoring
     outcomes: list[CheckOutcome] = [
-        exif.run(image_bytes),
-        blur.run(image_bytes, cfg.thresholds),
-        uniqueness.run(
+        _timed(lambda: exif.run(image_bytes)),
+        _timed(lambda: blur.run(image_bytes, cfg.thresholds)),
+        _timed(lambda: uniqueness.run(
             image_bytes,
             tenant_id=context.tenant_id,
             store=context.hash_store,
             thresholds=cfg.thresholds,
-        ),
-        recapture.run(image_bytes),
+        )),
+        _timed(lambda: recapture.run(image_bytes)),
     ]
 
     # 5. Content — skip the paid vision call if a free hard gate already fired.
@@ -62,7 +73,11 @@ def score(image_bytes: bytes, context: EngineContext) -> Verdict:
         )
     else:
         outcomes.append(
-            relevance.run(image_bytes, vision=context.vision, thresholds=cfg.thresholds)
+            _timed(
+                lambda: relevance.run(
+                    image_bytes, vision=context.vision, thresholds=cfg.thresholds
+                )
+            )
         )
 
     result = fuse(outcomes, cfg)

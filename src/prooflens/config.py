@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     env: str = Field(default="dev", alias="PROOFLENS_ENV")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
 
+    # Admin API bearer token (X-Admin-Token). Staging/prod MUST override.
+    admin_token: str = Field(default="dev-admin-token", alias="PROOFLENS_ADMIN_TOKEN")
+
     database_url: str = Field(
         default="postgresql+psycopg://prooflens:prooflens@localhost:5432/prooflens",
         alias="DATABASE_URL",

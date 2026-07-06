@@ -22,8 +22,10 @@ custom fields on the same LSQ opportunity.
   like an ideal meeting" (field environments vary across city tiers).
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md),
-[docs/DESIGN_PRINCIPLES.md](docs/DESIGN_PRINCIPLES.md) and
-[docs/VERDICT_COPY.md](docs/VERDICT_COPY.md).
+[docs/DESIGN_PRINCIPLES.md](docs/DESIGN_PRINCIPLES.md),
+[docs/VERDICT_COPY.md](docs/VERDICT_COPY.md),
+[docs/RUNBOOK.md](docs/RUNBOOK.md) and
+[docs/TENANT_ONBOARDING.md](docs/TENANT_ONBOARDING.md).
 
 ## Quickstart (clone → running, offline)
 
@@ -100,19 +102,38 @@ tests/{unit,integration,golden}/
 docs/  deploy/  scripts/  .env.example
 ```
 
-## Database (Phase 2+)
+## Run the full stack (Docker)
 
-The engine, CLI and tests never need a database. The service does:
+The engine, CLI and tests never need a database. The **service** (api + worker +
+postgres) does — `docker compose` runs migrations on boot and seeds a dev
+tenant:
+
+```bash
+docker compose -f deploy/docker-compose.yml up --build
+
+curl -s localhost:8000/healthz    # {"status":"ok"}
+curl -s localhost:8000/readyz     # {"status":"ready"}  (DB reachable)
+curl -s localhost:8000/metrics    # Prometheus: queue depth, band mix, latencies, vision failures
+
+# Create a tenant (admin token defaults to dev-admin-token)
+curl -sX POST localhost:8000/admin/tenants -H "X-Admin-Token: dev-admin-token" \
+  -H "content-type: application/json" \
+  -d '{"slug":"acme","name":"Acme","webhook_secret":"s","field_map":{"band":"B","score":"S","reason":"R"}}'
+```
+
+See [docs/TENANT_ONBOARDING.md](docs/TENANT_ONBOARDING.md) for the webhook wiring
+and [docs/RUNBOOK.md](docs/RUNBOOK.md) for operations.
+
+Without Docker (against your own Postgres):
 
 ```bash
 pip install -e ".[service]"
 export DATABASE_URL=postgresql+psycopg://prooflens:prooflens@localhost:5432/prooflens
-alembic upgrade head              # build the schema
-python scripts/seed_dev_tenant.py # seed one dev tenant
+alembic upgrade head                       # build the schema
+python scripts/seed_dev_tenant.py          # seed one dev tenant
+uvicorn prooflens.api.app:app --port 8000  # api  (separate shell:)
+python -m prooflens.worker                 # worker
 ```
-
-`docker compose up` (app + worker + postgres, migrations on boot) lands in
-Phase 3.
 
 ## Build phases
 
@@ -126,8 +147,10 @@ Phase 3.
   worker → FakeLSQ shows the three fields; a duplicate event id returns 200 and
   is not reprocessed. The `anthropic`/`local_vlm` backends exist but are **never
   called** without explicit approval.
-- **Phase 3 — "production skin":** admin API, metrics/logging wiring, Dockerfile
-  + docker-compose, runbook + onboarding, `RealLSQClient`.
+- **Phase 3 — "production skin" (this milestone):** admin tenant CRUD,
+  Prometheus `/metrics` + structured logging, Dockerfile + docker-compose
+  (migrations on boot), RUNBOOK + onboarding guide, `RealLSQClient` last with
+  the LSQ unknowns stubbed behind marked TODOs. ✅
 
 ## Ask-before-guessing: LSQ unknowns (stubbed behind interfaces)
 

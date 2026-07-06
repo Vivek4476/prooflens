@@ -18,6 +18,7 @@ from .lsq.fake import FakeLSQClient
 from .service.processor import process_job
 from .service.repo import Repo
 from .telemetry import configure_logging, get_logger
+from .telemetry.metrics import JOBS_PROCESSED, observe_verdict
 
 
 def run_once(repo: Repo, lsq: LSQClient, settings: Settings) -> int:
@@ -33,12 +34,15 @@ def run_once(repo: Repo, lsq: LSQClient, settings: Settings) -> int:
             repo.complete(job.id)
             repo.commit()
             processed += 1
+            observe_verdict(job.tenant_id, verdict)
+            JOBS_PROCESSED.labels(outcome="done").inc()
             jlog.info("job.done", band=verdict.band, score=verdict.score,
                       reason_code=verdict.reason_code)
         except Exception as exc:  # noqa: BLE001 — fail-open, reschedule/DLQ
             repo.rollback()
             repo.fail(job.id, exc)
             repo.commit()
+            JOBS_PROCESSED.labels(outcome="failed").inc()
             jlog.warning("job.failed", error=str(exc)[:300])
     return processed
 

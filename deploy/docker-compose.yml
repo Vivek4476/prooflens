@@ -1,0 +1,67 @@
+# ProofLens local stack: postgres + one-shot migrate/seed + api + worker.
+# From the repo root:  docker compose -f deploy/docker-compose.yml up --build
+# Then: curl localhost:8000/healthz   and   curl localhost:8000/metrics
+
+x-app-env: &app-env
+  DATABASE_URL: postgresql+psycopg://prooflens:prooflens@db:5432/prooflens
+  # Dev-only secrets; OVERRIDE in staging/prod (Fernet key + admin token).
+  PROOFLENS_SECRET_KEY: ${PROOFLENS_SECRET_KEY:-dev-insecure-key-do-not-use-in-production-0000000000000000=}
+  PROOFLENS_ADMIN_TOKEN: ${PROOFLENS_ADMIN_TOKEN:-dev-admin-token}
+  VISION_BACKEND: ${VISION_BACKEND:-stub}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: prooflens
+      POSTGRES_PASSWORD: prooflens
+      POSTGRES_DB: prooflens
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prooflens"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  # Runs migrations on boot, then seeds one dev tenant. Exits 0 when done.
+  migrate:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    command: sh -c "alembic upgrade head && python scripts/seed_dev_tenant.py"
+    environment:
+      <<: *app-env
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    command: uvicorn prooflens.api.app:app --host 0.0.0.0 --port 8000
+    environment:
+      <<: *app-env
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    command: python -m prooflens.worker
+    environment:
+      <<: *app-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:
