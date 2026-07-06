@@ -59,7 +59,10 @@ def build_parser() -> argparse.ArgumentParser:
     sc.add_argument(
         "--backend",
         default="stub",
-        help="vision backend (default: stub; anthropic/local_vlm spend/require setup)",
+        help=(
+            "vision backend: stub (default, offline) | gemini | openrouter | "
+            "nvidia | anthropic | local_vlm"
+        ),
     )
     sc.set_defaults(func=_score_command)
     return parser

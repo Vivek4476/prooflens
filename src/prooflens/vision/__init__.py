@@ -34,13 +34,24 @@ def get_backend(name: str = "stub", **kwargs) -> VisionBackend:
             model=kwargs.get("model", "claude-haiku-4-5"),
             max_edge=kwargs.get("max_edge", 768),
         )
-    if name == "local_vlm":
-        from .local_vlm import LocalVLMBackend
+    # OpenAI-compatible hosted/local endpoints (Gemini, OpenRouter, Ollama, ...).
+    if name in ("local_vlm", "gemini", "openrouter"):
+        from .openai_compat import OpenAICompatBackend
 
-        return LocalVLMBackend(
-            base_url=kwargs["base_url"],
-            model=kwargs["model"],
+        return OpenAICompatBackend(
+            name=name,
             api_key=kwargs.get("api_key", "not-needed"),
+            model=kwargs["model"],
+            base_url=kwargs["base_url"],
+            max_edge=kwargs.get("max_edge", 768),
+        )
+    if name == "nvidia":
+        from .nvidia_backend import NvidiaBackend
+
+        return NvidiaBackend(
+            api_key=kwargs.get("api_key", ""),
+            model=kwargs.get("model", "meta/llama-3.2-90b-vision-instruct"),
+            base_url=kwargs.get("base_url", "https://integrate.api.nvidia.com/v1"),
             max_edge=kwargs.get("max_edge", 768),
         )
     raise ValueError(f"unknown vision backend: {name!r}")

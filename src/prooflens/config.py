@@ -48,6 +48,32 @@ class Settings(BaseSettings):
     local_vlm_model: str = Field(default="qwen2-vl:7b", alias="LOCAL_VLM_MODEL")
     local_vlm_api_key: str = Field(default="not-needed", alias="LOCAL_VLM_API_KEY")
 
+    # NVIDIA-hosted VLMs (free tier at build.nvidia.com; key looks like nvapi-...).
+    nvidia_api_key: str = Field(default="", alias="NVIDIA_API_KEY")
+    nvidia_model: str = Field(
+        default="meta/llama-3.2-90b-vision-instruct", alias="NVIDIA_MODEL"
+    )
+    nvidia_base_url: str = Field(
+        default="https://integrate.api.nvidia.com/v1", alias="NVIDIA_BASE_URL"
+    )
+
+    # Google Gemini via AI Studio (free tier; just a Google account, no card).
+    gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")
+    gemini_model: str = Field(default="gemini-2.0-flash", alias="GEMINI_MODEL")
+    gemini_base_url: str = Field(
+        default="https://generativelanguage.googleapis.com/v1beta/openai",
+        alias="GEMINI_BASE_URL",
+    )
+
+    # OpenRouter (free ":free" vision models; email signup, no card).
+    openrouter_api_key: str = Field(default="", alias="OPENROUTER_API_KEY")
+    openrouter_model: str = Field(
+        default="meta-llama/llama-3.2-11b-vision-instruct:free", alias="OPENROUTER_MODEL"
+    )
+    openrouter_base_url: str = Field(
+        default="https://openrouter.ai/api/v1", alias="OPENROUTER_BASE_URL"
+    )
+
     # Queue / worker.
     queue_max_attempts: int = Field(default=5, alias="QUEUE_MAX_ATTEMPTS")
     queue_backoff_base_seconds: int = Field(default=5, alias="QUEUE_BACKOFF_BASE_SECONDS")
@@ -65,15 +91,32 @@ class Settings(BaseSettings):
     def build_vision_backend(self, name: str | None = None) -> VisionBackend:
         """Construct the configured vision backend. Defaults to the stub."""
         name = (name or self.vision_backend or "stub").strip().lower()
-        return get_backend(
-            name,
-            api_key=(
-                self.anthropic_api_key if name == "anthropic" else self.local_vlm_api_key
-            ),
-            model=(self.anthropic_model if name == "anthropic" else self.local_vlm_model),
-            base_url=self.local_vlm_base_url,
-            max_edge=self.vision_max_edge,
-        )
+        per_backend = {
+            "stub": {},
+            "anthropic": {"api_key": self.anthropic_api_key, "model": self.anthropic_model},
+            "local_vlm": {
+                "api_key": self.local_vlm_api_key,
+                "model": self.local_vlm_model,
+                "base_url": self.local_vlm_base_url,
+            },
+            "nvidia": {
+                "api_key": self.nvidia_api_key,
+                "model": self.nvidia_model,
+                "base_url": self.nvidia_base_url,
+            },
+            "gemini": {
+                "api_key": self.gemini_api_key,
+                "model": self.gemini_model,
+                "base_url": self.gemini_base_url,
+            },
+            "openrouter": {
+                "api_key": self.openrouter_api_key,
+                "model": self.openrouter_model,
+                "base_url": self.openrouter_base_url,
+            },
+        }
+        kwargs = per_backend.get(name, {})
+        return get_backend(name, max_edge=self.vision_max_edge, **kwargs)
 
 
 @functools.lru_cache(maxsize=1)
