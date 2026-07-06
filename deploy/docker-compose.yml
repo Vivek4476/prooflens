@@ -9,6 +9,12 @@ x-app-env: &app-env
   PROOFLENS_ADMIN_TOKEN: ${PROOFLENS_ADMIN_TOKEN:-dev-admin-token}
   VISION_BACKEND: ${VISION_BACKEND:-stub}
   LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+  # Optional hosted vision keys (passed through when set on the host / .env).
+  OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+  OPENROUTER_MODEL: ${OPENROUTER_MODEL:-nvidia/nemotron-nano-12b-v2-vl:free}
+  GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+  NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
 
 services:
   db:

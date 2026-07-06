@@ -29,7 +29,7 @@ class OpenAICompatBackend(VisionBackend):
         model: str,
         base_url: str,
         max_edge: int = 768,
-        timeout: float = 60.0,
+        timeout: float = 30.0,
     ):
         if not api_key:
             raise ValueError(f"an API key is required for the {name} backend")

@@ -45,8 +45,9 @@ async def score_image(
         )
 
     settings = get_settings()
-    # Never call a paid backend implicitly: the request/tenant/env chooses it.
-    chosen = backend or tenant_view.vision_backend or settings.vision_backend
+    # Direct scoring is operator-driven: the request override wins, else the
+    # env VISION_BACKEND (the tenant's own backend governs the async webhook path).
+    chosen = backend or settings.vision_backend
     vision = settings.build_vision_backend(chosen)
 
     ctx = EngineContext(

@@ -9,20 +9,31 @@ import { useState } from "react";
  * it sits on a light chip because the artwork assumes a light background.
  */
 export function Logo({ collapsed = false }: { collapsed?: boolean }) {
-  const [failed, setFailed] = useState(false);
+  // Show the placeholder until the real artwork actually loads — never flash a
+  // broken-image glyph when the PNG isn't present.
+  const [status, setStatus] = useState<"probing" | "ok" | "missing">("probing");
 
   return (
     <div className="flex flex-col gap-1.5">
       <div className="inline-flex items-center rounded-md bg-white px-2 py-1.5 shadow-1 dark:ring-1 dark:ring-black/10">
-        {failed ? (
-          <Placeholder collapsed={collapsed} />
-        ) : (
+        {status === "ok" ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src="/brand/abc-life-insurance.png"
             alt="Aditya Birla Capital — Life Insurance"
             className={collapsed ? "h-7 w-auto" : "h-8 w-auto"}
-            onError={() => setFailed(true)}
+          />
+        ) : (
+          <Placeholder collapsed={collapsed} />
+        )}
+        {status === "probing" && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src="/brand/abc-life-insurance.png"
+            alt=""
+            className="hidden"
+            onLoad={() => setStatus("ok")}
+            onError={() => setStatus("missing")}
           />
         )}
       </div>
