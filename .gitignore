@@ -20,3 +20,6 @@ dist/
 
 # OS
 .DS_Store
+
+# Generated demo dataset (regenerate via scripts/generate_demo_images.py)
+/demo_images/
