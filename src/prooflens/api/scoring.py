@@ -15,8 +15,8 @@ from collections import Counter
 from datetime import UTC, datetime
 from typing import Literal
 
+import anyio
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
-from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
 from ..config import get_settings
@@ -31,6 +31,14 @@ router = APIRouter(tags=["scoring"])
 DEFAULT_TENANT = "dev"  # seeded by scripts/seed_dev_tenant.py / the migrate service
 
 REVIEWER = "Demo Operator"  # placeholder identity until SSO/RBAC (M4)
+
+# Bound how many image scorings run concurrently in this process. Each one
+# transiently allocates decode buffers + FFT arrays; on a small instance a
+# handful of large images running at once (the threadpool default is ~40) stack
+# their spikes into an OOM. Excess requests QUEUE on this limiter — fail-open:
+# they wait a moment, they are never rejected.
+_SCORE_CONCURRENCY = 2
+_score_limiter = anyio.CapacityLimiter(_SCORE_CONCURRENCY)
 
 
 class ReviewBody(BaseModel):
@@ -52,7 +60,10 @@ async def score_image(
     # call — to a worker thread. On a single-worker server, running it on the
     # event loop blocked health-check probes during a multi-second inference, so
     # the platform killed the instance mid-request (the 502s we saw on Render).
-    return await run_in_threadpool(_score_direct, data, tenant, backend, repo)
+    # The limiter caps concurrent scorings so their memory spikes can't stack.
+    return await anyio.to_thread.run_sync(
+        _score_direct, data, tenant, backend, repo, limiter=_score_limiter
+    )
 
 
 def _score_direct(data: bytes, tenant: str, backend: str | None, repo: Repo) -> dict:
