@@ -5,6 +5,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -77,24 +78,56 @@ export default function AnalyticsPage() {
           {isLoading || !a ? (
             <Skeleton className="h-full w-full" />
           ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={series} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="date" tick={{ fontSize: 12, fill: "var(--text-muted)" }} stroke="var(--border)" />
-                <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "var(--text-muted)" }} stroke="var(--border)" />
-                <Tooltip
-                  contentStyle={{
-                    background: "var(--surface)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }}
-                />
-                <Bar dataKey="Clear" stackId="b" fill="var(--verdict-clear)" maxBarSize={64} />
-                <Bar dataKey="Doubtful" stackId="b" fill="var(--verdict-doubtful)" maxBarSize={64} />
-                <Bar dataKey="Suspect" stackId="b" fill="var(--verdict-suspect)" maxBarSize={64} radius={[3, 3, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <>
+              <div className="h-full w-full" aria-hidden="true">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={series} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                    <XAxis dataKey="date" tick={{ fontSize: 12, fill: "var(--text-muted)" }} stroke="var(--border)" />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "var(--text-muted)" }} stroke="var(--border)" />
+                    <Tooltip
+                      contentStyle={{
+                        background: "var(--surface)",
+                        border: "1px solid var(--border)",
+                        borderRadius: 8,
+                        fontSize: 12,
+                      }}
+                    />
+                    <Legend
+                      iconType="square"
+                      iconSize={10}
+                      wrapperStyle={{ fontSize: 12, color: "var(--text-muted)" }}
+                    />
+                    <Bar dataKey="Clear" stackId="b" fill="var(--verdict-clear)" maxBarSize={64} />
+                    <Bar dataKey="Doubtful" stackId="b" fill="var(--verdict-doubtful)" maxBarSize={64} />
+                    <Bar dataKey="Suspect" stackId="b" fill="var(--verdict-suspect)" maxBarSize={64} radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <table className="sr-only">
+                <caption>
+                  Band mix over time: daily counts of Clear, Doubtful, and Suspect verdicts.
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Date</th>
+                    <th scope="col">Clear</th>
+                    <th scope="col">Doubtful</th>
+                    <th scope="col">Suspect</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {series.map((d) => (
+                    <tr key={d.date}>
+                      <th scope="row">{d.date}</th>
+                      <td>{d.Clear}</td>
+                      <td>{d.Doubtful}</td>
+                      <td>{d.Suspect}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
           )}
         </ChartCard>
 
