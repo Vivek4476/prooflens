@@ -98,6 +98,22 @@ export default function VerdictDetailPage() {
             </dl>
           </Card>
 
+          {/* Moderator review — only once a decision has been recorded. */}
+          {r.review && (
+            <Card>
+              <CardHeader title="Moderator review" subtitle="The human decision recorded for this verdict." />
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-4 px-5 py-4 sm:grid-cols-4">
+                <Field label="Decision" value={r.review.status.replace("_", " ")} />
+                <Field label="Reviewer" value={r.review.reviewer ?? "—"} />
+                <Field
+                  label="Reviewed"
+                  value={r.review.reviewed_at ? formatDateTime(r.review.reviewed_at) : "—"}
+                />
+                <Field label="Note" value={r.review.note ?? "—"} />
+              </dl>
+            </Card>
+          )}
+
           {/* Full evidence */}
           <Card>
             <CardHeader
