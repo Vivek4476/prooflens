@@ -81,10 +81,14 @@ class StubBackend(VisionBackend):
         # the synthetic golden set deterministic and stable across v1 -> v2.
         return ContentAssessment(
             people_count=people_count,
+            # The stub cannot read interaction; treat >=2 people as interacting so
+            # a genuine multi-person scene stays a valid meeting deterministically.
+            people_interacting=people_count >= 2,
             setting=setting,
             environment=setting,
             primary_subject=subject,
             scene_description=description,
+            emotional_tone="neutral" if people_present else "unclear",
             looks_like_photo_of_a_screen=False,  # real screen recapture is a separate check
             is_designed_graphic=graphic_like,
             is_meme_or_screenshot=graphic_like,

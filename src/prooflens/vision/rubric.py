@@ -37,7 +37,7 @@ def load_rubric(version: str = "v1") -> dict:
 
 # Active rubric version. Bumping this requires a new rubrics/<version>.yaml and a
 # golden-set review in the same PR.
-RUBRIC_VERSION = "v2"
+RUBRIC_VERSION = "v3"
 
 _ACTIVE = load_rubric(RUBRIC_VERSION)
 SYSTEM_PROMPT: str = _ACTIVE["system_prompt"]

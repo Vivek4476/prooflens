@@ -88,23 +88,30 @@ def _gates(checks: dict[str, CheckOutcome], cfg: ScoringConfig) -> list[tuple[Re
             fired.append((Reason.SCREEN_RECAPTURE, caps.screen_recapture))
         if d.get("is_designed_graphic") or d.get("is_meme_or_screenshot"):
             fired.append((Reason.DESIGNED_GRAPHIC, caps.designed_graphic))
-        if int(d.get("people_count", 0)) == 0:
+        pc = int(d.get("people_count", 0))
+        if pc == 0:
             fired.append((Reason.NO_PEOPLE_OR_IRRELEVANT, caps.no_people))
         elif int(d.get("plausibility", 100)) < cfg.thresholds.plausibility_gate:
             fired.append((Reason.NO_PEOPLE_OR_IRRELEVANT, caps.low_plausibility))
-        # Real capture of real people, but no apparent visit/interaction. Fire ONLY
-        # when the model is confident there is no visit — an ambiguous read must
-        # lower confidence, not manufacture a flag. Caps to Doubtful, never Suspect.
+
+        # A valid proof-of-meeting needs >=2 people in a genuine interaction. These
+        # meeting gates fire ONLY on a real capture (red flags handled above) and
+        # ONLY when the model is confident — an ambiguous read lowers confidence,
+        # it does not manufacture a flag. Both cap to Doubtful, never Suspect.
+        not_flag = not (
+            d.get("looks_like_photo_of_a_screen")
+            or d.get("is_designed_graphic")
+            or d.get("is_meme_or_screenshot")
+        )
+        conf_high = str(d.get("context_confidence", "")).lower() == "high"
         vc = d.get("visit_context")
-        if (
-            vc is not None
-            and int(d.get("people_count", 0)) > 0
-            and not (d.get("looks_like_photo_of_a_screen") or d.get("is_designed_graphic")
-                     or d.get("is_meme_or_screenshot"))
-            and int(vc) < cfg.thresholds.visit_context_gate
-            and str(d.get("context_confidence", "")).lower() == "high"
-        ):
-            fired.append((Reason.NO_VISIT_CONTEXT, caps.weak_visit_context))
+        if pc > 0 and not_flag and conf_high:
+            if pc == 1:
+                # A lone individual is never evidence of a meeting.
+                fired.append((Reason.SINGLE_PERSON, caps.weak_visit_context))
+            elif vc is not None and int(vc) < cfg.thresholds.visit_context_gate:
+                # >=2 people but no genuine interaction (posed group, no exchange).
+                fired.append((Reason.NO_VISIT_CONTEXT, caps.weak_visit_context))
     elif content is not None and not content.available:
         # Vision unavailable: score without it, but never award Clear.
         fired.append((Reason.NO_CONTENT_ANALYSIS, caps.no_content))

@@ -65,6 +65,26 @@ def test_no_people_gate():
     assert r.reason_code == Reason.NO_PEOPLE_OR_IRRELEVANT.value
 
 
+def test_single_person_is_not_a_meeting_doubtful():
+    # A lone individual — real photo, but not evidence of a customer meeting.
+    checks = _clean_checks()
+    checks[4] = _content(
+        people_count=1, plausibility=85, visit_context=30, context_confidence="high"
+    )
+    r = fuse(checks, DEFAULT_SCORING)
+    assert r.band == "Doubtful"  # flagged for review, never Suspect (it's a real photo)
+    assert r.reason_code == Reason.SINGLE_PERSON.value
+
+
+def test_single_person_low_confidence_does_not_gate():
+    checks = _clean_checks()
+    checks[4] = _content(
+        people_count=1, plausibility=85, visit_context=30, context_confidence="low"
+    )
+    r = fuse(checks, DEFAULT_SCORING)
+    assert r.reason_code != Reason.SINGLE_PERSON.value
+
+
 def test_no_visit_context_gates_to_doubtful_not_suspect():
     # A real photo of real people, but the model is confident there's no visit.
     checks = _clean_checks()

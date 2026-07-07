@@ -18,10 +18,12 @@ class ContentAssessment(BaseModel):
     """The rubric's output contract. Field names mirror rubrics/v1.yaml."""
 
     people_count: int = Field(ge=0, le=100)
+    people_interacting: bool = False  # v3 — >=2 people apparently interacting
     setting: str = "unknown"
     environment: str = "unknown"
     primary_subject: str = "unknown"
     scene_description: str = ""
+    emotional_tone: str = "unclear"  # v3 — engaged|neutral|posed|tense|unclear
     looks_like_photo_of_a_screen: bool = False
     is_designed_graphic: bool = False
     is_meme_or_screenshot: bool = False
@@ -38,7 +40,8 @@ class ContentAssessment(BaseModel):
     model: str = "unknown"
 
     @field_validator(
-        "setting", "environment", "primary_subject", "scene_description", "reason",
+        "setting", "environment", "primary_subject", "scene_description",
+        "emotional_tone", "reason",
         mode="before",
     )
     @classmethod
@@ -66,6 +69,7 @@ class ContentAssessment(BaseModel):
             return None
 
     @field_validator(
+        "people_interacting",
         "looks_like_photo_of_a_screen",
         "is_designed_graphic",
         "is_meme_or_screenshot",
