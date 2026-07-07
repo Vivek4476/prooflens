@@ -44,6 +44,10 @@ class ResultView:
     source: str = "direct"   # "webhook" (came via LSQ) | "direct" (scored via /v1/score)
     opportunity_id: str | None = None
     rep_id: str | None = None
+    review_status: str | None = None   # approve|reject|false_positive|escalate; None = pending
+    review_note: str | None = None
+    reviewed_at: str | None = None     # ISO 8601
+    reviewer: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -59,4 +63,15 @@ class ResultView:
             "opportunity_id": self.opportunity_id,
             "rep_id": self.rep_id,
             "checks": self.checks,
+            "review": self._review_dict(),
+        }
+
+    def _review_dict(self) -> dict | None:
+        if self.review_status is None:
+            return None
+        return {
+            "status": self.review_status,
+            "note": self.review_note,
+            "reviewed_at": self.reviewed_at,
+            "reviewer": self.reviewer,
         }
