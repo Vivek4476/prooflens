@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     cors_origins: str = Field(
         default="http://localhost:3000,http://127.0.0.1:3000", alias="CORS_ORIGINS"
     )
+    # Regex for origins allowed IN ADDITION to cors_origins. Default matches every
+    # Vercel deployment of this project (the stable alias AND per-deploy preview
+    # URLs like prooflens-<hash>-<scope>.vercel.app), so a new deploy URL isn't
+    # blocked by exact-match CORS. Empty string disables the regex.
+    cors_origin_regex: str = Field(
+        default=r"https://prooflens-.*\.vercel\.app", alias="CORS_ORIGIN_REGEX"
+    )
 
     database_url: str = Field(
         default="postgresql+psycopg://prooflens:prooflens@localhost:5432/prooflens",
