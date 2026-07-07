@@ -30,19 +30,35 @@ _MOIRE_PEAK_GATE = 200.0      # max/mean FFT energy in the high-freq band
 _GLARE_FRACTION_GATE = 0.012  # fraction of near-white specular pixels
 _BEZEL_CONTRAST_GATE = 55.0   # interior mean minus border mean (0-255)
 
+# Cap the FFT working area to bound memory. A full-resolution 12 MP FFT
+# transiently allocates ~0.5 GB (complex128 spectrum + fftshift copy + abs), the
+# dominant per-request spike that OOMs a small instance. We take a CENTRAL CROP
+# (not a downscale — area-averaging would smooth away the very moire pattern we
+# detect) so the analysed frequencies stay at native pixel scale. No-op for
+# images already within the cap, so scoring is unchanged for typical uploads.
+_MOIRE_MAX_EDGE = 1024
+
 
 def _moire_ratio(gray) -> float:
     import numpy as np
 
+    h0, w0 = gray.shape
+    if h0 > _MOIRE_MAX_EDGE or w0 > _MOIRE_MAX_EDGE:
+        ch, cw = min(h0, _MOIRE_MAX_EDGE), min(w0, _MOIRE_MAX_EDGE)
+        y0, x0 = (h0 - ch) // 2, (w0 - cw) // 2
+        gray = gray[y0 : y0 + ch, x0 : x0 + cw]
+
     g = gray.astype("float32")
     g -= g.mean()
     spectrum = np.abs(np.fft.fftshift(np.fft.fft2(g)))
+    del g
     h, w = spectrum.shape
     cy, cx = h // 2, w // 2
     yy, xx = np.ogrid[:h, :w]
     radius = np.sqrt((yy - cy) ** 2 + (xx - cx) ** 2)
     # High-frequency band only: exclude the low-freq disk (natural image energy).
     band = spectrum[radius > 0.18 * min(h, w)]
+    del spectrum, radius
     if band.size == 0:
         return 0.0
     mean = float(band.mean()) + 1e-6
