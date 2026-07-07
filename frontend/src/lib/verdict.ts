@@ -69,8 +69,16 @@ export function checkState(c: CheckOutcome): CheckState {
     case "content": {
       if (d.looks_like_photo_of_a_screen || d.is_designed_graphic || d.is_meme_or_screenshot)
         return "fail";
+      // Visit-context thresholds mirror the backend defaults (no_visit_suspect_gate=15,
+      // visit_context_gate=35) so this row reflects the same relevance the verdict used.
+      const vc = Number(d.visit_context);
+      const confHigh = String(d.context_confidence ?? "").toLowerCase() === "high";
+      if (confHigh && Number.isFinite(vc) && vc < 15) return "fail"; // clearly not a visit
+      if (Number.isFinite(vc) && vc < 15) return "warn"; // clearly not a visit, lower confidence → review
       if (Number(d.people_count) === 0) return "warn";
       if (Number(d.plausibility) < 30) return "warn";
+      if (Number(d.people_count) === 1) return "warn"; // lone person — not a meeting
+      if (confHigh && Number.isFinite(vc) && vc < 35) return "warn"; // weak visit context
       return "pass";
     }
     default:
