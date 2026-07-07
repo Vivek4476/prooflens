@@ -2,7 +2,7 @@
 
 import { useMutation } from "@tanstack/react-query";
 import { CheckCircle2 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ReviewCard } from "@/components/review/ReviewCard";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -22,37 +22,99 @@ const DECISION_KEYS: Record<string, ReviewDecision> = {
   e: "escalate",
 };
 
+// Deferred-commit window: how long the user has to Undo before the decision
+// is actually POSTed to the server (there is no server-side revert endpoint).
+const UNDO_MS = 5000;
+
 export default function ReviewPage() {
   const toast = useToast();
   const { data, isLoading, isError, refetch } = useResults({ limit: 200, review: "pending" });
-  const [pendingId, setPendingId] = useState<string | null>(null);
   const [focusIdx, setFocusIdx] = useState(0);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  // Items optimistically removed from the queue while their undo window is open.
+  const [committing, setCommitting] = useState<Set<string>>(new Set());
+  // Pending deferred commits, keyed by item id, so several can be queued at once.
+  const pendingRef = useRef<Map<string, { timer: ReturnType<typeof setTimeout>; decision: ReviewDecision }>>(
+    new Map(),
+  );
 
   const queue: ResultItem[] = useMemo(
     () =>
       (data?.items ?? [])
-        .filter((r) => r.band !== "Clear" && !r.review)
+        .filter((r) => r.band !== "Clear" && !r.review && !committing.has(r.id))
         .sort((a, b) => BAND_ORDER[a.band] - BAND_ORDER[b.band]),
-    [data],
+    [data, committing],
   );
 
   const decide = useMutation({
     mutationFn: ({ id, decision }: { id: string; decision: ReviewDecision }) =>
       api.reviewDecision(id, decision),
-    onMutate: ({ id }) => setPendingId(id),
-    onSettled: () => setPendingId(null),
-    onSuccess: (_res, { decision }) => {
-      toast({ kind: "success", title: `Marked ${decision.replace("_", " ")}` });
-      refetch();
-    },
-    onError: () =>
+    onSuccess: () => refetch(),
+    // A failed commit must NOT leave the item stranded in `committing` (which
+    // would hide it from the queue with no way to retry). Restore it so the
+    // moderator sees the card again and can re-decide.
+    onError: (_err, { id }) => {
+      setCommitting((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       toast({
         kind: "error",
         title: "Couldn't record the decision",
-        description: "The review service didn't accept the decision. Please retry.",
-      }),
+        description: "The review service didn't accept it — the card is back in the queue. Please retry.",
+      });
+    },
   });
+
+  // Cancel a still-pending commit and restore the item to the queue. The server
+  // is never called for an undone decision.
+  const undoDecision = useCallback((id: string) => {
+    const entry = pendingRef.current.get(id);
+    if (!entry) return;
+    clearTimeout(entry.timer);
+    pendingRef.current.delete(id);
+    setCommitting((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }, []);
+
+  // Optimistically remove the item, then commit the decision after the undo
+  // window elapses. Guards against deciding the same item twice mid-commit.
+  const deferDecision = useCallback(
+    (id: string, decision: ReviewDecision) => {
+      if (pendingRef.current.has(id)) return;
+      setCommitting((prev) => new Set(prev).add(id));
+      const timer = setTimeout(() => {
+        pendingRef.current.delete(id);
+        decide.mutate({ id, decision });
+      }, UNDO_MS);
+      pendingRef.current.set(id, { timer, decision });
+      toast({
+        kind: "success",
+        title: `Marked ${decision.replace("_", " ")} · undo below`,
+        duration: UNDO_MS,
+        action: { label: "Undo", onClick: () => undoDecision(id) },
+      });
+    },
+    [decide, toast, undoDecision],
+  );
+
+  // On unmount, flush any still-pending timers by committing immediately so a
+  // navigation away still records the user's intent.
+  useEffect(() => {
+    const pending = pendingRef.current;
+    return () => {
+      for (const [id, { timer, decision }] of pending) {
+        clearTimeout(timer);
+        api.reviewDecision(id, decision).catch(() => {});
+      }
+      pending.clear();
+    };
+  }, []);
 
   // Keep the focused index within bounds as the queue shrinks.
   useEffect(() => {
@@ -76,12 +138,12 @@ export default function ReviewPage() {
       } else if (DECISION_KEYS[k]) {
         e.preventDefault();
         const item = queue[focusIdx];
-        if (item && pendingId == null) decide.mutate({ id: item.id, decision: DECISION_KEYS[k] });
+        if (item) deferDecision(item.id, DECISION_KEYS[k]);
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [queue, focusIdx, pendingId, decide]);
+  }, [queue, focusIdx, deferDecision]);
 
   useEffect(() => {
     cardRefs.current[focusIdx]?.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -128,8 +190,8 @@ export default function ReviewPage() {
               <ReviewCard
                 item={item}
                 focused={i === focusIdx}
-                status={pendingId === item.id ? "pending" : "idle"}
-                onDecide={(decision) => decide.mutate({ id: item.id, decision })}
+                status="idle"
+                onDecide={(decision) => deferDecision(item.id, decision)}
               />
             </div>
           ))}

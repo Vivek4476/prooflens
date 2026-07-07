@@ -121,6 +121,13 @@ export default function AnalyzePage() {
   const showResult = !!result && !revealing;
   const showStepper = mutation.isPending || revealing;
 
+  // Once the verdict is revealed, move focus to the result panel so keyboard and
+  // screen-reader users are taken to the fresh verdict instead of left on Analyze.
+  const resultRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (showResult) resultRef.current?.focus({ preventScroll: false });
+  }, [showResult]);
+
   function reset() {
     mutation.reset();
     setFile(null);
@@ -208,7 +215,7 @@ export default function AnalyzePage() {
             </Card>
           )}
 
-          {showResult && result && <ResultPanel result={result} />}
+          {showResult && result && <ResultPanel result={result} panelRef={resultRef} />}
 
           {!showStepper && !showResult && !mutation.isError && (
             <div className="flex h-full min-h-[300px] flex-col items-center justify-center rounded-[var(--radius)] border border-dashed border-border-strong px-6 text-center">
@@ -237,9 +244,18 @@ export default function AnalyzePage() {
   );
 }
 
-function ResultPanel({ result }: { result: ScoreResponse }) {
+function ResultPanel({
+  result,
+  panelRef,
+}: {
+  result: ScoreResponse;
+  panelRef?: React.Ref<HTMLDivElement>;
+}) {
   return (
     <motion.div
+      ref={panelRef}
+      tabIndex={-1}
+      className="outline-none"
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.22 }}

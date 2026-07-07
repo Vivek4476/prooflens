@@ -27,6 +27,10 @@ function Th({
   const active = k && sortKey === k;
   return (
     <th
+      scope="col"
+      aria-sort={
+        k ? (active ? (sortDir === "asc" ? "ascending" : "descending") : "none") : undefined
+      }
       className={cn(
         "whitespace-nowrap px-4 py-2.5 text-caption font-medium uppercase tracking-wide text-text-muted",
         align === "right" ? "text-right" : "text-left",
@@ -66,9 +70,70 @@ export function ResultsTable({
   onSort?: (k: SortKey) => void;
 }) {
   const router = useRouter();
+  const open = (id: string) => router.push(`/verdict/${id}`);
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-body-sm">
+    <>
+      {/* Mobile: stacked cards below the sm breakpoint */}
+      <ul className="flex flex-col gap-3 sm:hidden">
+        {items.map((r) => (
+          <li key={r.id}>
+            <div
+              onClick={() => open(r.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") open(r.id);
+              }}
+              tabIndex={0}
+              role="link"
+              aria-label={`Open verdict ${r.band}, score ${Math.round(r.score)}`}
+              className="flex cursor-pointer flex-col gap-3 rounded-[var(--radius)] border border-border p-4 hover:bg-surface-2/60 focus-visible:bg-surface-2"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <VerdictBadge band={r.band} size="sm" />
+                <span className="text-body font-semibold tabular-nums text-text">
+                  {Math.round(r.score)}
+                </span>
+              </div>
+              <p className="text-body-sm text-text-secondary">{r.reason}</p>
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-caption">
+                {!compact && (
+                  <div className="flex flex-col gap-0.5">
+                    <dt className="uppercase tracking-wide text-text-muted">Rep</dt>
+                    <dd className="tabular-nums text-text-secondary">{r.rep_id ?? "—"}</dd>
+                  </div>
+                )}
+                {!compact && (
+                  <div className="flex flex-col gap-0.5">
+                    <dt className="uppercase tracking-wide text-text-muted">Opportunity</dt>
+                    <dd className="tabular-nums text-text-secondary">{r.opportunity_id ?? "—"}</dd>
+                  </div>
+                )}
+                {!compact && (
+                  <div className="flex flex-col gap-0.5">
+                    <dt className="uppercase tracking-wide text-text-muted">Source</dt>
+                    <dd>
+                      <span className="rounded bg-surface-2 px-1.5 py-0.5 text-caption text-text-muted">
+                        {r.source}
+                      </span>
+                    </dd>
+                  </div>
+                )}
+                <div className="flex flex-col gap-0.5">
+                  <dt className="uppercase tracking-wide text-text-muted">Processing</dt>
+                  <dd className="tabular-nums text-text-secondary">{formatMs(r.processing_ms)}</dd>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <dt className="uppercase tracking-wide text-text-muted">Time</dt>
+                  <dd className="text-text-secondary">{formatDateTime(r.created_at)}</dd>
+                </div>
+              </dl>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      {/* Desktop: the full table at sm and up */}
+      <div className="hidden overflow-x-auto sm:block">
+        <table className="w-full border-collapse text-body-sm">
         <thead>
           <tr className="border-b border-border">
             <Th label="Verdict" k="band" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
@@ -85,9 +150,9 @@ export function ResultsTable({
           {items.map((r) => (
             <tr
               key={r.id}
-              onClick={() => router.push(`/verdict/${r.id}`)}
+              onClick={() => open(r.id)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") router.push(`/verdict/${r.id}`);
+                if (e.key === "Enter") open(r.id);
               }}
               tabIndex={0}
               role="link"
@@ -118,6 +183,7 @@ export function ResultsTable({
           ))}
         </tbody>
       </table>
-    </div>
+      </div>
+    </>
   );
 }
