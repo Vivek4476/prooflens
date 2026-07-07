@@ -35,6 +35,7 @@ class Reason(StrEnum):
     SCREEN_RECAPTURE = "screen_recapture"
     DESIGNED_GRAPHIC = "designed_graphic"
     NO_PEOPLE_OR_IRRELEVANT = "no_people_or_irrelevant"
+    NO_VISIT_CONTEXT = "no_visit_context"
     TOO_BLURRED = "too_blurred"
     NO_CONTENT_ANALYSIS = "no_content_analysis"
 
@@ -46,6 +47,7 @@ REASON_TEXT: dict[Reason, str] = {
     Reason.SCREEN_RECAPTURE: "Photo of another screen — screen edge and glare detected.",
     Reason.DESIGNED_GRAPHIC: "Designed graphic or screenshot, not a photo of a live scene.",
     Reason.NO_PEOPLE_OR_IRRELEVANT: "No people or relevant scene detected in the photo.",
+    Reason.NO_VISIT_CONTEXT: "No visit in progress — the photo shows no interaction or visit.",
     Reason.TOO_BLURRED: "Too blurred to assess — please retake in better light.",
     Reason.NO_CONTENT_ANALYSIS: "Scored without content analysis — vision check unavailable.",
 }
@@ -57,6 +59,7 @@ REASON_PRIORITY: tuple[Reason, ...] = (
     Reason.SCREEN_RECAPTURE,
     Reason.DESIGNED_GRAPHIC,
     Reason.NO_PEOPLE_OR_IRRELEVANT,
+    Reason.NO_VISIT_CONTEXT,
     Reason.TOO_BLURRED,
     Reason.NO_CONTENT_ANALYSIS,
     Reason.CLEAR,

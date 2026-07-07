@@ -63,23 +63,34 @@ class StubBackend(VisionBackend):
             plausibility = 12
             setting = "graphic"
             subject = "designed graphic or screenshot"
+            description = "A designed graphic or screenshot, not a photograph of a live scene."
         elif people_present:
             plausibility = min(90, 65 + people_count * 8)
             setting = "indoor"
             subject = "people in a room"
+            description = f"{people_count} person(s) in an indoor setting."
         else:
             plausibility = 22
             setting = "scene"
             subject = "scene with no people"
+            description = "A scene with no people present."
 
+        # The stub cannot read interaction, so it mirrors visit_context to
+        # plausibility (a real capture of people is treated as having context);
+        # genuine visit-context judgement comes from the real backends. This keeps
+        # the synthetic golden set deterministic and stable across v1 -> v2.
         return ContentAssessment(
             people_count=people_count,
             setting=setting,
+            environment=setting,
             primary_subject=subject,
+            scene_description=description,
             looks_like_photo_of_a_screen=False,  # real screen recapture is a separate check
             is_designed_graphic=graphic_like,
             is_meme_or_screenshot=graphic_like,
             plausibility=plausibility,
+            visit_context=plausibility,
+            context_confidence="high",
             reason="Deterministic stub verdict (not a real model judgement).",
             backend=self.name,
             model="stub",

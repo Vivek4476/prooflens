@@ -54,7 +54,7 @@ def test_hamming_hex():
 def test_engine_stamps_rubric_version_and_orders_output():
     store = InMemoryHashStore()
     v = score_image(IMAGES_DIR / "meeting.jpg", store=store, backend=get_backend("stub"))
-    assert v.rubric_version == "v1"
+    assert v.rubric_version == "v2"
     d = v.to_dict()
     # verdict first, evidence second, internals last
     keys = list(d.keys())

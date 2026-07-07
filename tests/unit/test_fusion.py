@@ -65,6 +65,46 @@ def test_no_people_gate():
     assert r.reason_code == Reason.NO_PEOPLE_OR_IRRELEVANT.value
 
 
+def test_no_visit_context_gates_to_doubtful_not_suspect():
+    # A real photo of real people, but the model is confident there's no visit.
+    checks = _clean_checks()
+    checks[4] = _content(
+        people_count=2, plausibility=85, visit_context=15, context_confidence="high"
+    )
+    r = fuse(checks, DEFAULT_SCORING)
+    assert r.band == "Doubtful"  # never Suspect — it IS a real capture
+    assert r.reason_code == Reason.NO_VISIT_CONTEXT.value
+
+
+def test_ambiguous_visit_context_does_not_gate():
+    # Low visit_context but the model is NOT confident -> reduce confidence,
+    # never manufacture a flag. The gate must not fire.
+    checks = _clean_checks()
+    checks[4] = _content(
+        people_count=2, plausibility=85, visit_context=15, context_confidence="low"
+    )
+    r = fuse(checks, DEFAULT_SCORING)
+    assert r.reason_code != Reason.NO_VISIT_CONTEXT.value
+
+
+def test_missing_visit_context_never_penalised():
+    # An older backend omits visit_context entirely (None) -> no gate, stays Clear.
+    checks = _clean_checks()
+    checks[4] = _content(people_count=2, plausibility=85, visit_context=None)
+    r = fuse(checks, DEFAULT_SCORING)
+    assert r.band == "Clear"
+    assert r.reason_code == Reason.CLEAR.value
+
+
+def test_strong_visit_context_is_clear():
+    checks = _clean_checks()
+    checks[4] = _content(
+        people_count=2, plausibility=88, visit_context=85, context_confidence="high"
+    )
+    r = fuse(checks, DEFAULT_SCORING)
+    assert r.band == "Clear"
+
+
 def test_blur_is_a_soft_quality_gate_not_suspect():
     checks = _clean_checks()
     checks[1] = _co("sharpness", 0.0, too_blurred=True)

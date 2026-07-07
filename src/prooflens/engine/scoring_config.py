@@ -35,7 +35,8 @@ class Thresholds(BaseModel):
     unique_distance: int = 12  # >= this => comfortably unique (full marks)
 
     # --- content / relevance (vision model) ---
-    plausibility_gate: int = 30  # < this => scene reads as irrelevant
+    plausibility_gate: int = 30  # < this => scene reads as irrelevant (not a real capture)
+    visit_context_gate: int = 35  # < this (with high confidence) => no apparent visit
 
 
 class Caps(BaseModel):
@@ -51,6 +52,7 @@ class Caps(BaseModel):
     designed_graphic: float = 20.0   # graphic/meme/shot-> Suspect
     no_people: float = 30.0          # empty/irrelevant -> Suspect
     low_plausibility: float = 45.0   # people but odd   -> Doubtful
+    weak_visit_context: float = 55.0 # real, no visit   -> Doubtful (never Suspect)
     too_blurred: float = 55.0        # unreadable       -> Doubtful
     no_content: float = 69.0         # vision unavailable-> never Clear (Doubtful)
 

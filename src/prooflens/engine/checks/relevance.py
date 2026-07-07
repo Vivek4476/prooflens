@@ -39,21 +39,29 @@ def run(image_bytes: bytes, *, vision: VisionBackend, thresholds: Thresholds) ->
         )
 
     plaus = assessment.plausibility
-    # The check's own contribution tracks plausibility, knocked down by red flags.
-    score = float(plaus)
+    # Two axes: capture authenticity (plausibility) and visit context. The check's
+    # soft contribution blends them so a real photo that lacks any visit/interaction
+    # is knocked down; a missing visit_context (older backend) falls back to
+    # plausibility so it is never unfairly penalised. Red flags cap it hard.
+    vc = assessment.visit_context if assessment.visit_context is not None else plaus
+    score = 0.6 * float(plaus) + 0.4 * float(vc)
     if assessment.has_red_flag:
         score = min(score, 25.0)
 
     data = assessment.model_dump()
     data["is_real_backend"] = vision.is_real
+    # Prefer the model's scene description — "what is in the picture" — falling back
+    # to the structured summary when a backend doesn't provide one.
+    summary = assessment.scene_description.strip() or (
+        f"{assessment.people_count} person(s), setting={assessment.setting}"
+    )
+    if not vision.is_real:
+        summary += " [STUB]"
     return CheckOutcome(
         NAME,
         available=True,
         score=round(score, 1),
-        summary=(
-            f"{assessment.people_count} person(s), setting={assessment.setting}, "
-            f"plausibility={plaus}" + ("" if vision.is_real else " [STUB]")
-        ),
+        summary=summary,
         metric=float(plaus),
         data=data,
     )

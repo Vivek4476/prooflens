@@ -52,7 +52,7 @@ def test_score_returns_real_verdict(client):
         "exif", "sharpness", "uniqueness", "recapture", "content"
     }
     assert body["processing_ms"] >= 0
-    assert body["rubric_version"] == "v1"
+    assert body["rubric_version"] == "v2"
 
 
 def test_get_single_result_returns_full_evidence(client):

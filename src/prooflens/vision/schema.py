@@ -19,21 +19,51 @@ class ContentAssessment(BaseModel):
 
     people_count: int = Field(ge=0, le=100)
     setting: str = "unknown"
+    environment: str = "unknown"
     primary_subject: str = "unknown"
+    scene_description: str = ""
     looks_like_photo_of_a_screen: bool = False
     is_designed_graphic: bool = False
     is_meme_or_screenshot: bool = False
     plausibility: int = Field(ge=0, le=100)
+    # v2 — the visit-context axis. None means the model did not assess it (an
+    # older/uncooperative backend); the engine then falls back to plausibility
+    # and never fires the weak-visit-context gate on a missing value.
+    visit_context: int | None = None
+    context_confidence: str = "moderate"  # "high" | "moderate" | "low"
     reason: str = ""
 
     # Backend provenance — not part of the rubric, filled in by the backend.
     backend: str = "unknown"
     model: str = "unknown"
 
-    @field_validator("setting", "primary_subject", "reason", mode="before")
+    @field_validator(
+        "setting", "environment", "primary_subject", "scene_description", "reason",
+        mode="before",
+    )
     @classmethod
     def _coerce_str(cls, v: Any) -> str:
         return "" if v is None else str(v)[:300]
+
+    @field_validator("context_confidence", mode="before")
+    @classmethod
+    def _coerce_confidence(cls, v: Any) -> str:
+        s = str(v or "").strip().lower()
+        if s in {"high", "moderate", "low"}:
+            return s
+        if s in {"medium", "mid"}:
+            return "moderate"
+        return "moderate"
+
+    @field_validator("visit_context", mode="before")
+    @classmethod
+    def _coerce_visit_context(cls, v: Any) -> int | None:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        try:
+            return max(0, min(100, int(round(float(v)))))
+        except (TypeError, ValueError):
+            return None
 
     @field_validator(
         "looks_like_photo_of_a_screen",

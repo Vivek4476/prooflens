@@ -13,7 +13,7 @@ def test_cli_scores_and_prints_json(capsys):
     assert rc == 0
     out = json.loads(capsys.readouterr().out)
     assert out["band"] == "Clear"
-    assert "reason" in out and out["rubric_version"] == "v1"
+    assert "reason" in out and out["rubric_version"] == "v2"
     # first structural key after image path is the decision-driver band
     assert list(out.keys())[:3] == ["image", "band", "score"]
 
