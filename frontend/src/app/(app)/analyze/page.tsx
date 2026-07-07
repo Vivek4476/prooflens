@@ -31,6 +31,15 @@ function errorDetail(err: unknown): string | null {
   return e?.message ?? null;
 }
 
+/** Is this failure a transient one worth auto-retrying? The free-tier API can
+ * cold-start (~20-30s), returning a 502 or a network timeout on the first hit;
+ * a retry a few seconds later succeeds. Genuine 4xx (bad request) are not. */
+function isTransient(err: unknown): boolean {
+  const status = (err as { response?: { status?: number } })?.response?.status;
+  if (status == null) return true; // no response => network error / timeout
+  return [408, 425, 429, 500, 502, 503, 504].includes(status);
+}
+
 export default function AnalyzePage() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -40,9 +49,20 @@ export default function AnalyzePage() {
     // No backend param — the server always uses its configured Live AI provider
     // (VISION_BACKEND, e.g. groq). There is no demo/stub path in the UI.
     mutationFn: (f: File) => api.score(f),
+    // Survive a free-tier cold start: the first request wakes the instance and
+    // may 502/time out; retrying transient failures self-heals as "Scoring…"
+    // instead of surfacing "Live AI unavailable" on the first try.
+    retry: (failureCount, error) => failureCount < 3 && isTransient(error),
+    retryDelay: (attempt) => Math.min(10_000, 2_000 * 2 ** attempt), // 2s, 4s, 8s
     onSuccess: () => setRevealed(-1),
   });
   const result = mutation.data;
+
+  // Pre-warm the free-tier API on mount so the first score isn't a cold start —
+  // by the time the user uploads and clicks Analyze, the instance is awake.
+  useEffect(() => {
+    api.ready().catch(() => {});
+  }, []);
 
   // Object URL lifecycle for the preview.
   useEffect(() => {
