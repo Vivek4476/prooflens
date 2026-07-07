@@ -5,9 +5,12 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * The ABSLI tenant logo, fitted to its real ~2:1 proportions. The source PNG is
- * a wide horizontal lockup, so it is rendered in a height-constrained, width-auto
- * white card (object-contain, padded, NOT clipped) — never forced into a square.
+ * The ABSLI tenant logo. The source PNG is a wide ~2.4:1 lockup on a solid white
+ * background, so it is rendered on a light card (the artwork assumes a light
+ * ground) with object-contain — never clipped, never distorted.
+ *
+ * - `md` (masthead): a full-width, centered card that reads as a header.
+ * - `sm`: a compact inline chip for dense contexts.
  */
 export function TenantLogo({
   size = "md",
@@ -17,38 +20,32 @@ export function TenantLogo({
   className?: string;
 }) {
   const [ok, setOk] = useState(true);
-  const box = size === "md" ? "h-11 px-3" : "h-8 px-2";
-  const img = size === "md" ? "max-h-6" : "max-h-4";
-
-  if (!ok) {
-    return (
-      <span
-        className={cn(
-          "inline-grid place-items-center rounded-md bg-white ring-1 ring-border",
-          box,
-          className,
-        )}
-      >
-        <span className="text-body-sm font-bold text-brand-crimson">ABSLI</span>
-      </span>
-    );
-  }
+  const box =
+    size === "md"
+      ? "flex w-full items-center justify-center rounded-lg px-4 py-3"
+      : "inline-flex h-8 items-center justify-center rounded-md px-2";
+  const imgHeight = size === "md" ? "h-9" : "h-4";
 
   return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-md bg-white ring-1 ring-border",
-        box,
-        className,
+    <span className={cn("bg-white ring-1 ring-border", box, className)}>
+      {ok ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src="/brand/abc-life-insurance.png"
+          alt="Aditya Birla Sun Life Insurance"
+          className={cn("w-auto object-contain", imgHeight)}
+          onError={() => setOk(false)}
+        />
+      ) : (
+        <span
+          className={cn(
+            "font-bold text-brand-crimson",
+            size === "md" ? "text-h2" : "text-body-sm",
+          )}
+        >
+          ABSLI
+        </span>
       )}
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/brand/abc-life-insurance.png"
-        alt="Aditya Birla Sun Life Insurance"
-        className={cn("w-auto object-contain", img)}
-        onError={() => setOk(false)}
-      />
     </span>
   );
 }
