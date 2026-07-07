@@ -125,9 +125,9 @@ export default function SettingsPage() {
 
       <div className="flex items-center gap-3 text-caption text-text-muted">
         <Activity size={14} />
-        <span>ProofLens · Capture Integrity — scores &amp; flags, never blocks. Images are never stored.</span>
+        <span>Capture Integrity — scores &amp; flags, never blocks. Images are never stored.</span>
         <Building2 size={14} className="ml-auto" />
-        <span>ProofLens</span>
+        <span>Aditya Birla Sun Life Insurance · powered by ProofLens</span>
       </div>
     </div>
   );

@@ -6,7 +6,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "ProofLens — Capture Integrity",
+  title: "ABSLI Capture Integrity · ProofLens",
   description: "Image-authenticity scoring for proof-of-visit photos.",
 };
 
