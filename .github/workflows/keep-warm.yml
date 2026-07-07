@@ -1,0 +1,43 @@
+name: keep-warm
+
+# Pings the Render API health endpoint on a schedule so the free-tier instance
+# doesn't spin down. Render sleeps after ~15 min idle, and the next request then
+# takes a ~30-60s cold start that returns 502 — which the Analyze UI surfaces as
+# "Live AI unavailable". A lightweight ping every ~10 min resets the idle timer.
+#
+# Notes:
+#  - GitHub can delay/queue scheduled runs under load, so treat this as best-
+#    effort keep-warm, not a hard SLA. For a guaranteed-awake instance, upgrade
+#    the Render service off the free tier.
+#  - GitHub disables scheduled workflows after 60 days with no repo activity.
+#  - Run it manually anytime from Actions -> keep-warm -> "Run workflow".
+
+on:
+  schedule:
+    - cron: "*/10 * * * *" # every 10 minutes (UTC)
+  workflow_dispatch: {}
+
+# If a run is still going when the next fires, don't pile up.
+concurrency:
+  group: keep-warm
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /healthz (with cold-start retries)
+        run: |
+          API="https://prooflens-api.onrender.com/healthz"
+          for i in 1 2 3 4 5; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 90 "$API" || echo "000")
+            echo "attempt $i -> HTTP $code"
+            if [ "$code" = "200" ]; then
+              echo "API is warm."
+              exit 0
+            fi
+            sleep 25
+          done
+          # Best-effort: a lingering cold start shouldn't spam failure emails.
+          echo "healthz not 200 after retries (cold start may still be resolving)."
+          exit 0
