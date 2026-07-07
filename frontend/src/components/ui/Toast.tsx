@@ -10,6 +10,10 @@ interface Toast {
   kind: ToastKind;
   title: string;
   description?: string;
+  // Optional inline action (e.g. Undo). Rendered as a labelled text button.
+  action?: { label: string; onClick: () => void };
+  // How long the toast stays before auto-dismiss (ms). Defaults to 4500.
+  duration?: number;
 }
 
 const ToastContext = createContext<(t: Omit<Toast, "id">) => void>(() => {});
@@ -30,19 +34,27 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const push = useCallback((t: Omit<Toast, "id">) => {
     const id = Date.now() + Math.floor(Math.random() * 1000);
     setToasts((prev) => [...prev, { ...t, id }]);
-    setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), 4500);
+    setTimeout(
+      () => setToasts((prev) => prev.filter((x) => x.id !== id)),
+      t.duration ?? 4500,
+    );
   }, []);
 
   return (
     <ToastContext.Provider value={push}>
       {children}
-      <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex w-[min(92vw,360px)] flex-col gap-2">
+      <div
+        role="region"
+        aria-live="polite"
+        className="pointer-events-none fixed bottom-4 right-4 z-50 flex w-[min(92vw,360px)] flex-col gap-2"
+      >
         <AnimatePresence>
           {toasts.map((t) => {
             const Icon = ICONS[t.kind];
             return (
               <motion.div
                 key={t.id}
+                role={t.kind === "error" ? "alert" : undefined}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 8 }}
@@ -63,6 +75,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   <p className="text-body-sm font-medium text-text">{t.title}</p>
                   {t.description && (
                     <p className="mt-0.5 text-caption text-text-secondary">{t.description}</p>
+                  )}
+                  {t.action && (
+                    <button
+                      onClick={() => {
+                        t.action?.onClick();
+                        setToasts((prev) => prev.filter((x) => x.id !== t.id));
+                      }}
+                      className="mt-1.5 text-body-sm font-medium text-brand-crimson"
+                    >
+                      {t.action.label}
+                    </button>
                   )}
                 </div>
                 <button
