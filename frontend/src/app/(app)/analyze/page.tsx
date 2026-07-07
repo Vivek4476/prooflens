@@ -49,11 +49,12 @@ export default function AnalyzePage() {
     // No backend param — the server always uses its configured Live AI provider
     // (VISION_BACKEND, e.g. groq). There is no demo/stub path in the UI.
     mutationFn: (f: File) => api.score(f),
-    // Survive a free-tier cold start: the first request wakes the instance and
-    // may 502/time out; retrying transient failures self-heals as "Scoring…"
-    // instead of surfacing "Live AI unavailable" on the first try.
-    retry: (failureCount, error) => failureCount < 3 && isTransient(error),
-    retryDelay: (attempt) => Math.min(10_000, 2_000 * 2 ** attempt), // 2s, 4s, 8s
+    // Survive a free-tier cold start: when the instance is asleep, Render returns
+    // a 502 WITHOUT CORS headers, which the browser reports as "Network Error".
+    // Cold starts observed at 40s+, so retry transient failures across ~50s so the
+    // score self-heals as "Scoring…" once the instance finishes waking.
+    retry: (failureCount, error) => failureCount < 8 && isTransient(error),
+    retryDelay: (attempt) => Math.min(8_000, 2_000 + 2_000 * attempt), // 2,4,6,8,8…
     onSuccess: () => setRevealed(-1),
   });
   const result = mutation.data;
