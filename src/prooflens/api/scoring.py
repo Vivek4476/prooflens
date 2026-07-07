@@ -14,8 +14,11 @@ from __future__ import annotations
 from collections import Counter
 from datetime import UTC, datetime
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.concurrency import run_in_threadpool
+from pydantic import BaseModel
 
 from ..config import get_settings
 from ..engine import EngineContext, score
@@ -27,6 +30,13 @@ from .deps import get_repo
 router = APIRouter(tags=["scoring"])
 
 DEFAULT_TENANT = "dev"  # seeded by scripts/seed_dev_tenant.py / the migrate service
+
+REVIEWER = "Demo Operator"  # placeholder identity until SSO/RBAC (M4)
+
+
+class ReviewBody(BaseModel):
+    decision: Literal["approve", "reject", "false_positive", "escalate"]
+    note: str | None = None
 
 
 @router.post("/v1/score")
@@ -126,9 +136,10 @@ def list_results(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     band: str | None = Query(None),
+    review: str | None = Query(None),
     repo: Repo = Depends(get_repo),
 ) -> dict:
-    items, total = repo.list_results(limit=limit, offset=offset, band=band)
+    items, total = repo.list_results(limit=limit, offset=offset, band=band, review=review)
     return {
         "items": [r.to_dict() for r in items],
         "total": total,
@@ -144,6 +155,17 @@ def get_result(result_id: str, repo: Repo = Depends(get_repo)) -> dict:
     if result is None:
         raise HTTPException(status_code=404, detail=f"no result {result_id!r}")
     return result.to_dict()
+
+
+@router.post("/v1/results/{result_id}/review")
+def review_result(
+    result_id: str, body: ReviewBody, repo: Repo = Depends(get_repo)
+) -> dict:
+    """Record a moderator decision on a stored verdict (writes an audit event)."""
+    view = repo.record_review(result_id, body.decision, body.note, REVIEWER)
+    if view is None:
+        raise HTTPException(status_code=404, detail=f"no result {result_id!r}")
+    return view.to_dict()
 
 
 @router.get("/v1/analytics/summary")
