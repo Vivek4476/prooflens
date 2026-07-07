@@ -24,8 +24,14 @@ def run(image_bytes: bytes, thresholds: Thresholds) -> CheckOutcome:
         return CheckOutcome(NAME, available=True, score=0.0, summary="Could not decode image.")
 
     import cv2  # available here
+    import numpy as np
 
-    variance = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+    # CV_32F (not CV_64F) halves the full-resolution Laplacian array; the kernel
+    # yields small integer responses that are exact in float32, so computing the
+    # variance in float64 (var(dtype=...)) keeps the metric bit-identical.
+    lap = cv2.Laplacian(gray, cv2.CV_32F)
+    variance = float(lap.var(dtype=np.float64))
+    del lap
     floor, ok = thresholds.blur_floor, thresholds.sharp_ok
 
     if variance <= floor:
