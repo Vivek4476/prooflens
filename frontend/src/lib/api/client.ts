@@ -66,11 +66,12 @@ export const api = {
     return data;
   },
 
-  // Review decisions — endpoint NOT yet implemented (see BACKEND_REQUIREMENTS.md).
-  // This calls the real (documented) endpoint; the UI handles its absence
-  // honestly rather than mocking a response.
-  async reviewDecision(id: string, decision: ReviewDecision, note?: string): Promise<unknown> {
-    const { data } = await http.post(`/v1/results/${id}/review`, { decision, note });
+  // Record a moderator decision. Returns the updated result (with a `review` block).
+  async reviewDecision(id: string, decision: ReviewDecision, note?: string): Promise<ResultItem> {
+    const { data } = await http.post(`/v1/results/${encodeURIComponent(id)}/review`, {
+      decision,
+      note,
+    });
     return data;
   },
 };
