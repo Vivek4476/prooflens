@@ -50,7 +50,7 @@ export function TenantLogo({
   return (
     <span
       className={cn(
-        "flex w-full items-center justify-center rounded-lg px-0.5 py-1",
+        "flex w-full items-center justify-center rounded-lg px-2 py-2",
         "bg-transparent dark:bg-white/95",
         className,
       )}
@@ -60,7 +60,7 @@ export function TenantLogo({
         <img
           src="/brand/absli-logo.png"
           alt="Aditya Birla Sun Life Insurance"
-          className="h-auto w-full object-contain"
+          className="h-10 w-auto object-contain"
           onError={() => setOk(false)}
         />
       ) : (
