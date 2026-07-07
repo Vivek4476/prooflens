@@ -2,7 +2,7 @@
 
 import { useMutation } from "@tanstack/react-query";
 import { CheckCircle2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ReviewCard } from "@/components/review/ReviewCard";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -29,9 +29,13 @@ export default function ReviewPage() {
   const [focusIdx, setFocusIdx] = useState(0);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  const queue: ResultItem[] = (data?.items ?? [])
-    .filter((r) => r.band !== "Clear" && !r.review)
-    .sort((a, b) => BAND_ORDER[a.band] - BAND_ORDER[b.band]);
+  const queue: ResultItem[] = useMemo(
+    () =>
+      (data?.items ?? [])
+        .filter((r) => r.band !== "Clear" && !r.review)
+        .sort((a, b) => BAND_ORDER[a.band] - BAND_ORDER[b.band]),
+    [data],
+  );
 
   const decide = useMutation({
     mutationFn: ({ id, decision }: { id: string; decision: ReviewDecision }) =>
@@ -60,6 +64,7 @@ export default function ReviewPage() {
     function onKey(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (!queue.length) return;
       const k = e.key.toLowerCase();
       if (k === "j" || e.key === "ArrowDown") {
@@ -80,7 +85,7 @@ export default function ReviewPage() {
 
   useEffect(() => {
     cardRefs.current[focusIdx]?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [focusIdx]);
+  }, [focusIdx, queue.length]);
 
   return (
     <div className="space-y-5">
