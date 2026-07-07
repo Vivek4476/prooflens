@@ -96,6 +96,50 @@ def test_no_visit_context_gates_to_doubtful_not_suspect():
     assert r.reason_code == Reason.NO_VISIT_CONTEXT.value
 
 
+def test_clearly_not_a_visit_gates_to_suspect():
+    # The pool case: a real, confident capture whose visit_context is near-absent
+    # (a shirtless man at a pool). Clearly not a customer visit -> Suspect.
+    checks = _clean_checks()
+    checks[4] = _content(
+        people_count=1, plausibility=100, visit_context=0, context_confidence="high"
+    )
+    r = fuse(checks, DEFAULT_SCORING)
+    assert r.band == "Suspect"
+    assert r.reason_code == Reason.NOT_A_VISIT.value  # outranks single_person
+
+
+def test_group_clearly_not_a_visit_gates_to_suspect():
+    checks = _clean_checks()
+    checks[4] = _content(
+        people_count=3, plausibility=95, visit_context=5, context_confidence="high"
+    )
+    r = fuse(checks, DEFAULT_SCORING)
+    assert r.band == "Suspect"
+    assert r.reason_code == Reason.NOT_A_VISIT.value
+
+
+def test_borderline_visit_context_stays_doubtful():
+    # 15 <= visit_context < 35: weak but not clearly-absent -> Doubtful, NOT Suspect.
+    checks = _clean_checks()
+    checks[4] = _content(
+        people_count=2, plausibility=85, visit_context=20, context_confidence="high"
+    )
+    r = fuse(checks, DEFAULT_SCORING)
+    assert r.band == "Doubtful"
+    assert r.reason_code == Reason.NO_VISIT_CONTEXT.value
+
+
+def test_not_a_visit_needs_high_confidence():
+    # Near-absent visit_context but the model is unsure -> no hard flag manufactured.
+    checks = _clean_checks()
+    checks[4] = _content(
+        people_count=1, plausibility=100, visit_context=0, context_confidence="low"
+    )
+    r = fuse(checks, DEFAULT_SCORING)
+    assert r.reason_code != Reason.NOT_A_VISIT.value
+    assert r.band != "Suspect"
+
+
 def test_ambiguous_visit_context_does_not_gate():
     # Low visit_context but the model is NOT confident -> reduce confidence,
     # never manufacture a flag. The gate must not fire.
