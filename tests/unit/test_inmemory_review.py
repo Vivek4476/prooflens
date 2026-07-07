@@ -17,7 +17,8 @@ def _verdict() -> Verdict:
     return Verdict(
         band="Suspect", score=20.0, reason="Suspect — designed graphic",
         reason_code="designed_graphic", rubric_version="v1",
-        checks=[CheckOutcome(name="content", available=True, score=0.0, summary="x", metric=None, data={}, latency_ms=1.0)],
+        checks=[CheckOutcome(name="content", available=True, score=0.0, summary="x",
+                             metric=None, data={}, latency_ms=1.0)],
     )
 
 

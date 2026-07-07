@@ -157,7 +157,10 @@ class PostgresRepo:
             tenant_id=row.tenant_id,
             job_id=row.job_id,
             event="review.decision",
-            detail={"result_id": str(row.id), "decision": decision, "note": note, "reviewer": reviewer},
+            detail={
+                "result_id": str(row.id), "decision": decision,
+                "note": note, "reviewer": reviewer,
+            },
         ))
         self._session.flush()
         job = self._session.get(Job, row.job_id) if row.job_id else None

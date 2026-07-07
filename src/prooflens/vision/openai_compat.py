@@ -11,7 +11,6 @@ from __future__ import annotations
 import base64
 import json
 import logging
-import socket
 import urllib.error
 import urllib.request
 
@@ -100,7 +99,7 @@ class OpenAICompatBackend(VisionBackend):
             raise VisionUnavailable(
                 f"{self.name} API error {exc.code}: {detail}", status=exc.code
             ) from exc
-        except (urllib.error.URLError, socket.timeout, TimeoutError) as exc:
+        except (urllib.error.URLError, TimeoutError) as exc:
             reason = getattr(exc, "reason", exc)
             logger.warning(
                 "vision inference FAILED backend=%s model=%s transport=%r",

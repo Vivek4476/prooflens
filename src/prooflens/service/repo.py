@@ -188,7 +188,10 @@ class InMemoryRepo:
             "event": "review.decision",
             "tenant_id": view.tenant_id,
             "job_id": None,
-            "detail": {"result_id": result_id, "decision": decision, "note": note, "reviewer": reviewer},
+            "detail": {
+                "result_id": result_id, "decision": decision,
+                "note": note, "reviewer": reviewer,
+            },
         })
         return view
 
