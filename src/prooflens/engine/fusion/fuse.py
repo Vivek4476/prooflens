@@ -105,21 +105,28 @@ def _gates(checks: dict[str, CheckOutcome], cfg: ScoringConfig) -> list[tuple[Re
         )
         conf_high = str(d.get("context_confidence", "")).lower() == "high"
         vc = d.get("visit_context")
-        if pc > 0 and not_flag and conf_high:
-            # STRONG relevance gate: the model is confident and the visit context is
-            # near-absent — the scene is clearly not a customer visit at all (a pool,
-            # gym, tourist selfie). This is the ONE meeting gate that caps to Suspect;
-            # it is deliberately stricter than the Doubtful gate below so genuine but
-            # unusual field visits (rural home, roadside) are not hard-flagged.
-            if vc is not None and int(vc) < cfg.thresholds.no_visit_suspect_gate:
-                fired.append((Reason.NOT_A_VISIT, caps.not_a_visit))
-            # Milder meeting gates — a real capture that just lacks meeting evidence.
-            # These cap to Doubtful, never Suspect.
-            if pc == 1:
-                # A lone individual is never evidence of a meeting.
-                fired.append((Reason.SINGLE_PERSON, caps.weak_visit_context))
-            elif vc is not None and int(vc) < cfg.thresholds.visit_context_gate:
-                # >=2 people but no genuine interaction (posed group, no exchange).
+        clearly_no_visit = vc is not None and int(vc) < cfg.thresholds.no_visit_suspect_gate
+        if pc > 0 and not_flag:
+            if conf_high:
+                # STRONG relevance gate: confident AND the visit context is near-absent
+                # — the scene is clearly not a customer visit at all (a pool, gym,
+                # tourist selfie). This is the ONE meeting gate that caps to Suspect;
+                # stricter than the Doubtful gates below so genuine but unusual field
+                # visits (rural home, roadside) are not hard-flagged.
+                if clearly_no_visit:
+                    fired.append((Reason.NOT_A_VISIT, caps.not_a_visit))
+                # Milder meeting gates — a real capture that just lacks meeting
+                # evidence. These cap to Doubtful, never Suspect.
+                if pc == 1:
+                    # A lone individual is never evidence of a meeting.
+                    fired.append((Reason.SINGLE_PERSON, caps.weak_visit_context))
+                elif vc is not None and int(vc) < cfg.thresholds.visit_context_gate:
+                    # >=2 people but no genuine interaction (posed group, no exchange).
+                    fired.append((Reason.NO_VISIT_CONTEXT, caps.weak_visit_context))
+            elif clearly_no_visit:
+                # Not highly confident, but the scene still reads as clearly NOT a visit
+                # (visit_context near zero). Worth a human glance -> Doubtful, never
+                # Suspect: an unsure read must not manufacture a hard flag.
                 fired.append((Reason.NO_VISIT_CONTEXT, caps.weak_visit_context))
     elif content is not None and not content.available:
         # Vision unavailable: score without it, but never award Clear.

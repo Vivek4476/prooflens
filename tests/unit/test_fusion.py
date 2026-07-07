@@ -129,15 +129,28 @@ def test_borderline_visit_context_stays_doubtful():
     assert r.reason_code == Reason.NO_VISIT_CONTEXT.value
 
 
-def test_not_a_visit_needs_high_confidence():
-    # Near-absent visit_context but the model is unsure -> no hard flag manufactured.
+def test_low_confidence_irrelevance_is_doubtful_not_suspect():
+    # Near-absent visit_context but the model is unsure: no HARD flag, but the scene
+    # still reads as clearly-not-a-visit -> route to review (Doubtful), never Suspect.
     checks = _clean_checks()
     checks[4] = _content(
         people_count=1, plausibility=100, visit_context=0, context_confidence="low"
     )
     r = fuse(checks, DEFAULT_SCORING)
-    assert r.reason_code != Reason.NOT_A_VISIT.value
-    assert r.band != "Suspect"
+    assert r.band == "Doubtful"
+    assert r.reason_code == Reason.NO_VISIT_CONTEXT.value
+    assert r.reason_code != Reason.NOT_A_VISIT.value  # never the Suspect reason
+
+
+def test_moderate_confidence_irrelevance_is_doubtful():
+    # "moderate" (the schema default) is also not "high" -> Doubtful, not Suspect.
+    checks = _clean_checks()
+    checks[4] = _content(
+        people_count=2, plausibility=90, visit_context=5, context_confidence="moderate"
+    )
+    r = fuse(checks, DEFAULT_SCORING)
+    assert r.band == "Doubtful"
+    assert r.reason_code == Reason.NO_VISIT_CONTEXT.value
 
 
 def test_ambiguous_visit_context_does_not_gate():

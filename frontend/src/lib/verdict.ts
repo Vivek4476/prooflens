@@ -74,6 +74,7 @@ export function checkState(c: CheckOutcome): CheckState {
       const vc = Number(d.visit_context);
       const confHigh = String(d.context_confidence ?? "").toLowerCase() === "high";
       if (confHigh && Number.isFinite(vc) && vc < 15) return "fail"; // clearly not a visit
+      if (Number.isFinite(vc) && vc < 15) return "warn"; // clearly not a visit, lower confidence → review
       if (Number(d.people_count) === 0) return "warn";
       if (Number(d.plausibility) < 30) return "warn";
       if (Number(d.people_count) === 1) return "warn"; // lone person — not a meeting
