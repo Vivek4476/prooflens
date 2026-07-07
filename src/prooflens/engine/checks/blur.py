@@ -16,10 +16,16 @@ NAME = "sharpness"
 
 
 def run(image_bytes: bytes, thresholds: Thresholds) -> CheckOutcome:
+    """Decode the grayscale then score it. The pipeline decodes once and calls
+    ``run_on_gray`` directly; this wrapper stays for standalone/test callers."""
     if not CV2_AVAILABLE:  # pragma: no cover
         return CheckOutcome(NAME, available=False, score=None, summary="OpenCV not installed.")
+    return run_on_gray(load_gray(image_bytes), thresholds)
 
-    gray = load_gray(image_bytes)
+
+def run_on_gray(gray, thresholds: Thresholds) -> CheckOutcome:
+    if not CV2_AVAILABLE:  # pragma: no cover
+        return CheckOutcome(NAME, available=False, score=None, summary="OpenCV not installed.")
     if gray is None:
         return CheckOutcome(NAME, available=True, score=0.0, summary="Could not decode image.")
 

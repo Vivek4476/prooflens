@@ -20,6 +20,7 @@ from collections.abc import Callable
 
 from ..vision.rubric import RUBRIC_VERSION
 from .checks import blur, exif, recapture, relevance, uniqueness
+from .checks._imaging import CV2_AVAILABLE, load_gray
 from .fusion import fuse
 from .types import CheckOutcome, EngineContext, Verdict
 
@@ -48,16 +49,22 @@ def _free_hard_gate_fired(outcomes: list[CheckOutcome]) -> bool:
 def score(image_bytes: bytes, context: EngineContext) -> Verdict:
     """Score one image. ``engine.score(image_bytes, context) -> Verdict``."""
     cfg = context.scoring
+    # Decode the grayscale ONCE and share it with the two OpenCV checks (blur,
+    # recapture) instead of each re-decoding the raw bytes — one fewer full-frame
+    # decode per request. EXIF (needs raw metadata) and uniqueness (its own dHash
+    # decode) stay on the bytes. Native resolution is preserved, so scoring is
+    # identical; this is a memory/CPU cleanup, not a calibration change.
+    shared_gray = load_gray(image_bytes) if CV2_AVAILABLE else None
     outcomes: list[CheckOutcome] = [
         _timed(lambda: exif.run(image_bytes)),
-        _timed(lambda: blur.run(image_bytes, cfg.thresholds)),
+        _timed(lambda: blur.run_on_gray(shared_gray, cfg.thresholds)),
         _timed(lambda: uniqueness.run(
             image_bytes,
             tenant_id=context.tenant_id,
             store=context.hash_store,
             thresholds=cfg.thresholds,
         )),
-        _timed(lambda: recapture.run(image_bytes)),
+        _timed(lambda: recapture.run_on_gray(shared_gray)),
     ]
 
     # 5. Content — skip the paid vision call if a free hard gate already fired.
