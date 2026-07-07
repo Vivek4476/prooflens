@@ -35,17 +35,13 @@ export default function AnalyzePage() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(-1); // -1 => not revealing yet
-  // "live" => let the server pick its configured provider (VISION_BACKEND); "stub"
-  // => force the deterministic Demo model. Live AI is the default so demos show a
-  // real model judgement.
-  const [model, setModel] = useState<"stub" | "live">("live");
 
   const mutation = useMutation({
-    // backend omitted for "live" so the server resolves its configured provider.
-    mutationFn: ({ f, backend }: { f: File; backend?: string }) => api.score(f, { backend }),
+    // No backend param — the server always uses its configured Live AI provider
+    // (VISION_BACKEND, e.g. groq). There is no demo/stub path in the UI.
+    mutationFn: (f: File) => api.score(f),
     onSuccess: () => setRevealed(-1),
   });
-  const liveBackend = (m: "stub" | "live"): string | undefined => (m === "stub" ? "stub" : undefined);
   const result = mutation.data;
 
   // Object URL lifecycle for the preview.
@@ -127,36 +123,15 @@ export default function AnalyzePage() {
             onClear={reset}
             disabled={mutation.isPending}
           />
-          <div>
-            <div className="mb-2 flex items-center gap-1 rounded-md border border-border bg-surface p-1">
-              {(
-                [
-                  { key: "stub", label: "Demo model", hint: "instant" },
-                  { key: "live", label: "Live AI", hint: "real · slower" },
-                ] as const
-              ).map((opt) => (
-                <button
-                  key={opt.key}
-                  onClick={() => setModel(opt.key)}
-                  disabled={mutation.isPending}
-                  aria-pressed={model === opt.key}
-                  className={
-                    "flex-1 rounded px-3 py-1.5 text-caption font-medium transition-colors " +
-                    (model === opt.key
-                      ? "bg-surface-2 text-text"
-                      : "text-text-muted hover:text-text-secondary")
-                  }
-                >
-                  {opt.label} <span className="text-text-muted">· {opt.hint}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+          <p className="flex items-center gap-1.5 text-caption text-text-muted">
+            <Sparkles size={13} className="text-brand-crimson" />
+            Scored by Live AI — a real vision model.
+          </p>
           <div className="flex items-center gap-3">
             <Button
               variant="primary"
               disabled={!file || mutation.isPending}
-              onClick={() => file && mutation.mutate({ f: file, backend: liveBackend(model) })}
+              onClick={() => file && mutation.mutate(file)}
               className="flex-1"
             >
               <Sparkles size={16} />
@@ -179,14 +154,10 @@ export default function AnalyzePage() {
                 <AlertCircle size={18} className="mt-0.5 text-danger" />
                 <div className="flex-1">
                   <p className="text-body-sm font-medium text-text">
-                    {model === "live"
-                      ? "Live AI is currently unavailable"
-                      : "Could not score the image"}
+                    Live AI is currently unavailable
                   </p>
                   <p className="mt-1 text-caption text-text-secondary">
-                    {model === "live"
-                      ? "Please check the AI provider configuration or try again later — or switch to the Demo model to keep scoring."
-                      : "The scoring service did not respond. ProofLens never blocks an upload — you can retry."}
+                    Please check the AI provider configuration or try again later. ProofLens never blocks an upload — you can retry.
                   </p>
                   {errorDetail(mutation.error) && (
                     <p className="mt-2 break-words rounded bg-surface-2 px-2 py-1.5 font-mono text-caption text-text-muted">
@@ -196,22 +167,11 @@ export default function AnalyzePage() {
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Button
                       variant="secondary"
-                      onClick={() => file && mutation.mutate({ f: file, backend: liveBackend(model) })}
+                      onClick={() => file && mutation.mutate(file)}
                     >
                       <RotateCcw size={15} />
                       Retry
                     </Button>
-                    {model === "live" && file && (
-                      <Button
-                        variant="ghost"
-                        onClick={() => {
-                          setModel("stub");
-                          mutation.mutate({ f: file, backend: "stub" });
-                        }}
-                      >
-                        Use Demo model
-                      </Button>
-                    )}
                   </div>
                 </div>
               </div>
