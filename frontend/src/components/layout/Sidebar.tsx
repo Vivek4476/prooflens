@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { Brandmark } from "@/components/brand/Brandmark";
-import { TenantSwitcher } from "@/components/brand/TenantSwitcher";
+import { AbsliMasthead } from "@/components/brand/AbsliMasthead";
+import { PoweredByProofLens } from "@/components/brand/PoweredByProofLens";
 import { NAV } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
@@ -17,10 +17,9 @@ export function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Co-brand masthead: ProofLens product mark + the active tenant. */}
-      <div className="space-y-3 border-b border-border px-4 py-4">
-        <Brandmark />
-        <TenantSwitcher />
+      {/* ABSLI-first masthead: the tenant is the primary brand. */}
+      <div className="border-b border-border px-4 py-4">
+        <AbsliMasthead />
       </div>
 
       <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
@@ -55,9 +54,9 @@ export function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
         })}
       </nav>
 
-      <div className="border-t border-border p-4">
-        <p className="text-caption text-text-muted">Scores &amp; flags — never blocks.</p>
-        <p className="text-caption text-text-muted">Images are never stored.</p>
+      <div className="space-y-2.5 border-t border-border p-4">
+        <PoweredByProofLens />
+        <p className="text-caption text-text-muted">Scores &amp; flags — never blocks. Images are never stored.</p>
       </div>
     </div>
   );

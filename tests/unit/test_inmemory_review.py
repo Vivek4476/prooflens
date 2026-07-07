@@ -1,0 +1,47 @@
+"""record_review updates the result, writes an audit entry, and filters."""
+
+from __future__ import annotations
+
+from prooflens.engine.scoring_config import ScoringConfig
+from prooflens.engine.types import CheckOutcome, Verdict
+from prooflens.service.repo import InMemoryRepo
+from prooflens.service.views import TenantView
+
+
+def _repo() -> InMemoryRepo:
+    t = TenantView(id="t1", slug="dev", webhook_secret="s", field_map={}, scoring=ScoringConfig())
+    return InMemoryRepo([t])
+
+
+def _verdict() -> Verdict:
+    return Verdict(
+        band="Suspect", score=20.0, reason="Suspect — designed graphic",
+        reason_code="designed_graphic", rubric_version="v1",
+        checks=[CheckOutcome(name="content", available=True, score=0.0, summary="x", metric=None, data={}, latency_ms=1.0)],
+    )
+
+
+def test_record_review_updates_and_audits():
+    repo = _repo()
+    rid = repo.record_result("t1", None, _verdict())
+    view = repo.record_review(rid, "approve", "ok", "Demo Operator")
+    assert view is not None
+    assert view.review_status == "approve" and view.reviewer == "Demo Operator"
+    assert view.reviewed_at is not None
+    assert repo.audit_log[-1]["event"] == "review.decision"
+    assert repo.audit_log[-1]["detail"]["decision"] == "approve"
+
+
+def test_record_review_unknown_id_returns_none():
+    assert _repo().record_review("nope", "approve", None, "Demo Operator") is None
+
+
+def test_list_results_review_filter():
+    repo = _repo()
+    a = repo.record_result("t1", None, _verdict())
+    repo.record_result("t1", None, _verdict())  # left pending
+    repo.record_review(a, "reject", None, "Demo Operator")
+    pending, _ = repo.list_results(review="pending")
+    rejected, _ = repo.list_results(review="reject")
+    assert len(pending) == 1 and pending[0].review_status is None
+    assert len(rejected) == 1 and rejected[0].id == a

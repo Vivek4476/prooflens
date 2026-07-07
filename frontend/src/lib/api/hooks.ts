@@ -30,7 +30,12 @@ export function useHealth() {
   return { state, ...query };
 }
 
-export function useResults(params?: { limit?: number; offset?: number; band?: string }) {
+export function useResults(params?: {
+  limit?: number;
+  offset?: number;
+  band?: string;
+  review?: string;
+}) {
   return useQuery({
     queryKey: ["results", params],
     queryFn: () => api.results(params),

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, CircleSlash, X } from "lucide-react";
+import { ArrowUpCircle, Check, CircleSlash, X } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -8,25 +8,33 @@ import { StateIcon } from "@/components/verdict/StateIcon";
 import { VerdictBadge } from "@/components/verdict/VerdictBadge";
 import type { ResultItem, ReviewDecision } from "@/lib/api/types";
 import { CHECK_LABEL, checkConfidence, checkState } from "@/lib/verdict";
-import { formatRelative } from "@/lib/utils";
+import { cn, formatRelative } from "@/lib/utils";
 
 export function ReviewCard({
   item,
   onDecide,
   status,
+  focused = false,
 }: {
   item: ResultItem;
   onDecide: (d: ReviewDecision) => void;
-  status: "idle" | "pending" | "attempted";
+  status: "idle" | "pending";
+  focused?: boolean;
 }) {
-  // The signals that actually drove the flag (warn/fail), most severe first.
   const flags = item.checks
     .map((c) => ({ c, s: checkState(c) }))
     .filter((x) => x.s === "fail" || x.s === "warn")
     .sort((a, b) => (a.s === "fail" ? -1 : 1) - (b.s === "fail" ? -1 : 1));
 
+  const busy = status === "pending";
+
   return (
-    <Card className="flex flex-col gap-4 p-5">
+    <Card
+      className={cn(
+        "flex flex-col gap-4 p-5 transition-shadow",
+        focused && "ring-2 ring-brand-crimson",
+      )}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <VerdictBadge band={item.band} />
@@ -35,10 +43,8 @@ export function ReviewCard({
         <span className="text-caption text-text-muted">{formatRelative(item.created_at)}</span>
       </div>
 
-      {/* Verbatim reason */}
       <p className="text-body font-medium leading-snug text-text">{item.reason}</p>
 
-      {/* Evidence that fired */}
       {flags.length > 0 && (
         <div className="space-y-1.5 rounded-md bg-surface-2 p-3">
           {flags.map(({ c, s }) => {
@@ -68,21 +74,22 @@ export function ReviewCard({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
-        <Button variant="secondary" onClick={() => onDecide("approve")} disabled={status === "pending"}>
+        <Button variant="secondary" onClick={() => onDecide("approve")} disabled={busy}>
           <Check size={15} />
           Approve
         </Button>
-        <Button variant="danger" onClick={() => onDecide("reject")} disabled={status === "pending"}>
+        <Button variant="danger" onClick={() => onDecide("reject")} disabled={busy}>
           <X size={15} />
           Reject
         </Button>
-        <Button variant="ghost" onClick={() => onDecide("false_positive")} disabled={status === "pending"}>
+        <Button variant="ghost" onClick={() => onDecide("false_positive")} disabled={busy}>
           <CircleSlash size={15} />
           False positive
         </Button>
-        {status === "attempted" && (
-          <span className="ml-auto text-caption text-warn">Pending backend endpoint</span>
-        )}
+        <Button variant="ghost" onClick={() => onDecide("escalate")} disabled={busy}>
+          <ArrowUpCircle size={15} />
+          Escalate
+        </Button>
       </div>
     </Card>
   );

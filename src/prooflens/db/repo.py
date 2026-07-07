@@ -8,13 +8,14 @@ Repo protocol as InMemoryRepo, so the API/worker code is unchanged.
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 
 from ..engine.types import Verdict
 from ..queue import queue as q
 from ..service.views import JobView, ResultView, TenantView
 from ..tenants.service import resolve_scoring
 from .hashstore import PostgresHashStore
-from .models import Job, Result, Tenant
+from .models import AuditLog, Job, Result, Tenant
 
 
 def _tenant_view(t: Tenant) -> TenantView:
@@ -103,11 +104,16 @@ class PostgresRepo:
         return str(row.id)
 
     def list_results(
-        self, *, limit: int = 50, offset: int = 0, band: str | None = None
+        self, *, limit: int = 50, offset: int = 0, band: str | None = None,
+        review: str | None = None,
     ) -> tuple[list[ResultView], int]:
         query = self._session.query(Result)
         if band:
             query = query.filter(Result.band == band)
+        if review == "pending":
+            query = query.filter(Result.review_status.is_(None))
+        elif review:
+            query = query.filter(Result.review_status == review)
         total = query.count()
         rows = (
             query.order_by(Result.created_at.desc()).offset(offset).limit(limit).all()
@@ -133,6 +139,30 @@ class PostgresRepo:
         job = self._session.get(Job, row.job_id) if row.job_id else None
         return self._to_view(row, job)
 
+    def record_review(
+        self, result_id: str, decision: str, note: str | None, reviewer: str
+    ) -> ResultView | None:
+        try:
+            rid = uuid.UUID(result_id)
+        except (ValueError, AttributeError):
+            return None
+        row = self._session.get(Result, rid)
+        if row is None:
+            return None
+        row.review_status = decision
+        row.review_note = note
+        row.reviewed_at = datetime.now(UTC)
+        row.reviewer = reviewer
+        self._session.add(AuditLog(
+            tenant_id=row.tenant_id,
+            job_id=row.job_id,
+            event="review.decision",
+            detail={"result_id": str(row.id), "decision": decision, "note": note, "reviewer": reviewer},
+        ))
+        self._session.flush()
+        job = self._session.get(Job, row.job_id) if row.job_id else None
+        return self._to_view(row, job)
+
     @staticmethod
     def _to_view(r: Result, job: Job | None) -> ResultView:
         # The trail (rep/opportunity) rides on the originating job payload.
@@ -153,6 +183,10 @@ class PostgresRepo:
             source="webhook" if r.job_id else "direct",
             opportunity_id=payload.get("opportunity_id"),
             rep_id=payload.get("rep_id"),
+            review_status=r.review_status,
+            review_note=r.review_note,
+            reviewed_at=r.reviewed_at.isoformat() if r.reviewed_at else None,
+            reviewer=r.reviewer,
         )
 
     def commit(self) -> None:

@@ -49,13 +49,22 @@ class Repo(Protocol):
         ...
 
     def list_results(
-        self, *, limit: int = 50, offset: int = 0, band: str | None = None
+        self, *, limit: int = 50, offset: int = 0, band: str | None = None,
+        review: str | None = None,
     ) -> tuple[list[ResultView], int]:
-        """Newest-first page of results + total matching count."""
+        """Newest-first page of results + total matching count.
+        review="pending" => undecided only; other value => exact review_status match."""
         ...
 
     def get_result(self, result_id: str) -> ResultView | None:
         """A single stored result by id, or None if it doesn't exist."""
+        ...
+
+    def record_review(
+        self, result_id: str, decision: str, note: str | None, reviewer: str
+    ) -> ResultView | None:
+        """Record a moderator decision on a result; write an audit event.
+        Returns the updated view, or None if result_id is unknown."""
         ...
 
     def commit(self) -> None: ...
@@ -74,6 +83,7 @@ class InMemoryRepo:
         self._queued: list[str] = []
         self._status: dict[str, str] = {}
         self.results: list[ResultView] = []
+        self.audit_log: list[dict] = []
         self._ids = itertools.count(1)
 
     def add_tenant(self, tenant: TenantView) -> None:
@@ -150,14 +160,37 @@ class InMemoryRepo:
         return rid
 
     def list_results(
-        self, *, limit: int = 50, offset: int = 0, band: str | None = None
+        self, *, limit: int = 50, offset: int = 0, band: str | None = None,
+        review: str | None = None,
     ) -> tuple[list[ResultView], int]:
         rows = [r for r in self.results if band is None or r.band == band]
+        if review == "pending":
+            rows = [r for r in rows if r.review_status is None]
+        elif review:
+            rows = [r for r in rows if r.review_status == review]
         rows = list(reversed(rows))  # newest first
         return rows[offset : offset + limit], len(rows)
 
     def get_result(self, result_id: str) -> ResultView | None:
         return next((r for r in self.results if r.id == result_id), None)
+
+    def record_review(
+        self, result_id: str, decision: str, note: str | None, reviewer: str
+    ) -> ResultView | None:
+        view = next((r for r in self.results if r.id == result_id), None)
+        if view is None:
+            return None
+        view.review_status = decision
+        view.review_note = note
+        view.reviewed_at = datetime.now(UTC).isoformat()
+        view.reviewer = reviewer
+        self.audit_log.append({
+            "event": "review.decision",
+            "tenant_id": view.tenant_id,
+            "job_id": None,
+            "detail": {"result_id": result_id, "decision": decision, "note": note, "reviewer": reviewer},
+        })
+        return view
 
     def commit(self) -> None:  # no-op in memory
         pass

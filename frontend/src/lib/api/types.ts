@@ -48,6 +48,8 @@ export interface ResultItem {
   opportunity_id: string | null;
   rep_id: string | null;
   checks: CheckOutcome[];
+  // Present once a moderator has actioned this result; null/absent while pending.
+  review?: ReviewBlock | null;
 }
 
 export interface ResultsPage {
@@ -109,6 +111,13 @@ export interface Tenant {
   scoring: ScoringConfig;
 }
 
-export type ReviewDecision = "approve" | "reject" | "false_positive";
+export type ReviewDecision = "approve" | "reject" | "false_positive" | "escalate";
+
+export interface ReviewBlock {
+  status: ReviewDecision;
+  note: string | null;
+  reviewed_at: string | null;
+  reviewer: string | null;
+}
 
 export type HealthState = "ok" | "degraded" | "down" | "loading";
