@@ -135,6 +135,11 @@ class Result(Base):
     checks: Mapped[list] = mapped_column(JSONB, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    review_status: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    review_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reviewer: Mapped[str | None] = mapped_column(String(120), nullable=True)
+
 
 class AuditLog(Base):
     __tablename__ = "audit_log"

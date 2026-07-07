@@ -22,7 +22,7 @@ def main() -> None:
 
         tenant = Tenant(
             slug=DEV_SLUG,
-            name="Dev Tenant",
+            name="Aditya Birla Sun Life Insurance",
             webhook_secret="dev-webhook-secret-change-me",
             # Placeholder LSQ creds (encrypted at rest). Replace for real use.
             lsq_credentials_encrypted=encrypt("dev-lsq-access-key:dev-lsq-secret-key"),
