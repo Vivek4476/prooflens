@@ -7,12 +7,9 @@ import { TenantLogo } from "@/components/brand/TenantLogo";
  */
 export function AbsliMasthead() {
   return (
-    <div className="flex flex-col gap-2.5">
+    <div className="flex flex-col gap-2">
       <TenantLogo size="md" />
-      <div className="leading-tight">
-        <p className="text-body-sm font-semibold text-text">Aditya Birla Sun Life Insurance</p>
-        <p className="text-caption text-text-muted">Capture Integrity workspace</p>
-      </div>
+      <p className="text-center text-caption text-text-muted">Capture Integrity workspace</p>
     </div>
   );
 }

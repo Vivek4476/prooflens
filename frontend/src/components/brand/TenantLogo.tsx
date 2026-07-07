@@ -5,12 +5,15 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * The ABSLI tenant logo. The source PNG is a wide ~2.4:1 lockup on a solid white
- * background, so it is rendered on a light card (the artwork assumes a light
- * ground) with object-contain — never clipped, never distorted.
+ * The ABSLI tenant logo.
  *
- * - `md` (masthead): a full-width, centered card that reads as a header.
- * - `sm`: a compact inline chip for dense contexts.
+ * - `md` (masthead): a full-bleed, transparent-background lockup
+ *   (`absli-logo.png`) that spans the full width of the sidebar bar and sits
+ *   directly on the sidebar surface. In dark mode the artwork's maroon text
+ *   loses contrast against the dark surface, so it gets a light rounded
+ *   panel behind it in that theme only.
+ * - `sm`: a compact inline chip on the original white-background PNG, for
+ *   dense contexts (e.g. exports) where a light card is still appropriate.
  */
 export function TenantLogo({
   size = "md",
@@ -20,31 +23,48 @@ export function TenantLogo({
   className?: string;
 }) {
   const [ok, setOk] = useState(true);
-  const box =
-    size === "md"
-      ? "flex w-full items-center justify-center rounded-lg px-4 py-3"
-      : "inline-flex h-8 items-center justify-center rounded-md px-2";
-  const imgHeight = size === "md" ? "h-9" : "h-4";
+
+  if (size === "sm") {
+    return (
+      <span
+        className={cn(
+          "inline-flex h-8 items-center justify-center rounded-md bg-white px-2 ring-1 ring-border",
+          className,
+        )}
+      >
+        {ok ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src="/brand/abc-life-insurance.png"
+            alt="Aditya Birla Sun Life Insurance"
+            className="h-4 w-auto object-contain"
+            onError={() => setOk(false)}
+          />
+        ) : (
+          <span className="text-body-sm font-bold text-brand-crimson">ABSLI</span>
+        )}
+      </span>
+    );
+  }
 
   return (
-    <span className={cn("bg-white ring-1 ring-border", box, className)}>
+    <span
+      className={cn(
+        "flex w-full items-center justify-center rounded-lg px-0.5 py-1",
+        "bg-transparent dark:bg-white/95",
+        className,
+      )}
+    >
       {ok ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src="/brand/abc-life-insurance.png"
+          src="/brand/absli-logo.png"
           alt="Aditya Birla Sun Life Insurance"
-          className={cn("w-auto object-contain", imgHeight)}
+          className="h-auto w-full object-contain"
           onError={() => setOk(false)}
         />
       ) : (
-        <span
-          className={cn(
-            "font-bold text-brand-crimson",
-            size === "md" ? "text-h2" : "text-body-sm",
-          )}
-        >
-          ABSLI
-        </span>
+        <span className="text-h2 font-bold text-brand-crimson">ABSLI</span>
       )}
     </span>
   );
