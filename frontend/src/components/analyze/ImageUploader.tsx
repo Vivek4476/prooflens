@@ -1,9 +1,11 @@
 "use client";
 
-import { ImageIcon, UploadCloud, X } from "lucide-react";
+import { AlertCircle, ImageIcon, UploadCloud, X } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
+
+const MAX_FILE_BYTES = 15 * 1024 * 1024; // 15 MB
 
 export function ImageUploader({
   preview,
@@ -20,12 +22,21 @@ export function ImageUploader({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleFiles = useCallback(
     (files: FileList | null) => {
       const file = files?.[0];
       if (!file) return;
-      if (!file.type.startsWith("image/")) return;
+      if (!file.type.startsWith("image/")) {
+        setError("That's not an image — please choose a JPG or PNG.");
+        return;
+      }
+      if (file.size > MAX_FILE_BYTES) {
+        setError("Image is too large (max 15 MB).");
+        return;
+      }
+      setError(null);
       onSelect(file);
     },
     [onSelect],
@@ -56,7 +67,8 @@ export function ImageUploader({
   }
 
   return (
-    <div
+    <div className="space-y-2">
+      <div
       role="button"
       tabIndex={0}
       onClick={() => inputRef.current?.click()}
@@ -92,6 +104,13 @@ export function ImageUploader({
         className="hidden"
         onChange={(e) => handleFiles(e.target.files)}
       />
+      </div>
+      {error && (
+        <p role="alert" className="flex items-center gap-1.5 text-caption text-danger">
+          <AlertCircle size={13} className="shrink-0" />
+          {error}
+        </p>
+      )}
     </div>
   );
 }
