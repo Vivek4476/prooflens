@@ -1,11 +1,11 @@
 """parse_bound: date-only -> whole-day; full timestamp -> exact instant; UTC."""
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
-from prooflens.api.date_range import parse_bound
+from prooflens.api.date_range import parse_bound, resolve_range
 
 
 def test_none_and_empty_return_none():
@@ -53,3 +53,63 @@ def test_basic_format_date_is_not_treated_as_date_only():
     # as a naive datetime at midnight, which is then treated as UTC.
     result = parse_bound("20260708", is_end=False)
     assert result == datetime(2026, 7, 8, tzinfo=UTC)
+
+
+UTC_ALIAS = timezone.utc
+
+
+def _today():
+    return datetime.now(UTC_ALIAS).date()
+
+
+def test_resolve_defaults_to_last_30_days():
+    start, end = resolve_range(None, None)
+    assert start.date() == _today() - timedelta(days=29)
+    assert end.date() == _today() + timedelta(days=1)      # exclusive next-midnight
+    assert (end - start).days == 30
+
+
+def test_resolve_only_start_defaults_end_to_today():
+    d = (_today() - timedelta(days=3)).isoformat()
+    start, end = resolve_range(d, None)
+    assert start.date() == _today() - timedelta(days=3)
+    assert end.date() == _today() + timedelta(days=1)
+
+
+def test_resolve_only_end_defaults_start_30_back():
+    d = (_today() - timedelta(days=2)).isoformat()
+    start, end = resolve_range(None, d)
+    assert end.date() == _today() - timedelta(days=1)      # exclusive of (d+1)
+    assert start.date() == (_today() - timedelta(days=2)) - timedelta(days=29)
+
+
+def test_resolve_same_day_is_valid():
+    d = (_today() - timedelta(days=1)).isoformat()
+    start, end = resolve_range(d, d)
+    assert (end - start).days == 1
+
+
+def test_resolve_future_start_rejected():
+    d = (_today() + timedelta(days=1)).isoformat()
+    with pytest.raises(ValueError, match="start_date is in the future"):
+        resolve_range(d, None)
+
+
+def test_resolve_future_end_rejected():
+    d = (_today() + timedelta(days=1)).isoformat()
+    with pytest.raises(ValueError, match="end_date is in the future"):
+        resolve_range(None, d)
+
+
+def test_resolve_start_after_end_rejected():
+    s = (_today() - timedelta(days=1)).isoformat()
+    e = (_today() - timedelta(days=5)).isoformat()
+    with pytest.raises(ValueError, match="start_date must be <= end_date"):
+        resolve_range(s, e)
+
+
+def test_resolve_span_over_400_days_rejected():
+    s = (_today() - timedelta(days=500)).isoformat()
+    e = _today().isoformat()
+    with pytest.raises(ValueError, match="max 400 days"):
+        resolve_range(s, e)
