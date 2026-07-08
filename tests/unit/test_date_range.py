@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
-from prooflens.api.date_range import parse_bound, resolve_range
+from prooflens.api.date_range import parse_bound, resolve_range, fill_series
 
 
 def test_none_and_empty_return_none():
@@ -113,3 +113,31 @@ def test_resolve_span_over_400_days_rejected():
     e = _today().isoformat()
     with pytest.raises(ValueError, match="max 400 days"):
         resolve_range(s, e)
+
+
+class _Row:
+    def __init__(self, band, score):
+        self.band = band
+        self.score = score
+
+
+def test_fill_series_zero_fills_gaps_in_order():
+    start = datetime(2026, 7, 1, tzinfo=UTC)
+    end = datetime(2026, 7, 4, tzinfo=UTC)          # covers Jul 1,2,3 (exclusive end)
+    by_day = {
+        "2026-07-01": [_Row("Clear", 80.0), _Row("Suspect", 10.0)],
+        "2026-07-03": [_Row("Doubtful", 50.0)],
+    }
+    series = fill_series(by_day, start, end)
+    assert [b["date"] for b in series] == ["2026-07-01", "2026-07-02", "2026-07-03"]
+    assert series[0] == {"date": "2026-07-01", "count": 2, "clear": 1, "doubtful": 0, "suspect": 1, "avg_score": 45.0}
+    assert series[1] == {"date": "2026-07-02", "count": 0, "clear": 0, "doubtful": 0, "suspect": 0, "avg_score": 0}
+    assert series[2]["count"] == 1 and series[2]["doubtful"] == 1
+
+
+def test_fill_series_fully_empty_range():
+    start = datetime(2026, 7, 1, tzinfo=UTC)
+    end = datetime(2026, 7, 3, tzinfo=UTC)          # Jul 1, 2
+    series = fill_series({}, start, end)
+    assert [b["date"] for b in series] == ["2026-07-01", "2026-07-02"]
+    assert all(b["count"] == 0 for b in series)

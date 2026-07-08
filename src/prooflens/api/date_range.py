@@ -71,3 +71,25 @@ def resolve_range(start_date: str | None, end_date: str | None) -> tuple[datetim
     end_next = end_day + timedelta(days=1)
     end = datetime(end_next.year, end_next.month, end_next.day, tzinfo=UTC)
     return start, end
+
+
+def fill_series(by_day: dict[str, list], start: datetime, end: datetime) -> list[dict]:
+    """One per-day bucket for every calendar day in [start.date(), (end-1day).date()],
+    oldest->newest. Days absent from ``by_day`` are zero-filled so charts render smoothly."""
+    out: list[dict] = []
+    day = start.date()
+    last = (end - timedelta(days=1)).date()
+    while day <= last:
+        key = day.isoformat()
+        rows = by_day.get(key, [])
+        day_scores = [x.score for x in rows]
+        out.append({
+            "date": key,
+            "count": len(rows),
+            "clear": sum(1 for x in rows if x.band == "Clear"),
+            "doubtful": sum(1 for x in rows if x.band == "Doubtful"),
+            "suspect": sum(1 for x in rows if x.band == "Suspect"),
+            "avg_score": round(sum(day_scores) / len(day_scores), 1) if day_scores else 0,
+        })
+        day += timedelta(days=1)
+    return out
