@@ -72,7 +72,7 @@ This is a legal and ethical guardrail, not a style preference.
 > "Flagged: matches an image submitted on 12 Mar. Compare both in review."
 
 **Success** — quiet confirmation, no celebration.
-> "Scored. Clear — no integrity signals found."
+> "Scored. Clear — no capture-integrity issues found."
 
 **Errors / degraded states** — honest, specific, forward-looking.
 > "Scored without content analysis — the vision service didn't respond. The score reflects
@@ -186,24 +186,33 @@ as product, not tenant. Accent coverage ≤10% of any screen.
 reports' headers. It is never interface chrome, never a button, never a chart color. This
 is the Stripe model: the dashboard is Stripe's; your logo marks whose data it is.
 
-**Token set:**
+**Token set** (names and current values are the source of truth in
+`frontend/src/styles/tokens.css`; the accent and Suspect values below are the
+*target* migration state — see the Migration notes at the end of this document
+for what still differs in code):
 
 | Token | Light | Dark | Job |
 |---|---|---|---|
-| `--canvas` | `#FAFAF9` | `#0E0E11` | Page background |
-| `--surface` | `#FFFFFF` | `#17171B` | Cards, panels |
-| `--surface-2` | `#F4F4F2` | `#1F1F24` | Insets, table headers |
-| `--border` | `#E8E7E3` | `#2A2A30` | Hairlines only |
-| `--ink` | `#17171A` | `#EDEDEF` | Primary text |
-| `--ink-2` | `#5C5B57` | `#A4A3A9` | Secondary text |
-| `--ink-3` | `#8F8E88` | `#6E6D74` | Captions, meta |
-| `--accent` | `#4C5FD5` | `#7B8CFF` | Interaction |
-| `--clear` | `#1F9D57` | `#34C77B` | Verdict: Clear |
-| `--doubtful` | `#E08A00` | `#F2A93B` | Verdict: Doubtful |
-| `--suspect` | `#DC2F45` | `#FF5C71` | Verdict: Suspect |
+| `--canvas` | `#FAFAF8` | `#101012` | Page background |
+| `--surface` | `#FFFFFF` | `#17171A` | Cards, panels |
+| `--surface-2` | `#F4F3F0` | `#1E1E22` | Insets, table headers |
+| `--surface-3` | `#ECEBE6` | `#26262B` | Deepest inset / skeleton base |
+| `--border` | `#E6E4DE` | `#2A2A2F` | Hairlines |
+| `--border-strong` | `#D4D1C9` | `#3A3A41` | Stronger separators, emphasis rings |
+| `--text` | `#1A1A18` | `#F4F3F0` | Primary text |
+| `--text-secondary` | `#56534D` | `#B3B1AB` | Secondary text |
+| `--text-muted` | `#8A867E` | `#7E7C77` | Captions, meta |
+| `--accent` (target) | `#4C5FD5` | `#7B8CFF` | Interaction (Focus Indigo — not yet in `tokens.css`) |
+| `--verdict-clear` | `#1F9D57` | `#35C47E` | Verdict: Clear |
+| `--verdict-doubtful` | `#E08A00` | `#F0A83C` | Verdict: Doubtful |
+| `--verdict-suspect` (target) | `#DC2F45` | `#F0596E` | Verdict: Suspect (target red; `tokens.css` still `#C8102E` light) |
 | `--tenant-brand` | per-tenant | per-tenant | Tenant chip only |
 
-**Charts & data visualization:** default series in neutrals (`--ink-2` scale) with accent
+Each verdict also has a paired `-bg` (soft tint) and `-fg` (accessible text)
+token — e.g. `--verdict-clear-bg` / `--verdict-clear-fg` — which the
+`VerdictBadge` component uses so the word stays legible on its tint.
+
+**Charts & data visualization:** default series in neutrals (`--text-secondary` scale) with accent
 for the highlighted series. Verdict colors appear in charts *only* when the data encodes
 verdicts (band distribution). Never rainbow palettes; never color to make a chart "pop."
 
@@ -217,17 +226,20 @@ and tables align like instrumentation.
 
 **The complete scale (nothing outside it):**
 
-| Role | Size/Line | Weight | Use |
-|---|---|---|---|
-| Display | 32/38 | 650 | The score, one hero number per screen |
-| H1 | 22/28 | 600 | Page title (one per page) |
-| H2 | 16/24 | 600 | Section headers |
-| Body | 14/22 | 450 | Default text, table cells |
-| Body-strong | 14/22 | 600 | Emphasis inside body — sparingly |
-| Caption | 12/16 | 450 | Meta, timestamps, footnotes |
+| Role | Class | Size/Line (px) | Weight | Use |
+|---|---|---|---|---|
+| Display | `text-display` | 32/38.4 | 600 | The score, one hero number per screen |
+| H1 | `text-h1` | 22/28 | 600 | Page title (one per page) |
+| H2 | `text-h2` | 17/22.4 | 600 | Section headers |
+| Body | `text-body` | 15/22.4 | 400 | Default text, table cells |
+| Body-sm | `text-body-sm` | 13/19.2 | 400 | Dense/secondary text, table meta |
+| Caption | `text-caption` | 12/16 | 400 | Meta, timestamps, footnotes |
 
-**Rhythm & rules:** labels are Caption in `--ink-3`, uppercase never (sentence case
-everywhere); values are Body or Display in `--ink` — a label must never visually compete
+*Body-strong* is not a separate size — it is the Body role at weight 600, applied
+with `font-semibold` for sparing in-line emphasis.
+
+**Rhythm & rules:** labels are Caption in `--text-muted`, uppercase never (sentence case
+everywhere); values are Body or Display in `--text` — a label must never visually compete
 with its value. Large numbers get whitespace equal to at least their own height above and
 beside them. Tables: Body at 450, numeric columns right-aligned tabular, row height 44px.
 Reading measure for prose ≤ 65ch. Weight creates hierarchy before size does; size changes
@@ -342,10 +354,10 @@ Motion is a status channel. Durations: **120ms** micro (hover, toggles), **200ms
 eighteen months; abstract neural swooshes are the new clip art.
 
 **One system: geometric line compositions derived from the logo.** Circles, arcs, and
-vesica intersections in `--ink-3` single-weight strokes with at most one accent element —
+vesica intersections in `--text-muted` single-weight strokes with at most one accent element —
 used only in empty states, onboarding, and error pages. They extend the mark's geometry, so
 every illustration is unmistakably ProofLens without a signature. Icons throughout the
-product: Lucide, 20px, 1.5px stroke, `--ink-2` — never filled, never multicolor.
+product: Lucide, 20px, 1.5px stroke, `--text-secondary` — never filled, never multicolor.
 
 ---
 
@@ -373,9 +385,11 @@ button. Never bare "No data." Never two CTAs.
 first-person "I found…". Findings are presented as the system's analysis in neutral third
 person: "This image appears…", "Three integrity signals were found."
 
-**Explaining a suspicious photo — always the four beats:**
-> **Suspect · 28/100** — *"Appears to be a photo of another screen — glare and screen-edge
-> detected."* Confidence: high. Recommended: compare with the agent's original submission
+**Explaining a suspicious photo — always the four beats.** The reason clause is the
+verbatim string from `docs/VERDICT_COPY.md` (never paraphrased); the surrounding
+confidence and recommendation are UI copy:
+> **Suspect · 28/100** — *"Photo of another screen — screen edge and glare detected."*
+> Confidence: high. Recommended: compare with the account's original submission
 > in review.
 
 **Confidence** is shown as a word + number pair — "High · 92", "Moderate · 61", "Low · 34"
@@ -414,16 +428,19 @@ earlier documents, **this section wins.** Update `frontend/src/styles/tokens.css
 1. ABSLI crimson `#C8102E` is removed from all interface chrome (masthead, buttons,
    headers). It appears only in the tenant identity chip (sidebar bottom) and report
    exports. The gold rule under the masthead is removed.
-2. Verdict Suspect changes from `#C8102E` to `#DC2F45` (dark `#FF5C71`) so risk ≠ tenant
-   brand. Update `--verdict-suspect` and golden-set visual references.
+2. Verdict Suspect (light) changes from `#C8102E` to `#DC2F45` so risk ≠ tenant
+   brand. Update `--verdict-suspect` and golden-set visual references. (The dark-theme
+   Suspect in `tokens.css` is `#F0596E`; keep it in step with the §6 table.)
 3. Primary interactive color is Focus Indigo `#4C5FD5` (dark `#7B8CFF`), replacing any
    crimson-primary buttons.
 4. App shell logo: ProofLens mark (per §5 Concept A geometry) + wordmark, monochrome ink.
    The ABC logo file moves to the tenant chip component.
 
 ### Color rules
-- Implement the full token table from §6 as CSS custom properties; themes switch via
-  `data-theme` on `<html>`. No hex values outside `tokens.css`.
+- Implement the full token table from §6 as CSS custom properties in `tokens.css`;
+  the dark theme is a `.dark` class override on `<html>`, toggled by next-themes
+  (`attribute="class"`, `darkMode: "class"` in `tailwind.config.ts`). No hex values
+  outside `tokens.css`.
 - Verdict colors only where data encodes verdicts, always paired with the verdict word.
 - Accent ≤10% of any screen: buttons (one primary per view), links, focus rings,
   active-nav text, selected states. Never backgrounds of large regions.
@@ -431,51 +448,63 @@ earlier documents, **this section wins.** Update `frontend/src/styles/tokens.css
 
 ### Typography rules
 - Inter variable, `"tnum" 1` on any element containing data numerals.
-- Only the six roles in §7's table; implement as utility classes
-  (`.text-display`, `.text-h1`, `.text-h2`, `.text-body`, `.text-body-strong`,
-  `.text-caption`). Any font-size not in the scale fails review.
-- Numeric table columns right-aligned; labels sentence case, `--ink-3`, Caption role.
+- Only the six roles in §7's table; they exist as Tailwind font-size utilities
+  (`text-display`, `text-h1`, `text-h2`, `text-body`, `text-body-sm`,
+  `text-caption`). Body-strong is `text-body` + `font-semibold`, not its own
+  class. Any font-size not in the scale fails review.
+- Numeric table columns right-aligned; labels sentence case, `--text-muted`, Caption role.
 
 ### Spacing & layout rules
 - 4px base; allowed steps: 4, 8, 12, 16, 24, 32, 48, 64. No arbitrary values.
-- Shell: sidebar fixed 240px; content max-width 1200px, centered; page padding 32px
+- Shell: sidebar fixed 248px; content max-width 1200px, centered; page padding 32px
   (desktop) / 16px (tablet); vertical section gap 32px; intra-card gap 16px.
-- Radii: 8px controls, 12px cards, 999px pills/badges. Shadows: exactly two elevations —
-  `0 1px 2px rgb(0 0 0 / 0.05)` (resting) and `0 4px 16px rgb(0 0 0 / 0.08)` (overlays).
-  Nothing else. No border + shadow + background stacking; pick one separator.
+- Radii: use the tokens `--radius` (10px, cards/controls) and `--radius-sm` (7px,
+  smaller controls); 999px (`rounded-full`) for pills/badges. Shadows: exactly two
+  elevations, `--shadow-1` (resting) and `--shadow-2` (overlays) — nothing else.
+  No border + shadow + background stacking; pick one separator.
 
 ### Component rules
-- One component per concept, reused everywhere: `VerdictBadge` (word + color, pill,
-  Caption 600), `ScoreDisplay` (Display role + "/100" Caption), `ConfidenceLabel`
-  (word · number), `IntegrityStrip` (proportional band bar), `PipelineStepper`,
-  `ChecksList` (renders only checks[] the backend returned), `HistoryTable`, `MetricCard`
-  (max 3 per screen), `EmptyState` (illustration + H2 + Body + ≤1 CTA), `TenantChip`.
+- One component per concept, reused everywhere. Existing components (names as in
+  `frontend/src/components`): `VerdictBadge` (word + color, pill, with a colour dot),
+  `ScoreRing` (Display-role number + "/ 100" Caption), `PipelineStepper`,
+  `ChecksList` (renders only the `checks[]` the backend returned), `ResultsTable`
+  (operational history), `MetricCard` (max 3 per screen), `EmptyState`
+  (icon/illustration + H2/title + Body + ≤1 CTA), `ChartCard`, and `TenantLogo`
+  (the tenant chip). Still to build per this doc: `ConfidenceLabel` (word · number)
+  and `IntegrityStrip` (proportional band bar, §10).
 - Buttons: primary (accent fill, white text), secondary (surface + border), ghost (text).
   One primary per view. 44px min height. No icon-only buttons without tooltips.
 - Tables: 44px rows, `--surface-2` header, hairline `--border` row separators, hover =
   `--surface-2` row tint. No zebra stripes, no card-per-row lists for operational data.
 
 ### Icon rules
-- Lucide only, 20px default (16px inside dense tables), 1.5px stroke, `--ink-2`;
+- Lucide only, 20px default (16px inside dense tables), 1.5px stroke, `--text-secondary`;
   verdict/status icons may take verdict colors. Never filled variants, never emoji in UI.
 
 ### Animation rules
-- Tokens: `--dur-1: 120ms; --dur-2: 200ms; --dur-3: 300ms;
-  --ease: cubic-bezier(0.2, 0, 0, 1)`. Nothing exceeds `--dur-3`.
-- Permitted animations: hover tone shifts, 150ms page content fade+rise, skeletons,
-  stepper state resolution, one score count-up (≤500ms), one chart draw-in (≤400ms),
-  toast enter/exit. Everything else is instant.
-- `prefers-reduced-motion: reduce` → all durations 0; skeletons static.
+- Durations follow the §11 ceiling: 120ms micro, 200ms standard, 300ms max —
+  nothing exceeds 300ms. The base transition token in `tailwind.config.ts` is
+  `transitionDuration.DEFAULT` (currently `180ms`); the named keyframes are
+  `fade-in` (180ms ease-out) and `slide-up` (200ms ease-out). Keep any new
+  durations inside the ceiling.
+- Permitted animations: hover tone shifts, page content fade+rise (`fade-in` /
+  `slide-up`), skeletons (`shimmer` keyframe), stepper state resolution, one
+  score count-up (≤500ms), one chart draw-in (≤400ms), toast enter/exit.
+  Everything else is instant.
+- `prefers-reduced-motion: reduce` → handled globally in `globals.css`
+  (durations collapsed to ~0) and via next-themes/`MotionConfig reducedMotion="user"`
+  in `providers.tsx`; skeletons render static.
 
 ### Branding rules
 - ProofLens mark per §5 geometry; monochrome in-app. Favicon = filled vesica. Tenant
-  logo renders only inside `TenantChip` (light chip in dark mode) and print/PDF exports.
+  logo renders only inside `TenantLogo` (the tenant chip; light chip in dark mode)
+  and print/PDF exports.
 - Never mix tenant color into charts, buttons, or verdict UI.
 
 ### Page layout rules
 - Every page: one H1, one primary action, one focal point. Dashboard per §10 exactly
   (hero anomaly number, review CTA, Integrity Strip, one table, ≤3 KPI cards).
-- Results view: VerdictBadge → ScoreDisplay → verbatim reason → ChecksList inline.
+- Results view: VerdictBadge → ScoreRing → verbatim reason → ChecksList inline.
   Explainability is never a separate navigation hop from a result.
 - Empty states per §13 copy; error states follow §3 voice (specific, forward-looking).
 
@@ -489,7 +518,9 @@ earlier documents, **this section wins.** Update `frontend/src/styles/tokens.css
 ### Accessibility rules
 - WCAG AA contrast in both themes (verify verdict colors on both canvases).
 - Meaning never by color alone — verdict word always present.
-- Full keyboard navigation; visible focus ring (2px accent outline, 2px offset).
+- Full keyboard navigation; visible focus ring (2px outline, 2px offset). The
+  focus color is the `--ring` token today; the target migration moves focus rings
+  to `--accent` (Focus Indigo) per §6.
 - Interactive targets ≥44×44px. `aria-live="polite"` on score/verdict updates.
 - All animation gated on reduced-motion; all images/icons carry labels or are
   `aria-hidden` when decorative.
