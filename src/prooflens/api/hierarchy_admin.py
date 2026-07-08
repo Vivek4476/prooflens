@@ -15,6 +15,7 @@ import uuid
 from datetime import date
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import Response
 
 from ..service.hierarchy import NODE_FIELDS
 from ..service.ids import normalize_id
@@ -114,9 +115,15 @@ def hierarchy_status(repo: Repo = Depends(get_repo)) -> dict:
 
 
 @router.get("/template", dependencies=[Depends(require_admin)])
-def hierarchy_template() -> dict:
-    return {"columns": list(_HEADER), "example": {
-        "agent_id": "REP-1", "sm": "Sam", "rsm": "Ravi", "srsm": "Sr1",
-        "zonal_head": "ZoneN", "branch": "North", "city": "Delhi",
-        "valid_from": "2026-01-01",
-    }}
+def hierarchy_template() -> Response:
+    output = io.StringIO()
+    writer = csv.writer(output, lineterminator="\n")
+    writer.writerow(_HEADER)
+    writer.writerow([
+        "REP-1", "Sam", "Ravi", "Sr1", "ZoneN", "North", "Delhi", "2026-01-01"
+    ])
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=\"hierarchy_template.csv\""}
+    )
