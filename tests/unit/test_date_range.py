@@ -1,11 +1,11 @@
 """parse_bound: date-only -> whole-day; full timestamp -> exact instant; UTC."""
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from prooflens.api.date_range import parse_bound, resolve_range, fill_series
+from prooflens.api.date_range import fill_series, parse_bound, resolve_range
 
 
 def test_none_and_empty_return_none():
@@ -55,7 +55,7 @@ def test_basic_format_date_is_not_treated_as_date_only():
     assert result == datetime(2026, 7, 8, tzinfo=UTC)
 
 
-UTC_ALIAS = timezone.utc
+UTC_ALIAS = UTC
 
 
 def _today():
@@ -130,8 +130,14 @@ def test_fill_series_zero_fills_gaps_in_order():
     }
     series = fill_series(by_day, start, end)
     assert [b["date"] for b in series] == ["2026-07-01", "2026-07-02", "2026-07-03"]
-    assert series[0] == {"date": "2026-07-01", "count": 2, "clear": 1, "doubtful": 0, "suspect": 1, "avg_score": 45.0}
-    assert series[1] == {"date": "2026-07-02", "count": 0, "clear": 0, "doubtful": 0, "suspect": 0, "avg_score": 0}
+    assert series[0] == {
+        "date": "2026-07-01", "count": 2, "clear": 1, "doubtful": 0, "suspect": 1,
+        "avg_score": 45.0,
+    }
+    assert series[1] == {
+        "date": "2026-07-02", "count": 0, "clear": 0, "doubtful": 0, "suspect": 0,
+        "avg_score": 0,
+    }
     assert series[2]["count"] == 1 and series[2]["doubtful"] == 1
 
 

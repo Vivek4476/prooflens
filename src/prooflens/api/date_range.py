@@ -54,6 +54,7 @@ def resolve_range(start_date: str | None, end_date: str | None) -> tuple[datetim
         end_day = today
         start_day = today - timedelta(days=_DEFAULT_DAYS - 1)
     elif start_day is None:
+        assert end_day is not None
         start_day = end_day - timedelta(days=_DEFAULT_DAYS - 1)
     elif end_day is None:
         end_day = today
