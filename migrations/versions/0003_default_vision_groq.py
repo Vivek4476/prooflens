@@ -2,8 +2,8 @@
 
 Existing rows are left as-is; operators change per-tenant backends explicitly.
 """
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0003_default_vision_groq"
 down_revision = "0002_review_and_absli_rename"
