@@ -13,6 +13,7 @@ from ..engine import EngineContext, Verdict, score
 from ..engine.verdicts import Reason
 from ..lsq.base import FieldUpdate, LSQClient
 from ..queue.errors import FatalError
+from ..vision.unavailable import UnavailableVision
 from .repo import Repo
 from .views import JobView, TenantView
 
@@ -46,8 +47,13 @@ def process_job(job: JobView, *, repo: Repo, lsq: LSQClient, settings: Settings)
         raise FatalError(f"unknown tenant {job.tenant_id}")
 
     image_bytes = _resolve_image_bytes(job.payload)
-    # Never call a paid backend implicitly: the tenant chooses (default stub).
-    backend = settings.build_vision_backend(tenant.vision_backend)
+    # Never call a paid backend implicitly; and never crash a job on a
+    # misconfigured backend — degrade to an unavailable vision so the verdict
+    # caps to Doubtful (fail-open) instead of dead-lettering.
+    try:
+        backend = settings.build_vision_backend(tenant.vision_backend)
+    except Exception as exc:  # noqa: BLE001
+        backend = UnavailableVision(f"{tenant.vision_backend} unavailable: {exc}")
 
     ctx = EngineContext(
         tenant_id=tenant.id,
