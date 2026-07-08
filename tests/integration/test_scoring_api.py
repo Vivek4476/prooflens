@@ -177,4 +177,78 @@ def test_results_and_analytics_populate(client):
     assert summary["band_distribution"]["Clear"] == 1
     assert summary["images_today"] == 3
     assert any(tr["reason_code"] == "designed_graphic" for tr in summary["top_reasons"])
-    assert summary["series"]  # at least one day bucket
+    # default 30-day range -> dense series (30 buckets), today's uploads land
+    # in the last bucket.
+    assert len(summary["series"]) == 30
+    assert summary["series"][-1]["count"] == 3
+
+
+def test_analytics_date_filters(client):
+    from datetime import date, timedelta
+    _upload(client, "meeting.jpg")           # all created "today"
+    _upload(client, "screenshot.jpg")
+    today = date.today().isoformat()
+    yesterday = (date.today() - timedelta(days=1)).isoformat()
+
+    all_ = client.get("/v1/analytics/summary").json()
+    assert all_["total"] == 2                # no params -> unchanged (30-day default)
+
+    incl = client.get(f"/v1/analytics/summary?start_date={today}").json()
+    assert incl["total"] == 2                # today's results are >= today 00:00
+
+    # exclusive upper bound: end_date=yesterday excludes today's uploads.
+    excl = client.get(f"/v1/analytics/summary?end_date={yesterday}").json()
+    assert excl["total"] == 0                # nothing on/before yesterday
+
+
+def test_analytics_bad_date_is_400(client):
+    r = client.get("/v1/analytics/summary?start_date=not-a-date")
+    assert r.status_code == 400
+
+
+def test_analytics_start_after_end_and_future_is_400(client):
+    # Superseded by resolve_range's stricter validation (V2 revision): a
+    # start_date after end_date is now a 400, not a silently-empty 200 (and
+    # 2999-01-01 is also rejected as a future date on its own).
+    _upload(client, "meeting.jpg")
+    r = client.get("/v1/analytics/summary?start_date=2999-01-01&end_date=2000-01-01")
+    assert r.status_code == 400
+    assert "future" in r.json()["detail"]
+
+
+def test_analytics_default_30_days_dense_series(client):
+    _upload(client, "meeting.jpg")
+    body = client.get("/v1/analytics/summary").json()
+    # default range = last 30 days -> 30 daily buckets, oldest->newest, last is today
+    assert len(body["series"]) == 30
+    from datetime import date
+    assert body["series"][-1]["date"] == date.today().isoformat()
+    assert body["total"] >= 1
+
+
+def test_analytics_future_end_date_400(client):
+    from datetime import date, timedelta
+    fut = (date.today() + timedelta(days=1)).isoformat()
+    r = client.get(f"/v1/analytics/summary?end_date={fut}")
+    assert r.status_code == 400
+
+
+def test_analytics_start_after_end_400(client):
+    r = client.get("/v1/analytics/summary?start_date=2026-06-10&end_date=2026-06-01")
+    assert r.status_code == 400
+
+
+def test_analytics_span_over_400_days_400(client):
+    r = client.get("/v1/analytics/summary?start_date=2020-01-01&end_date=2026-01-01")
+    assert r.status_code == 400
+
+
+def test_analytics_gap_filled_series_has_zero_days(client):
+    _upload(client, "meeting.jpg")   # today only
+    from datetime import date, timedelta
+    start = (date.today() - timedelta(days=4)).isoformat()
+    end = date.today().isoformat()
+    body = client.get(f"/v1/analytics/summary?start_date={start}&end_date={end}").json()
+    assert len(body["series"]) == 5                       # 5 contiguous days
+    assert body["series"][0]["count"] == 0                # 4 days ago, no data
+    assert body["series"][-1]["count"] >= 1               # today has the upload

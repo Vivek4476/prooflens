@@ -51,9 +51,11 @@ class Repo(Protocol):
     def list_results(
         self, *, limit: int = 50, offset: int = 0, band: str | None = None,
         review: str | None = None,
+        start: datetime | None = None, end: datetime | None = None,
     ) -> tuple[list[ResultView], int]:
         """Newest-first page of results + total matching count.
-        review="pending" => undecided only; other value => exact review_status match."""
+        review="pending" => undecided only; other value => exact review_status match.
+        start/end are a half-open range: created_at >= start AND created_at < end."""
         ...
 
     def get_result(self, result_id: str) -> ResultView | None:
@@ -162,12 +164,23 @@ class InMemoryRepo:
     def list_results(
         self, *, limit: int = 50, offset: int = 0, band: str | None = None,
         review: str | None = None,
+        start: datetime | None = None, end: datetime | None = None,
     ) -> tuple[list[ResultView], int]:
         rows = [r for r in self.results if band is None or r.band == band]
         if review == "pending":
             rows = [r for r in rows if r.review_status is None]
         elif review:
             rows = [r for r in rows if r.review_status == review]
+        if start is not None:
+            rows = [
+                r for r in rows
+                if r.created_at and datetime.fromisoformat(r.created_at) >= start
+            ]
+        if end is not None:
+            rows = [
+                r for r in rows
+                if r.created_at and datetime.fromisoformat(r.created_at) < end
+            ]
         rows = list(reversed(rows))  # newest first
         return rows[offset : offset + limit], len(rows)
 
