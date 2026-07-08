@@ -149,3 +149,32 @@ def test_results_and_analytics_populate(client):
     assert summary["images_today"] == 3
     assert any(tr["reason_code"] == "designed_graphic" for tr in summary["top_reasons"])
     assert summary["series"]  # at least one day bucket
+
+
+def test_analytics_date_filters(client):
+    from datetime import date, timedelta
+    _upload(client, "meeting.jpg")           # all created "today"
+    _upload(client, "screenshot.jpg")
+    today = date.today().isoformat()
+    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+
+    all_ = client.get("/v1/analytics/summary").json()
+    assert all_["total"] == 2                # no params -> unchanged
+
+    incl = client.get(f"/v1/analytics/summary?start_date={today}").json()
+    assert incl["total"] == 2                # today's results are >= today 00:00
+
+    excl = client.get(f"/v1/analytics/summary?start_date={tomorrow}").json()
+    assert excl["total"] == 0                # nothing on/after tomorrow
+
+
+def test_analytics_bad_date_is_400(client):
+    r = client.get("/v1/analytics/summary?start_date=not-a-date")
+    assert r.status_code == 400
+
+
+def test_analytics_start_after_end_is_empty_not_error(client):
+    _upload(client, "meeting.jpg")
+    r = client.get("/v1/analytics/summary?start_date=2999-01-01&end_date=2000-01-01")
+    assert r.status_code == 200
+    assert r.json()["total"] == 0

@@ -24,6 +24,7 @@ from ..engine import EngineContext, score
 from ..engine.types import Verdict
 from ..engine.verdicts import REASON_TEXT, Reason
 from ..service.repo import Repo, processing_ms
+from .date_range import parse_bound
 from .deps import get_repo
 
 router = APIRouter(tags=["scoring"])
@@ -179,9 +180,18 @@ def review_result(
 
 
 @router.get("/v1/analytics/summary")
-def analytics_summary(repo: Repo = Depends(get_repo)) -> dict:
+def analytics_summary(
+    repo: Repo = Depends(get_repo),
+    start_date: str | None = Query(default=None),
+    end_date: str | None = Query(default=None),
+) -> dict:
     # Cheap at demo scale: aggregate the recent results in Python.
-    items, total = repo.list_results(limit=5000, offset=0)
+    try:
+        start = parse_bound(start_date, is_end=False)
+        end = parse_bound(end_date, is_end=True)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"invalid date range: {exc}") from exc
+    items, total = repo.list_results(limit=5000, offset=0, start=start, end=end)
 
     bands = Counter(r.band for r in items)
     reason_counts = Counter(r.reason_code for r in items)
