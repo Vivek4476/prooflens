@@ -1,5 +1,8 @@
+"use client";
+
 import type { LucideIcon } from "lucide-react";
 
+import { CountUp } from "@/components/ui/CountUp";
 import { cn } from "@/lib/utils";
 
 /** A KPI card — headline number gets the space; label never competes with value. */
@@ -10,6 +13,7 @@ export function MetricCard({
   sub,
   icon: Icon,
   accent,
+  decimals = 0,
 }: {
   label: string;
   value: string | number;
@@ -17,7 +21,10 @@ export function MetricCard({
   sub?: string;
   icon?: LucideIcon;
   accent?: boolean; // subtle emphasis for the single most important KPI
+  decimals?: number;
 }) {
+  const isNumeric = typeof value === "number";
+
   return (
     <div
       className={cn(
@@ -42,7 +49,11 @@ export function MetricCard({
       </div>
       <div className="flex items-baseline gap-1">
         <span className="text-display leading-none tabular-nums text-text transition-colors duration-300">
-          {value}
+          {isNumeric ? (
+            <CountUp value={value} decimals={decimals} />
+          ) : (
+            value
+          )}
         </span>
         {suffix && <span className="text-body-sm text-text-muted">{suffix}</span>}
       </div>
