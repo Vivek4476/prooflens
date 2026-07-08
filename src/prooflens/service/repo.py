@@ -8,7 +8,7 @@ storage-agnostic and testable fully offline.
 from __future__ import annotations
 
 import itertools
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Protocol, runtime_checkable
 
 from ..engine.hashstore import InMemoryHashStore
@@ -70,6 +70,19 @@ class Repo(Protocol):
         Returns the updated view, or None if result_id is unknown."""
         ...
 
+    def replace_hierarchy(self, tenant_id: str, rows: list[dict], upload_id: str) -> None:
+        """Atomically replace this tenant's hierarchy with rows.
+        Each row: {agent_id, sm, rsm, srsm, zonal_head, branch, city, valid_from(date)}."""
+        ...
+
+    def get_hierarchy_rows(self, tenant_id: str) -> list[dict]:
+        """Current hierarchy rows for the tenant (dicts incl. upload_id)."""
+        ...
+
+    def hierarchy_status(self, tenant_id: str) -> dict:
+        """Current version + match rate vs distinct rep_ids in the last 90 days."""
+        ...
+
     def commit(self) -> None: ...
     def rollback(self) -> None: ...
 
@@ -87,6 +100,7 @@ class InMemoryRepo:
         self._status: dict[str, str] = {}
         self.results: list[ResultView] = []
         self.audit_log: list[dict] = []
+        self._hierarchy: dict[str, list[dict]] = {}
         self._ids = itertools.count(1)
 
     def add_tenant(self, tenant: TenantView) -> None:
@@ -208,6 +222,52 @@ class InMemoryRepo:
             },
         })
         return view
+
+    def replace_hierarchy(self, tenant_id: str, rows: list[dict], upload_id: str) -> None:
+        stored: list[dict] = []
+        for r in rows:
+            stored.append({
+                "agent_id": normalize_id(r.get("agent_id")),
+                "sm": r.get("sm"),
+                "rsm": r.get("rsm"),
+                "srsm": r.get("srsm"),
+                "zonal_head": r.get("zonal_head"),
+                "branch": r.get("branch"),
+                "city": r.get("city"),
+                "valid_from": r["valid_from"],
+                "upload_id": upload_id,
+            })
+        self._hierarchy[tenant_id] = stored
+
+    def get_hierarchy_rows(self, tenant_id: str) -> list[dict]:
+        return [dict(r) for r in self._hierarchy.get(tenant_id, [])]
+
+    def hierarchy_status(self, tenant_id: str) -> dict:
+        rows = self._hierarchy.get(tenant_id, [])
+        cutoff = datetime.now(UTC) - timedelta(days=90)
+        rep_ids: set[str] = set()
+        for r in self.results:
+            if r.tenant_id != tenant_id or not r.rep_id or not r.created_at:
+                continue
+            if datetime.fromisoformat(r.created_at) < cutoff:
+                continue
+            norm = normalize_id(r.rep_id)
+            if norm is not None:
+                rep_ids.add(norm)
+        agents = {normalize_id(r["agent_id"]) for r in rows}
+        matched = sum(1 for rid in rep_ids if rid in agents)
+        unmapped = len(rep_ids) - matched
+        total = matched + unmapped
+        upload_id = rows[0]["upload_id"] if rows else None
+        valid_from = max((r["valid_from"] for r in rows), default=None)
+        return {
+            "upload_id": upload_id,
+            "valid_from": valid_from.isoformat() if valid_from else None,
+            "row_count": len(rows),
+            "match_rate": round(matched / total, 3) if total else 0.0,
+            "matched": matched,
+            "unmapped": unmapped,
+        }
 
     def commit(self) -> None:  # no-op in memory
         pass

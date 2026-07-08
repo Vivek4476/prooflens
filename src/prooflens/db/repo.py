@@ -8,14 +8,14 @@ Repo protocol as InMemoryRepo, so the API/worker code is unchanged.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from ..engine.types import Verdict
 from ..queue import queue as q
 from ..service.views import JobView, ResultView, TenantView
 from ..tenants.service import resolve_scoring
 from .hashstore import PostgresHashStore
-from .models import AuditLog, Job, Result, Tenant
+from .models import AuditLog, Hierarchy, Job, Result, Tenant
 
 
 def _tenant_view(t: Tenant) -> TenantView:
@@ -174,6 +174,62 @@ class PostgresRepo:
         self._session.flush()
         job = self._session.get(Job, row.job_id) if row.job_id else None
         return self._to_view(row, job)
+
+    def replace_hierarchy(self, tenant_id: str, rows: list[dict], upload_id: str) -> None:
+        from ..service.ids import normalize_id
+
+        tid = uuid.UUID(tenant_id)
+        self._session.query(Hierarchy).filter(Hierarchy.tenant_id == tid).delete()
+        for r in rows:
+            self._session.add(Hierarchy(
+                tenant_id=tid,
+                agent_id=normalize_id(r.get("agent_id")),
+                sm=r.get("sm"), rsm=r.get("rsm"), srsm=r.get("srsm"),
+                zonal_head=r.get("zonal_head"), branch=r.get("branch"), city=r.get("city"),
+                valid_from=r["valid_from"], upload_id=upload_id,
+            ))
+        self._session.flush()
+
+    def get_hierarchy_rows(self, tenant_id: str) -> list[dict]:
+        tid = uuid.UUID(tenant_id)
+        rows = self._session.query(Hierarchy).filter(Hierarchy.tenant_id == tid).all()
+        return [{
+            "agent_id": h.agent_id, "sm": h.sm, "rsm": h.rsm, "srsm": h.srsm,
+            "zonal_head": h.zonal_head, "branch": h.branch, "city": h.city,
+            "valid_from": h.valid_from, "upload_id": h.upload_id,
+        } for h in rows]
+
+    def hierarchy_status(self, tenant_id: str) -> dict:
+        from ..service.ids import normalize_id
+
+        tid = uuid.UUID(tenant_id)
+        rows = self._session.query(Hierarchy).filter(Hierarchy.tenant_id == tid).all()
+        cutoff = datetime.now(UTC) - timedelta(days=90)
+        result_reps = (
+            self._session.query(Result.rep_id)
+            .filter(
+                Result.tenant_id == tid,
+                Result.rep_id.isnot(None),
+                Result.created_at >= cutoff,
+            )
+            .distinct()
+            .all()
+        )
+        rep_ids = {normalize_id(r[0]) for r in result_reps if normalize_id(r[0]) is not None}
+        agents = {normalize_id(h.agent_id) for h in rows}
+        matched = sum(1 for rid in rep_ids if rid in agents)
+        unmapped = len(rep_ids) - matched
+        total = matched + unmapped
+        upload_id = rows[0].upload_id if rows else None
+        valid_from = max((h.valid_from for h in rows), default=None)
+        return {
+            "upload_id": upload_id,
+            "valid_from": valid_from.isoformat() if valid_from else None,
+            "row_count": len(rows),
+            "match_rate": round(matched / total, 3) if total else 0.0,
+            "matched": matched,
+            "unmapped": unmapped,
+        }
 
     @staticmethod
     def _to_view(r: Result, job: Job | None) -> ResultView:
