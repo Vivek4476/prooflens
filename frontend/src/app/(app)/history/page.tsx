@@ -89,7 +89,7 @@ function HistoryInner() {
               setPage(0);
             }}
             placeholder="Search rep, opportunity, or reason…"
-            className="h-9 w-72 rounded-md border border-border bg-surface pl-8 pr-3 text-body-sm text-text placeholder:text-text-muted"
+            className="h-9 w-full sm:w-72 rounded-md border border-border bg-surface pl-8 pr-3 text-body-sm text-text placeholder:text-text-muted"
           />
         </div>
         <div className="flex items-center gap-1 rounded-md border border-border bg-surface p-1">
@@ -101,7 +101,7 @@ function HistoryInner() {
                 setPage(0);
               }}
               className={cn(
-                "rounded px-2.5 py-1 text-caption font-medium transition-colors",
+                "flex h-11 sm:h-auto items-center rounded px-3 sm:px-2.5 py-1 text-caption font-medium transition-colors",
                 band === b ? "bg-surface-2 text-text" : "text-text-muted hover:text-text-secondary",
               )}
             >

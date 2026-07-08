@@ -16,8 +16,8 @@ export function ScoreRing({ score, band, size = 160 }: { score: number; band: Ba
   const finalOffset = c * (1 - pct);
 
   return (
-    <div className="relative" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="-rotate-90">
+    <div className="relative mx-auto w-full aspect-square" style={{ maxWidth: size }}>
+      <svg viewBox={`0 0 ${size} ${size}`} className="-rotate-90 w-full h-full">
         <circle
           cx={size / 2}
           cy={size / 2}

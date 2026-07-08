@@ -156,7 +156,7 @@ export default function ReviewPage() {
         description="Doubtful and Suspect verdicts queued for a human decision."
       />
 
-      <Card className="flex items-center gap-3 px-4 py-2.5 text-caption text-text-muted">
+      <Card className="hidden sm:flex items-center gap-3 px-4 py-2.5 text-caption text-text-muted">
         <span className="font-medium text-text-secondary">Keyboard:</span>
         <kbd className="rounded bg-surface-2 px-1.5 py-0.5">J</kbd>/<kbd className="rounded bg-surface-2 px-1.5 py-0.5">K</kbd> move
         <span className="mx-1">·</span>

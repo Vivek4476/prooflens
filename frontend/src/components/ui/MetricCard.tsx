@@ -14,6 +14,7 @@ export function MetricCard({
   icon: Icon,
   accent,
   decimals = 0,
+  className,
 }: {
   label: string;
   value: string | number;
@@ -22,6 +23,7 @@ export function MetricCard({
   icon?: LucideIcon;
   accent?: boolean; // subtle emphasis for the single most important KPI
   decimals?: number;
+  className?: string;
 }) {
   const isNumeric = typeof value === "number";
 
@@ -29,7 +31,8 @@ export function MetricCard({
     <div
       className={cn(
         "card group flex flex-col gap-2 p-5 hover:shadow-2 hover:-translate-y-0.5 transition-all duration-300 cursor-default select-none",
-        accent && "ring-1 ring-border-strong"
+        accent && "ring-1 ring-border-strong",
+        className
       )}
     >
       <div className="flex items-center justify-between">

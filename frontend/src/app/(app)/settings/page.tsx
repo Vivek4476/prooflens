@@ -123,7 +123,7 @@ export default function SettingsPage() {
         </Card>
       </div>
 
-      <div className="flex items-center gap-3 text-caption text-text-muted">
+      <div className="flex flex-wrap items-center gap-3 text-caption text-text-muted">
         <Activity size={14} />
         <span>Capture Integrity — scores &amp; flags, never blocks. Images are never stored.</span>
         <Building2 size={14} className="ml-auto" />
