@@ -184,6 +184,7 @@ def test_analytics_start_after_end_and_future_is_400(client):
     _upload(client, "meeting.jpg")
     r = client.get("/v1/analytics/summary?start_date=2999-01-01&end_date=2000-01-01")
     assert r.status_code == 400
+    assert "future" in r.json()["detail"]
 
 
 def test_analytics_default_30_days_dense_series(client):

@@ -58,6 +58,8 @@ def resolve_range(start_date: str | None, end_date: str | None) -> tuple[datetim
     elif end_day is None:
         end_day = today
 
+    assert start_day is not None and end_day is not None
+
     if start_date is not None and start_day > today:
         raise ValueError("start_date is in the future")
     if end_date is not None and end_day > today:
