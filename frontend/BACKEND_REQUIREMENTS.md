@@ -63,6 +63,45 @@ resolved `scoring` config (weights, thresholds, caps, bands = defaults deep-merg
 with the tenant's overrides), so the Settings page can display real per-tenant
 thresholds without duplicating backend values.
 
+### Analytics + Team Hierarchy (implemented additively)
+
+All of the following are **additive** — no existing response key changed; the
+golden set and verdict-copy invariants are preserved.
+
+**`GET /v1/analytics/summary`** — now also accepts `from`/`to` (date aliases of
+`start_date`/`end_date`, both kept), `bucket=daily|weekly|monthly` (default
+`daily`), `group_by=none|zone|srsm|rsm|sm|branch|city` (default `none`). The
+response keeps every existing key and adds:
+- `buckets[]` — `{bucket_label, start, end, clear, doubtful, suspect, total, avg_score, incomplete}`. Weekly labels are `"Week 1..N"` anchored to the range start; monthly = calendar month (`YYYY-MM`).
+- `incomplete` — true if the current (today's) bucket is unfinished.
+- `previous` — `{clear, doubtful, suspect, total, avg_score}` for the immediately-preceding equal-length period (for deltas).
+- `period` / `previous_period` — `{from, to}` explicit window bounds.
+- `groups[]` — when `group_by != none`, one per node (incl. `"Unmapped"`): `{node, total, clear, doubtful, suspect, suspect_rate, avg_score, share}`.
+- `top_reasons[]` entries now also carry `short_label`.
+- The legacy per-day `series[]` is unchanged.
+
+**`GET /v1/results`** — now also accepts `reason` (exact `reason_code`),
+`rep_id` (normalized exact), and `from`/`to` (date range). Existing filters
+(`band`, `review`, `limit`, `offset`) unchanged.
+
+**`POST /v1/admin/hierarchy`** (multipart, `X-Admin-Token`) — CSV columns
+`agent_id, sm, rsm, srsm, zonal_head, branch, city, valid_from` (`valid_from`
+`YYYY-MM-DD`). Validates unknown columns / blank agent_id / duplicate agent_id
+within a `valid_from` / bad dates → 400. Returns
+`{upload_id, row_count, match_rate_preview, matched, unmapped}`. Versions via
+`upload_id`; the hierarchy is effective-dated (a result maps to the row with the
+latest `valid_from <= scored_date`).
+
+**`GET /v1/admin/hierarchy/status`** — `{upload_id, valid_from, row_count,
+match_rate, matched, unmapped}` (match rate vs distinct `rep_id`s in the last
+90 days of results).
+
+**`GET /v1/admin/hierarchy/template`** — the canonical column set + an example row.
+
+**Known gaps (logged, not fixed here):** the analytics/results read paths are
+NOT tenant-scoped (single-demo-tenant assumption; real fix is the SSO/RBAC
+milestone). CSV-only upload; XLSX deferred.
+
 ## Known trade-offs (by design)
 
 - **No thumbnails.** The backend **never stores images** — only an 8-byte
