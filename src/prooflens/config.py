@@ -47,8 +47,9 @@ class Settings(BaseSettings):
     )
     secret_key: str = Field(default=_DEV_SECRET_KEY, alias="PROOFLENS_SECRET_KEY")
 
-    # Vision backend (default stub = zero network / zero keys).
-    vision_backend: str = Field(default="stub", alias="VISION_BACKEND")
+    # Vision backend (default groq = real scoring out of the box; set
+    # VISION_BACKEND=stub for a fully offline / zero-key run).
+    vision_backend: str = Field(default="groq", alias="VISION_BACKEND")
     vision_max_edge: int = Field(default=768, alias="VISION_MAX_EDGE")
 
     anthropic_api_key: str = Field(default="", alias="ANTHROPIC_API_KEY")
@@ -135,8 +136,8 @@ class Settings(BaseSettings):
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     def build_vision_backend(self, name: str | None = None) -> VisionBackend:
-        """Construct the configured vision backend. Defaults to the stub."""
-        name = (name or self.vision_backend or "stub").strip().lower()
+        """Construct the configured vision backend. Defaults to groq."""
+        name = (name or self.vision_backend or "groq").strip().lower()
         per_backend = {
             "stub": {},
             "anthropic": {"api_key": self.anthropic_api_key, "model": self.anthropic_model},

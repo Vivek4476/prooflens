@@ -33,14 +33,16 @@ services:
       - key: PROOFLENS_ADMIN_TOKEN
         generateValue: true
       # --- Live AI (vision) --------------------------------------------------
-      # "Live AI" in the UI uses whatever provider VISION_BACKEND names. Leave it
-      # "stub" for the deterministic demo model; set it to a provider below to
-      # enable a real model. Add ONLY the key for the provider you choose.
+      # "Live AI" in the UI uses whatever provider VISION_BACKEND names.
+      # groq is the default; GROQ_API_KEY must be set or images cap to
+      # Doubtful (review). Set VISION_BACKEND=stub for the deterministic demo
+      # model instead, or to another provider below. Add ONLY the key for the
+      # provider you choose.
       #
       # RECOMMENDED: groq — fast (~1s), genuinely free tier, Llama-4 vision.
       #   set VISION_BACKEND=groq  and  GROQ_API_KEY=gsk_…
       - key: VISION_BACKEND
-        value: stub                  # stub | groq | gemini | openrouter | aimlapi
+        value: groq                  # stub | groq | gemini | openrouter | aimlapi
       - key: GROQ_API_KEY
         sync: false                  # gsk_… from groq.com — fast + free tier (recommended)
       - key: GROQ_MODEL
