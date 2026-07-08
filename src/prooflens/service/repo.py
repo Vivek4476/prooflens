@@ -13,6 +13,7 @@ from typing import Protocol, runtime_checkable
 
 from ..engine.hashstore import InMemoryHashStore
 from ..engine.types import HashStore, Verdict
+from .ids import normalize_id
 from .views import JobView, ResultView, TenantView
 
 
@@ -156,7 +157,7 @@ class InMemoryRepo:
                 processing_ms=processing_ms(verdict),
                 source="webhook" if job_id else "direct",
                 opportunity_id=opportunity_id,
-                rep_id=rep_id,
+                rep_id=normalize_id(rep_id),
             )
         )
         return rid

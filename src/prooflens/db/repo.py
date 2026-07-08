@@ -89,9 +89,13 @@ class PostgresRepo:
         opportunity_id: str | None = None,
         rep_id: str | None = None,
     ) -> str:
+        from ..service.ids import normalize_id
+
         row = Result(
             tenant_id=uuid.UUID(tenant_id),
             job_id=uuid.UUID(job_id) if job_id else None,
+            rep_id=normalize_id(rep_id),
+            opportunity_id=opportunity_id,
             band=verdict.band,
             score=int(round(verdict.score)),
             reason=verdict.reason,
@@ -173,8 +177,13 @@ class PostgresRepo:
 
     @staticmethod
     def _to_view(r: Result, job: Job | None) -> ResultView:
-        # The trail (rep/opportunity) rides on the originating job payload.
+        # Prefer the promoted columns; fall back to the originating job payload
+        # only for legacy rows the backfill did not reach (defence in depth).
         payload = (job.payload or {}) if job else {}
+        rep_id = r.rep_id if r.rep_id is not None else payload.get("rep_id")
+        opportunity_id = (
+            r.opportunity_id if r.opportunity_id is not None else payload.get("opportunity_id")
+        )
         return ResultView(
             id=str(r.id),
             created_at=r.created_at.isoformat() if r.created_at else "",
@@ -189,8 +198,8 @@ class PostgresRepo:
                 sum(float(c.get("latency_ms") or 0.0) for c in (r.checks or [])), 1
             ),
             source="webhook" if r.job_id else "direct",
-            opportunity_id=payload.get("opportunity_id"),
-            rep_id=payload.get("rep_id"),
+            opportunity_id=opportunity_id,
+            rep_id=rep_id,
             review_status=r.review_status,
             review_note=r.review_note,
             reviewed_at=r.reviewed_at.isoformat() if r.reviewed_at else None,

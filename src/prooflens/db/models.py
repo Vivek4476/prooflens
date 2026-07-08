@@ -121,12 +121,18 @@ class ImageHash(Base):
 
 class Result(Base):
     __tablename__ = "results"
+    __table_args__ = (
+        # Effective-dated hierarchy join + rep_id filtering are per (tenant, rep).
+        Index("ix_results_tenant_rep", "tenant_id", "rep_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"))
     job_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("jobs.id"), nullable=True
     )
+    rep_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    opportunity_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
     band: Mapped[str] = mapped_column(String(16))
     score: Mapped[float] = mapped_column(Integer)
     reason: Mapped[str] = mapped_column(String(200))
