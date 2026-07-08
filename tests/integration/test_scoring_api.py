@@ -184,11 +184,11 @@ def test_results_and_analytics_populate(client):
 
 
 def test_analytics_date_filters(client):
-    from datetime import date, timedelta
+    from datetime import UTC, datetime, timedelta
     _upload(client, "meeting.jpg")           # all created "today"
     _upload(client, "screenshot.jpg")
-    today = date.today().isoformat()
-    yesterday = (date.today() - timedelta(days=1)).isoformat()
+    today = datetime.now(UTC).date().isoformat()
+    yesterday = (datetime.now(UTC).date() - timedelta(days=1)).isoformat()
 
     all_ = client.get("/v1/analytics/summary").json()
     assert all_["total"] == 2                # no params -> unchanged (30-day default)
@@ -221,14 +221,14 @@ def test_analytics_default_30_days_dense_series(client):
     body = client.get("/v1/analytics/summary").json()
     # default range = last 30 days -> 30 daily buckets, oldest->newest, last is today
     assert len(body["series"]) == 30
-    from datetime import date
-    assert body["series"][-1]["date"] == date.today().isoformat()
+    from datetime import UTC, datetime
+    assert body["series"][-1]["date"] == datetime.now(UTC).date().isoformat()
     assert body["total"] >= 1
 
 
 def test_analytics_future_end_date_400(client):
-    from datetime import date, timedelta
-    fut = (date.today() + timedelta(days=1)).isoformat()
+    from datetime import UTC, datetime, timedelta
+    fut = (datetime.now(UTC).date() + timedelta(days=1)).isoformat()
     r = client.get(f"/v1/analytics/summary?end_date={fut}")
     assert r.status_code == 400
 
@@ -245,9 +245,9 @@ def test_analytics_span_over_400_days_400(client):
 
 def test_analytics_gap_filled_series_has_zero_days(client):
     _upload(client, "meeting.jpg")   # today only
-    from datetime import date, timedelta
-    start = (date.today() - timedelta(days=4)).isoformat()
-    end = date.today().isoformat()
+    from datetime import UTC, datetime, timedelta
+    start = (datetime.now(UTC).date() - timedelta(days=4)).isoformat()
+    end = datetime.now(UTC).date().isoformat()
     body = client.get(f"/v1/analytics/summary?start_date={start}&end_date={end}").json()
     assert len(body["series"]) == 5                       # 5 contiguous days
     assert body["series"][0]["count"] == 0                # 4 days ago, no data
@@ -282,8 +282,8 @@ def test_analytics_additive_keys_present(client):
 
 
 def test_analytics_from_to_aliases(client):
-    from datetime import date
-    today = date.today().isoformat()
+    from datetime import UTC, datetime
+    today = datetime.now(UTC).date().isoformat()
     _upload(client, "meeting.jpg")
     a = client.get(f"/v1/analytics/summary?from={today}").json()
     b = client.get(f"/v1/analytics/summary?start_date={today}").json()
@@ -291,9 +291,9 @@ def test_analytics_from_to_aliases(client):
 
 
 def test_analytics_weekly_bucket_labels(client, repo):
-    from datetime import date, timedelta
-    start = (date.today() - timedelta(days=13)).isoformat()
-    end = date.today().isoformat()
+    from datetime import UTC, datetime, timedelta
+    start = (datetime.now(UTC).date() - timedelta(days=13)).isoformat()
+    end = datetime.now(UTC).date().isoformat()
     _backdate(repo, "A1", "Suspect", 10, "recycled", 10)
     body = client.get(
         f"/v1/analytics/summary?from={start}&to={end}&bucket=weekly"
@@ -305,11 +305,11 @@ def test_analytics_weekly_bucket_labels(client, repo):
 
 
 def test_analytics_group_by_branch_with_unmapped(client, repo):
-    from datetime import date, timedelta
+    from datetime import UTC, datetime, timedelta
     repo.replace_hierarchy("t1", [{
         "agent_id": "A1", "sm": None, "rsm": None, "srsm": None,
         "zonal_head": None, "branch": "North", "city": None,
-        "valid_from": date.today() - timedelta(days=40),
+        "valid_from": datetime.now(UTC).date() - timedelta(days=40),
     }], "u1")
     _backdate(repo, "A1", "Suspect", 10, "recycled", 2)
     _backdate(repo, "A2", "Clear", 90, "clear", 2)     # unmapped
@@ -356,7 +356,7 @@ def test_results_filter_by_from_to(client, repo):
         ResultView(id="new", created_at=new, tenant_id="t1", band="Clear", score=90,
                    reason="r", reason_code="clear", rubric_version="v3"),
     ])
-    from datetime import date
-    today = date.today().isoformat()
+    from datetime import UTC, datetime
+    today = datetime.now(UTC).date().isoformat()
     only_today = client.get(f"/v1/results?from={today}").json()
     assert {i["id"] for i in only_today["items"]} == {"new"}
