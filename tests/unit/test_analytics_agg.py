@@ -125,3 +125,26 @@ def test_aggregate_group_by_includes_unmapped():
     assert groups["North"]["suspect_rate"] == 0.5
     assert groups["Unmapped"]["total"] == 1 and groups["Unmapped"]["suspect"] == 1
     assert round(groups["North"]["share"] + groups["Unmapped"]["share"], 3) == 1.0
+
+
+def test_weekly_bucket_end_clamped_to_range_end_when_not_multiple_of_7():
+    # Range Jun 1–Jun 10 (10 days): NOT a multiple of 7.
+    # Without the fix, the 2nd bucket reports end=2026-06-14 (4 days past range end).
+    # With the fix, the 2nd bucket reports end=2026-06-09 (range end minus 1).
+    start, end = _dt(date(2026, 6, 1)), _dt(date(2026, 6, 11))  # 10 days
+    items = [_r(date(2026, 6, 2), "Clear", 80), _r(date(2026, 6, 9), "Suspect", 10)]
+    b = build_buckets(items, start, end, "weekly")
+    assert len(b) == 2, f"Expected 2 buckets, got {len(b)}"
+    # Week 1: Jun 1–7 (full week)
+    assert b[0]["bucket_label"] == "Week 1"
+    assert b[0]["start"] == "2026-06-01"
+    assert b[0]["end"] == "2026-06-07", f"Week 1 end should be 2026-06-07, got {b[0]['end']}"
+    assert b[0]["total"] == 1 and b[0]["clear"] == 1
+    # Week 2: Jun 8–10 (partial, clamped to range end)
+    assert b[1]["bucket_label"] == "Week 2"
+    assert b[1]["start"] == "2026-06-08"
+    # CRITICAL: end must NOT exceed range_end (2026-06-10)
+    assert (
+        b[1]["end"] == "2026-06-10"
+    ), f"Week 2 end should be clamped to 2026-06-10, got {b[1]['end']}"
+    assert b[1]["total"] == 1 and b[1]["suspect"] == 1

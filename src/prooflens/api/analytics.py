@@ -87,6 +87,7 @@ def build_buckets(
         today = datetime.now(tz=start.tzinfo).date()
     edges = _bucket_edges(start, end, bucket)
     by_bucket: list[list[ResultView]] = [[] for _ in edges]
+    range_end_date = end.date()  # exclusive range boundary
     for r in items:
         if not r.created_at:
             continue
@@ -99,7 +100,8 @@ def build_buckets(
     for (bs, be, label), rows in zip(edges, by_bucket, strict=True):
         tally = _tally(rows)
         # Inclusive last day of the window for display.
-        last_day = be - timedelta(days=1)
+        # Clamp to not exceed the range's exclusive end.
+        last_day = min(be - timedelta(days=1), range_end_date - timedelta(days=1))
         out.append({
             "bucket_label": label,
             "start": bs.isoformat(),
