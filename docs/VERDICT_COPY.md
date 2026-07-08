@@ -63,6 +63,28 @@ integrity failure is what matters.
 Custom fields are written to LeadSquared in this order: **band, score, reason**.
 The band is the decision-driver and is written first.
 
+## Short labels (aggregate surfaces)
+
+Charts, group rows and reason legends use a concise label, never the full
+sentence. The single source of truth is `REASON_SHORT_LABEL` in
+[`src/prooflens/engine/verdicts.py`](../src/prooflens/engine/verdicts.py);
+`tests/unit/test_verdict_copy.py` asserts every `Reason` has one (≤ 32 chars).
+The full `reason` sentence remains the verdict surface — short labels are for
+counts and legends only.
+
+| Reason code | Short label |
+|---|---|
+| `clear` | Clear |
+| `recycled` | Recycled image |
+| `screen_recapture` | Photo of a screen |
+| `designed_graphic` | Designed graphic |
+| `no_people_or_irrelevant` | No people in scene |
+| `not_a_visit` | Not a visit |
+| `single_person` | Only one person |
+| `no_visit_context` | No visit in progress |
+| `too_blurred` | Too blurred |
+| `no_content_analysis` | Scored without content check |
+
 ## Tone
 
 ProofLens **scores and flags; it never blocks an upload and never claims to

@@ -8,14 +8,14 @@ Repo protocol as InMemoryRepo, so the API/worker code is unchanged.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from ..engine.types import Verdict
 from ..queue import queue as q
 from ..service.views import JobView, ResultView, TenantView
 from ..tenants.service import resolve_scoring
 from .hashstore import PostgresHashStore
-from .models import AuditLog, Job, Result, Tenant
+from .models import AuditLog, Hierarchy, Job, Result, Tenant
 
 
 def _tenant_view(t: Tenant) -> TenantView:
@@ -89,9 +89,13 @@ class PostgresRepo:
         opportunity_id: str | None = None,
         rep_id: str | None = None,
     ) -> str:
+        from ..service.ids import normalize_id
+
         row = Result(
             tenant_id=uuid.UUID(tenant_id),
             job_id=uuid.UUID(job_id) if job_id else None,
+            rep_id=normalize_id(rep_id),
+            opportunity_id=opportunity_id,
             band=verdict.band,
             score=int(round(verdict.score)),
             reason=verdict.reason,
@@ -105,12 +109,18 @@ class PostgresRepo:
 
     def list_results(
         self, *, limit: int = 50, offset: int = 0, band: str | None = None,
-        review: str | None = None,
+        review: str | None = None, reason: str | None = None, rep_id: str | None = None,
         start: datetime | None = None, end: datetime | None = None,
     ) -> tuple[list[ResultView], int]:
+        from ..service.ids import normalize_id
+
         query = self._session.query(Result)
         if band:
             query = query.filter(Result.band == band)
+        if reason is not None:
+            query = query.filter(Result.reason_code == reason)
+        if rep_id is not None:
+            query = query.filter(Result.rep_id == normalize_id(rep_id))
         if review == "pending":
             query = query.filter(Result.review_status.is_(None))
         elif review:
@@ -171,10 +181,71 @@ class PostgresRepo:
         job = self._session.get(Job, row.job_id) if row.job_id else None
         return self._to_view(row, job)
 
+    def replace_hierarchy(self, tenant_id: str, rows: list[dict], upload_id: str) -> None:
+        from ..service.ids import normalize_id
+
+        tid = uuid.UUID(tenant_id)
+        self._session.query(Hierarchy).filter(Hierarchy.tenant_id == tid).delete()
+        for r in rows:
+            self._session.add(Hierarchy(
+                tenant_id=tid,
+                agent_id=normalize_id(r.get("agent_id")),
+                sm=r.get("sm"), rsm=r.get("rsm"), srsm=r.get("srsm"),
+                zonal_head=r.get("zonal_head"), branch=r.get("branch"), city=r.get("city"),
+                valid_from=r["valid_from"], upload_id=upload_id,
+            ))
+        self._session.flush()
+
+    def get_hierarchy_rows(self, tenant_id: str) -> list[dict]:
+        tid = uuid.UUID(tenant_id)
+        rows = self._session.query(Hierarchy).filter(Hierarchy.tenant_id == tid).all()
+        return [{
+            "agent_id": h.agent_id, "sm": h.sm, "rsm": h.rsm, "srsm": h.srsm,
+            "zonal_head": h.zonal_head, "branch": h.branch, "city": h.city,
+            "valid_from": h.valid_from, "upload_id": h.upload_id,
+        } for h in rows]
+
+    def hierarchy_status(self, tenant_id: str) -> dict:
+        from ..service.ids import normalize_id
+
+        tid = uuid.UUID(tenant_id)
+        rows = self._session.query(Hierarchy).filter(Hierarchy.tenant_id == tid).all()
+        cutoff = datetime.now(UTC) - timedelta(days=90)
+        result_reps = (
+            self._session.query(Result.rep_id)
+            .filter(
+                Result.tenant_id == tid,
+                Result.rep_id.isnot(None),
+                Result.created_at >= cutoff,
+            )
+            .distinct()
+            .all()
+        )
+        rep_ids = {normalize_id(r[0]) for r in result_reps if normalize_id(r[0]) is not None}
+        agents = {normalize_id(h.agent_id) for h in rows}
+        matched = sum(1 for rid in rep_ids if rid in agents)
+        unmapped = len(rep_ids) - matched
+        total = matched + unmapped
+        upload_id = rows[0].upload_id if rows else None
+        valid_from = max((h.valid_from for h in rows), default=None)
+        return {
+            "upload_id": upload_id,
+            "valid_from": valid_from.isoformat() if valid_from else None,
+            "row_count": len(rows),
+            "match_rate": round(matched / total, 3) if total else 0.0,
+            "matched": matched,
+            "unmapped": unmapped,
+        }
+
     @staticmethod
     def _to_view(r: Result, job: Job | None) -> ResultView:
-        # The trail (rep/opportunity) rides on the originating job payload.
+        # Prefer the promoted columns; fall back to the originating job payload
+        # only for legacy rows the backfill did not reach (defence in depth).
         payload = (job.payload or {}) if job else {}
+        rep_id = r.rep_id if r.rep_id is not None else payload.get("rep_id")
+        opportunity_id = (
+            r.opportunity_id if r.opportunity_id is not None else payload.get("opportunity_id")
+        )
         return ResultView(
             id=str(r.id),
             created_at=r.created_at.isoformat() if r.created_at else "",
@@ -189,8 +260,8 @@ class PostgresRepo:
                 sum(float(c.get("latency_ms") or 0.0) for c in (r.checks or [])), 1
             ),
             source="webhook" if r.job_id else "direct",
-            opportunity_id=payload.get("opportunity_id"),
-            rep_id=payload.get("rep_id"),
+            opportunity_id=opportunity_id,
+            rep_id=rep_id,
             review_status=r.review_status,
             review_note=r.review_note,
             reviewed_at=r.reviewed_at.isoformat() if r.reviewed_at else None,

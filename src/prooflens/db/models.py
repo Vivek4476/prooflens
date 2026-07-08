@@ -5,12 +5,13 @@ audit, DLQ. Every table carries tenant_id and every query is tenant-scoped.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    Date,
     DateTime,
     Enum,
     ForeignKey,
@@ -121,12 +122,18 @@ class ImageHash(Base):
 
 class Result(Base):
     __tablename__ = "results"
+    __table_args__ = (
+        # Effective-dated hierarchy join + rep_id filtering are per (tenant, rep).
+        Index("ix_results_tenant_rep", "tenant_id", "rep_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"))
     job_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("jobs.id"), nullable=True
     )
+    rep_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    opportunity_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
     band: Mapped[str] = mapped_column(String(16))
     score: Mapped[float] = mapped_column(Integer)
     reason: Mapped[str] = mapped_column(String(200))
@@ -139,6 +146,32 @@ class Result(Base):
     review_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     reviewer: Mapped[str | None] = mapped_column(String(120), nullable=True)
+
+
+class Hierarchy(Base):
+    """Effective-dated org map: one row per (agent, version). A result maps to
+    the row with agent_id == result.rep_id and the LATEST valid_from <= scored
+    date. Tenant-scoped; org changes never rewrite historical reports."""
+
+    __tablename__ = "hierarchy"
+    __table_args__ = (
+        Index("ix_hierarchy_lookup", "tenant_id", "agent_id", "valid_from"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"))
+    agent_id: Mapped[str] = mapped_column(String(200))
+    sm: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    rsm: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    srsm: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    zonal_head: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    branch: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    city: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    valid_from: Mapped[date] = mapped_column(Date)
+    uploaded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    upload_id: Mapped[str] = mapped_column(String(64))
 
 
 class AuditLog(Base):

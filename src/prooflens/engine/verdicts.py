@@ -56,6 +56,21 @@ REASON_TEXT: dict[Reason, str] = {
     Reason.NO_CONTENT_ANALYSIS: "Scored without content analysis — vision check unavailable.",
 }
 
+# Concise labels for aggregate surfaces (charts, group rows). Full sentences in
+# REASON_TEXT remain the verdict surface; these are for counts/legends (spec §0e).
+REASON_SHORT_LABEL: dict[Reason, str] = {
+    Reason.CLEAR: "Clear",
+    Reason.RECYCLED: "Recycled image",
+    Reason.SCREEN_RECAPTURE: "Photo of a screen",
+    Reason.DESIGNED_GRAPHIC: "Designed graphic",
+    Reason.NO_PEOPLE_OR_IRRELEVANT: "No people in scene",
+    Reason.NOT_A_VISIT: "Not a visit",
+    Reason.SINGLE_PERSON: "Only one person",
+    Reason.NO_VISIT_CONTEXT: "No visit in progress",
+    Reason.TOO_BLURRED: "Too blurred",
+    Reason.NO_CONTENT_ANALYSIS: "Scored without content check",
+}
+
 # When more than one failure mode fires, the most decision-critical wins.
 # Fraud/integrity signals outrank quality signals; quality outranks "clear".
 REASON_PRIORITY: tuple[Reason, ...] = (

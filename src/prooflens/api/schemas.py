@@ -8,7 +8,9 @@ should arrive; we accept it inline as base64 or by reference (URL, Phase 3).
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from ..service.ids import normalize_id
 
 
 class WebhookPayload(BaseModel):
@@ -20,6 +22,13 @@ class WebhookPayload(BaseModel):
     # Image: inline bytes now; by-reference fetch is a Phase 3 TODO.
     image_base64: str | None = Field(default=None)
     image_url: str | None = Field(default=None)
+
+    @field_validator("rep_id")
+    @classmethod
+    def _normalize_rep_id(cls, v: str | None) -> str | None:
+        # Normalize at ingestion so every stored rep_id is already canonical
+        # (matches the hierarchy upload's normalization — one shared rule).
+        return normalize_id(v)
 
 
 class WebhookAck(BaseModel):
