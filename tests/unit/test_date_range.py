@@ -1,13 +1,11 @@
 """parse_bound: date-only -> whole-day; full timestamp -> exact instant; UTC."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from prooflens.api.date_range import parse_bound
-
-UTC = timezone.utc
 
 
 def test_none_and_empty_return_none():
@@ -44,7 +42,7 @@ def test_malformed_raises_valueerror():
 def test_offset_aware_timestamp_is_normalized_to_utc():
     result = parse_bound("2026-07-08T10:00:00-05:00", is_end=False)
     assert result == datetime(2026, 7, 8, 15, 0, tzinfo=UTC)
-    assert result.tzinfo == timezone.utc
+    assert result.tzinfo == UTC
     assert result.utcoffset() == timedelta(0)
 
 

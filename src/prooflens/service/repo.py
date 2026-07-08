@@ -172,9 +172,15 @@ class InMemoryRepo:
         elif review:
             rows = [r for r in rows if r.review_status == review]
         if start is not None:
-            rows = [r for r in rows if r.created_at and datetime.fromisoformat(r.created_at) >= start]
+            rows = [
+                r for r in rows
+                if r.created_at and datetime.fromisoformat(r.created_at) >= start
+            ]
         if end is not None:
-            rows = [r for r in rows if r.created_at and datetime.fromisoformat(r.created_at) < end]
+            rows = [
+                r for r in rows
+                if r.created_at and datetime.fromisoformat(r.created_at) < end
+            ]
         rows = list(reversed(rows))  # newest first
         return rows[offset : offset + limit], len(rows)
 
