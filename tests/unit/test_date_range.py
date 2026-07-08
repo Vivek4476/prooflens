@@ -1,7 +1,7 @@
 """parse_bound: date-only -> whole-day; full timestamp -> exact instant; UTC."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -39,3 +39,19 @@ def test_naive_timestamp_is_treated_as_utc():
 def test_malformed_raises_valueerror():
     with pytest.raises(ValueError):
         parse_bound("not-a-date", is_end=False)
+
+
+def test_offset_aware_timestamp_is_normalized_to_utc():
+    result = parse_bound("2026-07-08T10:00:00-05:00", is_end=False)
+    assert result == datetime(2026, 7, 8, 15, 0, tzinfo=UTC)
+    assert result.tzinfo == timezone.utc
+    assert result.utcoffset() == timedelta(0)
+
+
+def test_basic_format_date_is_not_treated_as_date_only():
+    # "20260708" has no dashes, so it must NOT match the strict YYYY-MM-DD
+    # date-only regex and should fall through to timestamp parsing instead.
+    # datetime.fromisoformat("20260708") parses this basic-format ISO string
+    # as a naive datetime at midnight, which is then treated as UTC.
+    result = parse_bound("20260708", is_end=False)
+    assert result == datetime(2026, 7, 8, tzinfo=UTC)

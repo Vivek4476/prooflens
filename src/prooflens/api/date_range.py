@@ -7,7 +7,10 @@ layer can return HTTP 400.
 """
 from __future__ import annotations
 
+import re
 from datetime import date, datetime, timedelta, timezone
+
+_DATE_ONLY_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
 def parse_bound(value: str | None, *, is_end: bool) -> datetime | None:
@@ -15,7 +18,7 @@ def parse_bound(value: str | None, *, is_end: bool) -> datetime | None:
         return None
     v = value.strip()
     # Date-only (YYYY-MM-DD) -> whole-day semantics.
-    if len(v) == 10 and v[4] == "-" and v[7] == "-":
+    if _DATE_ONLY_RE.fullmatch(v):
         d = date.fromisoformat(v)  # raises ValueError on a bad date
         dt = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
         return dt + timedelta(days=1) if is_end else dt
@@ -23,4 +26,6 @@ def parse_bound(value: str | None, *, is_end: bool) -> datetime | None:
     dt = datetime.fromisoformat(v)  # raises ValueError on malformed input
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
-    return dt
+    # Normalize offset-aware inputs (and the now-UTC-tagged naive ones) so the
+    # returned tzinfo is always exactly timezone.utc.
+    return dt.astimezone(timezone.utc)
