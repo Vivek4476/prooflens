@@ -24,7 +24,7 @@ from ..engine import EngineContext, score
 from ..engine.types import Verdict
 from ..engine.verdicts import REASON_TEXT, Reason
 from ..service.repo import Repo, processing_ms
-from .date_range import parse_bound
+from .date_range import fill_series, resolve_range
 from .deps import get_repo
 
 router = APIRouter(tags=["scoring"])
@@ -187,10 +187,9 @@ def analytics_summary(
 ) -> dict:
     # Cheap at demo scale: aggregate the recent results in Python.
     try:
-        start = parse_bound(start_date, is_end=False)
-        end = parse_bound(end_date, is_end=True)
+        start, end = resolve_range(start_date, end_date)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=f"invalid date range: {exc}") from exc
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     items, total = repo.list_results(limit=5000, offset=0, start=start, end=end)
 
     bands = Counter(r.band for r in items)
@@ -201,23 +200,11 @@ def analytics_summary(
     today = datetime.now(UTC).date().isoformat()
     images_today = sum(1 for r in items if (r.created_at or "").startswith(today))
 
-    # Per-day series (band mix + avg score), oldest -> newest.
+    # Per-day series (band mix + avg score), oldest -> newest, gap-filled.
     by_day: dict[str, list] = {}
     for r in items:
-        day = (r.created_at or "")[:10]
-        by_day.setdefault(day, []).append(r)
-    series = []
-    for day in sorted(by_day):
-        rows = by_day[day]
-        day_scores = [x.score for x in rows]
-        series.append({
-            "date": day,
-            "count": len(rows),
-            "clear": sum(1 for x in rows if x.band == "Clear"),
-            "doubtful": sum(1 for x in rows if x.band == "Doubtful"),
-            "suspect": sum(1 for x in rows if x.band == "Suspect"),
-            "avg_score": round(sum(day_scores) / len(day_scores), 1) if day_scores else 0,
-        })
+        by_day.setdefault((r.created_at or "")[:10], []).append(r)
+    series = fill_series(by_day, start, end)
 
     # Reason codes are always from the fixed vocabulary; map to the verbatim text.
     top_reasons = [
