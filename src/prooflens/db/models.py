@@ -57,7 +57,7 @@ class Tenant(Base):
     field_map: Mapped[dict] = mapped_column(JSONB, default=dict)
     # Per-tenant scoring overrides merged over ScoringConfig defaults.
     scoring_overrides: Mapped[dict] = mapped_column(JSONB, default=dict)
-    vision_backend: Mapped[str] = mapped_column(String(32), default="stub")
+    vision_backend: Mapped[str] = mapped_column(String(32), default="groq")
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
