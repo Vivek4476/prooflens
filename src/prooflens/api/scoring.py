@@ -12,7 +12,7 @@ frontend/BACKEND_REQUIREMENTS.md.
 from __future__ import annotations
 
 from collections import Counter
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 import anyio
@@ -22,15 +22,24 @@ from pydantic import BaseModel
 from ..config import get_settings
 from ..engine import EngineContext, score
 from ..engine.types import Verdict
-from ..engine.verdicts import REASON_TEXT, Reason
+from ..engine.verdicts import REASON_SHORT_LABEL, REASON_TEXT, Reason
 from ..service.repo import Repo, processing_ms
 from ..vision.unavailable import UnavailableVision
+from .analytics import aggregate_range
 from .date_range import fill_series, resolve_range
 from .deps import get_repo
 
 router = APIRouter(tags=["scoring"])
 
 DEFAULT_TENANT = "dev"  # seeded by scripts/seed_dev_tenant.py / the migrate service
+
+
+def _analytics_tenant_id(repo: Repo) -> str:
+    # The read path is single-demo-tenant (spec decision 5). Hierarchy is
+    # tenant-keyed, so resolve the demo tenant's id for the join. Empty string
+    # (no hierarchy loaded) yields no rows -> every result is "Unmapped".
+    t = repo.get_tenant_by_slug(DEFAULT_TENANT)
+    return t.id if t else ""
 
 REVIEWER = "Demo Operator"  # placeholder identity until SSO/RBAC (M4)
 
@@ -190,10 +199,19 @@ def analytics_summary(
     repo: Repo = Depends(get_repo),
     start_date: str | None = Query(default=None),
     end_date: str | None = Query(default=None),
+    from_: str | None = Query(default=None, alias="from"),
+    to: str | None = Query(default=None, alias="to"),
+    bucket: Literal["daily", "weekly", "monthly"] = Query(default="daily"),
+    group_by: Literal["none", "zone", "srsm", "rsm", "sm", "branch", "city"] = Query(
+        default="none"
+    ),
 ) -> dict:
+    # `from`/`to` are aliases of start_date/end_date; the explicit ones win if both given.
+    start_arg = start_date if start_date is not None else from_
+    end_arg = end_date if end_date is not None else to
     # Cheap at demo scale: aggregate the recent results in Python.
     try:
-        start, end = resolve_range(start_date, end_date)
+        start, end = resolve_range(start_arg, end_arg)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     items, total = repo.list_results(limit=5000, offset=0, start=start, end=end)
@@ -203,8 +221,9 @@ def analytics_summary(
     scores = [r.score for r in items]
     proc = [r.processing_ms for r in items if r.processing_ms]
 
-    today = datetime.now(UTC).date().isoformat()
-    images_today = sum(1 for r in items if (r.created_at or "").startswith(today))
+    today = datetime.now(UTC).date()
+    today_iso = today.isoformat()
+    images_today = sum(1 for r in items if (r.created_at or "").startswith(today_iso))
 
     # Per-day series (band mix + avg score), oldest -> newest, gap-filled.
     by_day: dict[str, list] = {}
@@ -212,9 +231,29 @@ def analytics_summary(
         by_day.setdefault((r.created_at or "")[:10], []).append(r)
     series = fill_series(by_day, start, end)
 
+    # Previous equal-length period (for deltas), fetched over its own window.
+    span_days = (end.date() - start.date()).days
+    prev_end = start
+    prev_start_date = start.date() - timedelta(days=span_days)
+    prev_start = datetime(
+        prev_start_date.year, prev_start_date.month, prev_start_date.day, tzinfo=UTC
+    )
+    prev_items, _ = repo.list_results(limit=5000, offset=0, start=prev_start, end=prev_end)
+
+    rows = repo.get_hierarchy_rows(_analytics_tenant_id(repo))
+    agg = aggregate_range(
+        items, prev_items, rows,
+        start=start, end=end, bucket=bucket, group_by=group_by, today=today,
+    )
+
     # Reason codes are always from the fixed vocabulary; map to the verbatim text.
     top_reasons = [
-        {"reason_code": code, "reason": REASON_TEXT[Reason(code)], "count": n}
+        {
+            "reason_code": code,
+            "reason": REASON_TEXT[Reason(code)],
+            "short_label": REASON_SHORT_LABEL[Reason(code)],
+            "count": n,
+        }
         for code, n in reason_counts.most_common()
     ]
 
@@ -227,5 +266,11 @@ def analytics_summary(
         "avg_processing_ms": round(sum(proc) / len(proc), 1) if proc else 0.0,
         "duplicates_caught": reason_counts.get(Reason.RECYCLED.value, 0),
         "top_reasons": top_reasons,
-        "series": series,
+        "series": series,               # legacy per-day series (unchanged shape)
+        "buckets": agg["series"],       # NEW bucketed series (daily/weekly/monthly)
+        "incomplete": agg["incomplete"],
+        "previous": agg["previous"],
+        "period": agg["period"],
+        "previous_period": agg["previous_period"],
+        "groups": agg["groups"],
     }

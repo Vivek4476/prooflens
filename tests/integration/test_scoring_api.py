@@ -252,3 +252,75 @@ def test_analytics_gap_filled_series_has_zero_days(client):
     assert len(body["series"]) == 5                       # 5 contiguous days
     assert body["series"][0]["count"] == 0                # 4 days ago, no data
     assert body["series"][-1]["count"] >= 1               # today has the upload
+
+
+def _backdate(repo, rep_id, band, score, reason_code, days_ago):
+    from datetime import UTC, datetime, timedelta
+
+    from prooflens.service.views import ResultView
+    ts = (datetime.now(UTC) - timedelta(days=days_ago)).isoformat()
+    repo.results.append(ResultView(
+        id=f"b{len(repo.results)}", created_at=ts, tenant_id="t1", band=band,
+        score=score, reason="r", reason_code=reason_code, rubric_version="v3",
+        rep_id=rep_id,
+    ))
+
+
+def test_analytics_additive_keys_present(client):
+    _upload(client, "meeting.jpg")
+    body = client.get("/v1/analytics/summary").json()
+    # every legacy key still present
+    for k in ("total", "images_today", "band_distribution", "suspect_pct",
+              "avg_score", "avg_processing_ms", "duplicates_caught",
+              "top_reasons", "series"):
+        assert k in body
+    # new additive keys
+    for k in ("incomplete", "previous", "period", "previous_period", "groups"):
+        assert k in body
+    assert body["groups"] == []                       # group_by defaults to none
+    assert "short_label" in body["top_reasons"][0]
+
+
+def test_analytics_from_to_aliases(client):
+    from datetime import date
+    today = date.today().isoformat()
+    _upload(client, "meeting.jpg")
+    a = client.get(f"/v1/analytics/summary?from={today}").json()
+    b = client.get(f"/v1/analytics/summary?start_date={today}").json()
+    assert a["total"] == b["total"] == 1
+
+
+def test_analytics_weekly_bucket_labels(client, repo):
+    from datetime import date, timedelta
+    start = (date.today() - timedelta(days=13)).isoformat()
+    end = date.today().isoformat()
+    _backdate(repo, "A1", "Suspect", 10, "recycled", 10)
+    body = client.get(
+        f"/v1/analytics/summary?from={start}&to={end}&bucket=weekly"
+    ).json()
+    # bucketed series lives under "buckets" — "series" stays the legacy daily
+    # array (fixed shape, unchanged) per the additive contract.
+    labels = [b["bucket_label"] for b in body["buckets"]]
+    assert labels[0] == "Week 1" and labels[-1].startswith("Week ")
+
+
+def test_analytics_group_by_branch_with_unmapped(client, repo):
+    from datetime import date, timedelta
+    repo.replace_hierarchy("t1", [{
+        "agent_id": "A1", "sm": None, "rsm": None, "srsm": None,
+        "zonal_head": None, "branch": "North", "city": None,
+        "valid_from": date.today() - timedelta(days=40),
+    }], "u1")
+    _backdate(repo, "A1", "Suspect", 10, "recycled", 2)
+    _backdate(repo, "A2", "Clear", 90, "clear", 2)     # unmapped
+    body = client.get("/v1/analytics/summary?group_by=branch").json()
+    nodes = {g["node"] for g in body["groups"]}
+    assert nodes == {"North", "Unmapped"}
+
+
+def test_analytics_previous_period_present(client):
+    _upload(client, "meeting.jpg")
+    body = client.get("/v1/analytics/summary").json()
+    assert set(body["period"]) == {"from", "to"}
+    assert set(body["previous_period"]) == {"from", "to"}
+    assert set(body["previous"]) >= {"clear", "doubtful", "suspect", "total", "avg_score"}
