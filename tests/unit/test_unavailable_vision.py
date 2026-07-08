@@ -16,7 +16,9 @@ def test_assess_raises_with_reason():
 
 
 def test_relevance_reports_unavailable_when_backend_raises():
-    outcome = relevance.run(b"\xff\xd8\xff", vision=UnavailableVision("boom"), thresholds=Thresholds())
+    outcome = relevance.run(
+        b"\xff\xd8\xff", vision=UnavailableVision("boom"), thresholds=Thresholds()
+    )
     assert outcome.available is False
     assert outcome.score is None
     assert outcome.data.get("error") is True
