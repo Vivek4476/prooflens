@@ -17,3 +17,9 @@ def test_status_column_persists_values_not_member_names():
     # column must be configured (values_callable) to emit the values, or every
     # INSERT fails with "invalid input value for enum job_status".
     assert set(Job.__table__.c.status.type.enums) == set(_EXPECTED)
+
+
+def test_tenant_vision_backend_defaults_to_groq():
+    from prooflens.db.models import Tenant
+    col = Tenant.__table__.c.vision_backend
+    assert col.default.arg == "groq"           # ORM-side default

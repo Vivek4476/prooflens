@@ -29,7 +29,8 @@ its URL). Secrets are **not** in the repo — you set them in each dashboard.
 | `DATABASE_URL` | auto-wired from the Render Postgres |
 | `PROOFLENS_SECRET_KEY` | auto-generated |
 | `PROOFLENS_ADMIN_TOKEN` | auto-generated — **copy it**, the frontend needs it |
-| `VISION_BACKEND` | `stub` (reliable). For a real model set `openrouter` and add `OPENROUTER_API_KEY`. |
+| `VISION_BACKEND` | `groq` (default; requires `GROQ_API_KEY`). If no key is set, scoring caps to `Doubtful` (never a fake `Clear`). For development/CI without a key, use `stub` — a test-only fixture, never production. |
+| `GROQ_API_KEY` | **required for production** — the default backend cannot work without it. |
 | `CORS_ORIGINS` | **set after step 2** to your Vercel URL (below) |
 
 > The **async worker** is not in the free blueprint (Render workers need a paid

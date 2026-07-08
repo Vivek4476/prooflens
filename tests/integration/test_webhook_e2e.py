@@ -26,11 +26,25 @@ SECRET = "webhook-s3cr3t"
 FIELD_MAP = {"band": "F_BAND", "score": "F_SCORE", "reason": "F_REASON"}
 
 
-def _tenant() -> TenantView:
+def _tenant(vision_backend: str = "stub") -> TenantView:
     return TenantView(
         id="tenant-1", slug="dev", webhook_secret=SECRET,
-        field_map=FIELD_MAP, scoring=ScoringConfig(), vision_backend="stub",
+        field_map=FIELD_MAP, scoring=ScoringConfig(), vision_backend=vision_backend,
     )
+
+
+def _run_one_job(vision_backend: str):
+    """Mirror the file's e2e wiring (InMemoryRepo + FakeLSQClient + real app) to
+    drive exactly one job through the webhook -> worker path, for a tenant
+    configured to `vision_backend`."""
+    repo = InMemoryRepo([_tenant(vision_backend)])
+    app = create_app()
+    app.dependency_overrides[get_repo] = lambda: repo
+    client = TestClient(app)
+    _post(client)
+    lsq = FakeLSQClient()
+    assert run_once(repo, lsq, get_settings()) == 1
+    return repo.results[-1]
 
 
 @pytest.fixture
@@ -113,3 +127,14 @@ def test_duplicate_event_id_is_not_reprocessed(client, repo):
     assert run_once(repo, lsq, get_settings()) == 1
     assert run_once(repo, lsq, get_settings()) == 0  # nothing left
     assert len(repo.results) == 1
+
+
+def test_worker_degrades_when_tenant_backend_has_no_key(monkeypatch):
+    monkeypatch.setenv("GROQ_API_KEY", "")
+    import prooflens.config as config
+    config.get_settings.cache_clear()
+    # Tenant configured to a live backend ("groq") with no key set: process_job
+    # must degrade to UnavailableVision (-> Doubtful) instead of raising.
+    result = _run_one_job(vision_backend="groq")
+    assert result.band != "Clear"
+    config.get_settings.cache_clear()

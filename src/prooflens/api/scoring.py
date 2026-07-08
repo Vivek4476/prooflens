@@ -24,6 +24,7 @@ from ..engine import EngineContext, score
 from ..engine.types import Verdict
 from ..engine.verdicts import REASON_TEXT, Reason
 from ..service.repo import Repo, processing_ms
+from ..vision.unavailable import UnavailableVision
 from .date_range import fill_series, resolve_range
 from .deps import get_repo
 
@@ -77,19 +78,24 @@ def _score_direct(data: bytes, tenant: str, backend: str | None, repo: Repo) -> 
     settings = get_settings()
     # Direct scoring is operator-driven: the request override wins, else the env
     # VISION_BACKEND. "Demo Model" (stub) always works; anything else is Live AI.
-    requested = (backend or settings.vision_backend or "stub").strip().lower()
-    live_ai = requested != "stub"
+    explicit = backend is not None            # operator named a backend on THIS request
+    requested = (backend or settings.vision_backend or "groq").strip().lower()
+    # "live_ai" now means the operator EXPLICITLY asked for a non-stub backend, so
+    # a misconfiguration should surface loudly (503). The configured default degrades
+    # quietly to Doubtful instead (fail-open: score & flag, never block).
+    live_ai = explicit and requested != "stub"
 
-    # Build the backend. If Live AI is requested but can't be constructed (e.g. a
-    # missing API key), surface the exact reason — never silently use the stub.
     try:
         vision = settings.build_vision_backend(requested)
     except Exception as exc:  # noqa: BLE001
-        if not live_ai:
-            raise
-        raise HTTPException(
-            status_code=503, detail=f"Live AI ({requested}) is unavailable: {exc}"
-        ) from exc
+        if explicit:
+            # They asked for this specific backend and it's misconfigured — say so.
+            raise HTTPException(
+                status_code=503, detail=f"Live AI ({requested}) is unavailable: {exc}"
+            ) from exc
+        # Default path: don't block, don't fake a Clear. Degrade to an unavailable
+        # vision so fusion caps the verdict to Doubtful (review).
+        vision = UnavailableVision(f"{requested} unavailable: {exc}")
 
     # Defer hash-remembering until we know the verdict is a keeper: a failed Live
     # AI call must not poison the duplicate store (which would make a retry look
