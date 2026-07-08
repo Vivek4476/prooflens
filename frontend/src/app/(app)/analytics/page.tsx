@@ -21,6 +21,75 @@ import { CardsSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { useAnalytics } from "@/lib/api/hooks";
 import { formatMs } from "@/lib/utils";
 
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    payload: {
+      date: string;
+      Clear: number;
+      Doubtful: number;
+      Suspect: number;
+      totalVolume: number;
+      avgScore: number;
+    };
+  }>;
+  label?: string;
+}
+
+function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    const total = data.totalVolume ?? 0;
+    const avgScore = data.avgScore ?? 0;
+    const clear = data.Clear ?? 0;
+    const doubtful = data.Doubtful ?? 0;
+    const suspect = data.Suspect ?? 0;
+    const sum = clear + doubtful + suspect || 1;
+
+    const clearPct = Math.round((clear / sum) * 100);
+    const doubtfulPct = Math.round((doubtful / sum) * 100);
+    const suspectPct = Math.round((suspect / sum) * 100);
+
+    return (
+      <div className="rounded-lg border border-border bg-surface p-3 shadow-2 text-body-sm space-y-2 min-w-[200px]">
+        <p className="font-semibold text-text">{label}</p>
+        <div className="border-b border-border pb-1.5 flex items-center justify-between text-caption text-text-secondary">
+          <span>Total volume</span>
+          <span className="font-medium text-text tabular-nums">{total} {total === 1 ? "image" : "images"}</span>
+        </div>
+        <div className="space-y-1 text-caption">
+          <div className="flex items-center justify-between gap-4">
+            <span className="flex items-center gap-1.5 text-text-secondary">
+              <span className="h-2 w-2 rounded bg-verdict-clear" style={{ backgroundColor: "var(--verdict-clear)" }} />
+              Clear
+            </span>
+            <span className="font-medium text-text tabular-nums">{clear} ({clearPct}%)</span>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <span className="flex items-center gap-1.5 text-text-secondary">
+              <span className="h-2 w-2 rounded bg-verdict-doubtful" style={{ backgroundColor: "var(--verdict-doubtful)" }} />
+              Doubtful
+            </span>
+            <span className="font-medium text-text tabular-nums">{doubtful} ({doubtfulPct}%)</span>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <span className="flex items-center gap-1.5 text-text-secondary">
+              <span className="h-2 w-2 rounded bg-verdict-suspect" style={{ backgroundColor: "var(--verdict-suspect)" }} />
+              Suspect
+            </span>
+            <span className="font-medium text-text tabular-nums">{suspect} ({suspectPct}%)</span>
+          </div>
+        </div>
+        <div className="border-t border-border pt-1.5 flex items-center justify-between text-caption font-semibold text-text">
+          <span>Avg Score</span>
+          <span className="tabular-nums">{Math.round(avgScore)}/100</span>
+        </div>
+      </div>
+    );
+  }
+  return null;
+}
+
 export default function AnalyticsPage() {
   const { data: a, isLoading, isError, refetch } = useAnalytics();
 
@@ -53,6 +122,8 @@ export default function AnalyticsPage() {
     Clear: d.clear,
     Doubtful: d.doubtful,
     Suspect: d.suspect,
+    totalVolume: d.count,
+    avgScore: d.avg_score,
   }));
 
   return (
@@ -85,14 +156,7 @@ export default function AnalyticsPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                     <XAxis dataKey="date" tick={{ fontSize: 12, fill: "var(--text-muted)" }} stroke="var(--border)" />
                     <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "var(--text-muted)" }} stroke="var(--border)" />
-                    <Tooltip
-                      contentStyle={{
-                        background: "var(--surface)",
-                        border: "1px solid var(--border)",
-                        borderRadius: 8,
-                        fontSize: 12,
-                      }}
-                    />
+                    <Tooltip content={<CustomTooltip />} />
                     <Legend
                       iconType="square"
                       iconSize={10}
@@ -142,16 +206,23 @@ export default function AnalyticsPage() {
               No flags yet — every verdict is Clear.
             </p>
           ) : (
-            <ul className="space-y-3">
+            <ul className="space-y-4">
               {flagReasons.map((r) => (
-                <li key={r.reason_code}>
-                  <div className="mb-1 flex items-baseline justify-between gap-3">
-                    <span className="truncate text-body-sm text-text-secondary">{r.reason}</span>
-                    <span className="shrink-0 text-body-sm font-medium tabular-nums text-text">{r.count}</span>
+                <li
+                  key={r.reason_code}
+                  className="group rounded-lg p-2 -mx-2 hover:bg-surface-2 transition-colors duration-200"
+                >
+                  <div className="mb-1.5 flex items-baseline justify-between gap-3">
+                    <span className="truncate text-body-sm text-text-secondary group-hover:text-text transition-colors duration-200">
+                      {r.reason}
+                    </span>
+                    <span className="shrink-0 text-body-sm font-medium tabular-nums text-text">
+                      {r.count}
+                    </span>
                   </div>
                   <div className="h-2 w-full overflow-hidden rounded-full bg-surface-3">
                     <div
-                      className="h-full rounded-full bg-text-secondary"
+                      className="h-full rounded-full bg-text-secondary group-hover:bg-text transition-all duration-300"
                       style={{ width: `${(r.count / maxReason) * 100}%` }}
                     />
                   </div>
