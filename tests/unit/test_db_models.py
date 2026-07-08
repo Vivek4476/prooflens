@@ -38,3 +38,16 @@ def test_results_have_tenant_rep_index():
     idx = {i.name: [c.name for c in i.columns] for i in Result.__table__.indexes}
     assert "ix_results_tenant_rep" in idx
     assert idx["ix_results_tenant_rep"] == ["tenant_id", "rep_id"]
+
+
+def test_hierarchy_model_columns_and_index():
+    from prooflens.db.models import Hierarchy
+    cols = Hierarchy.__table__.c
+    for name in (
+        "id", "tenant_id", "agent_id", "sm", "rsm", "srsm",
+        "zonal_head", "branch", "city", "valid_from", "uploaded_at", "upload_id",
+    ):
+        assert name in cols, f"missing column {name}"
+    assert str(cols.valid_from.type) == "DATE"
+    idx = {i.name: [c.name for c in i.columns] for i in Hierarchy.__table__.indexes}
+    assert idx["ix_hierarchy_lookup"] == ["tenant_id", "agent_id", "valid_from"]
