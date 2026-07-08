@@ -106,6 +106,7 @@ class PostgresRepo:
     def list_results(
         self, *, limit: int = 50, offset: int = 0, band: str | None = None,
         review: str | None = None,
+        start: datetime | None = None, end: datetime | None = None,
     ) -> tuple[list[ResultView], int]:
         query = self._session.query(Result)
         if band:
@@ -114,6 +115,10 @@ class PostgresRepo:
             query = query.filter(Result.review_status.is_(None))
         elif review:
             query = query.filter(Result.review_status == review)
+        if start is not None:
+            query = query.filter(Result.created_at >= start)
+        if end is not None:
+            query = query.filter(Result.created_at < end)
         total = query.count()
         rows = (
             query.order_by(Result.created_at.desc()).offset(offset).limit(limit).all()
