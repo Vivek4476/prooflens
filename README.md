@@ -30,7 +30,9 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md),
 ## Quickstart (clone → running, offline)
 
 No database, no API keys, no network needed for the engine + CLI + tests. The
-default vision backend is a deterministic **stub**.
+default vision backend is **groq**. For offline development and testing (no API key),
+the **stub** backend is available — it is a deterministic test-only fixture, never
+used in production.
 
 ```bash
 git clone https://github.com/Vivek4476/prooflens.git
@@ -86,7 +88,7 @@ alongside `rubrics/`.
 ```
 src/prooflens/
   engine/     pure scoring library: pipeline + checks/ + fusion/ + verdicts
-  vision/     VisionBackend protocol; stub (default), anthropic, local_vlm
+  vision/     VisionBackend protocol; groq (default), stub (test-only), anthropic, local_vlm
   db/         SQLAlchemy models, Postgres hash store, crypto (queue/tenants/results/audit/DLQ)
   queue/      Postgres job queue: SKIP LOCKED drain, backoff+jitter, DLQ
   tenants/    per-tenant scoring resolution + credentials
@@ -122,11 +124,11 @@ python scripts/generate_demo_images.py
 cd frontend && npm install && npm run seed:demo
 ```
 
-For a real vision model instead of the offline stub, start the stack with
-`VISION_BACKEND=openrouter` and an `OPENROUTER_API_KEY` in `.env` (the free tier
-rate-limits; scoring is fail-open, so a slow/failed model degrades to "scored
-without content analysis" rather than breaking). The Analyze page also has a
-per-request **Demo model / Live AI** switch.
+The default is `VISION_BACKEND=groq` with a `GROQ_API_KEY` in `.env` (required for
+production). If no key is set, scoring caps to `Doubtful` (never a fake `Clear`).
+For offline development/CI without any API key, use `VISION_BACKEND=stub` — it is
+a deterministic test-only fixture, never a production judgement. The Analyze page
+also has a per-request **Demo model / Live AI** switch.
 
 The frontend is a separate Next.js app in `frontend/` (see
 `frontend/BACKEND_REQUIREMENTS.md` for the exact API contract it consumes).

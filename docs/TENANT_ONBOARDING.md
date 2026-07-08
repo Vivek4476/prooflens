@@ -22,7 +22,7 @@ curl -sX POST localhost:8000/admin/tenants \
     "slug": "acme",
     "name": "Acme Insurance",
     "webhook_secret": "<shared-secret>",
-    "vision_backend": "stub",
+    "vision_backend": "groq",
     "field_map": {
       "band":   "mx_Custom_ProofLensBand",
       "score":  "mx_Custom_ProofLensScore",
@@ -78,9 +78,11 @@ curl -sX PATCH localhost:8000/admin/tenants/acme \
   -d '{"scoring_overrides": {"thresholds": {"blur_floor": 60}, "bands": {"clear": 75}}}'
 ```
 
-Start every tenant on `vision_backend: "stub"` to validate the integration with
-zero cost, then switch to a real backend (`anthropic` / `local_vlm`) once the
-field mapping and webhook are confirmed working.
+New tenants default to `vision_backend: "groq"` (the production default). For
+offline validation without an API key, you can temporarily use `vision_backend:
+"stub"` — it is a test-only fixture and will never produce a real `Clear`
+verdict. Once the field mapping and webhook are confirmed working, ensure the
+tenant uses a real backend (`groq` / `anthropic` / `local_vlm`).
 
 ## 5. Offboard
 
