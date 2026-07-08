@@ -65,6 +65,34 @@ def test_incomplete_flag_on_todays_bucket():
     assert b[0]["incomplete"] is False              # yesterday is complete
 
 
+def test_incomplete_flag_uses_injected_today_not_wall_clock():
+    # Injected `today` is deliberately far from wall-clock so this can never
+    # pass by accident of when the suite happens to run.
+    injected_today = date(2030, 3, 15)
+    start, end = _dt(date(2030, 3, 13)), _dt(date(2030, 3, 17))  # Mar 13,14,15,16
+    items = [_r(date(2030, 3, 13)), _r(date(2030, 3, 15))]
+    b = build_buckets(items, start, end, "daily", today=injected_today)
+    by_label = {x["bucket_label"]: x for x in b}
+    assert by_label["2030-03-15"]["incomplete"] is True
+    assert by_label["2030-03-13"]["incomplete"] is False
+    assert by_label["2030-03-14"]["incomplete"] is False
+    # Buckets after today's bucket are also not "incomplete" under the
+    # half-open [bucket.start, bucket.end) containment rule.
+    assert by_label["2030-03-16"]["incomplete"] is False
+
+
+def test_aggregate_range_passes_injected_today_through_to_buckets():
+    injected_today = date(2030, 3, 15)
+    start, end = _dt(date(2030, 3, 13)), _dt(date(2030, 3, 17))
+    items = [_r(date(2030, 3, 13)), _r(date(2030, 3, 15))]
+    out = aggregate_range(items, [], [], start=start, end=end, bucket="daily",
+                          group_by="none", today=injected_today)
+    by_label = {x["bucket_label"]: x for x in out["series"]}
+    assert by_label["2030-03-15"]["incomplete"] is True
+    assert by_label["2030-03-13"]["incomplete"] is False
+    assert out["incomplete"] is True
+
+
 def test_aggregate_previous_period_window_and_delta():
     # Range Jun 8..Jun 14 (7 days). Previous equal-length period = Jun 1..Jun 7.
     start, end = _dt(date(2026, 6, 8)), _dt(date(2026, 6, 15))

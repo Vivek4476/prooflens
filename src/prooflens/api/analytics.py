@@ -72,12 +72,19 @@ def _bucket_edges(start: datetime, end: datetime, bucket: str) -> list[tuple[dat
 
 
 def build_buckets(
-    items: list[ResultView], start: datetime, end: datetime, bucket: str
+    items: list[ResultView],
+    start: datetime,
+    end: datetime,
+    bucket: str,
+    today: date | None = None,
 ) -> list[dict]:
     """Bucketed band/score series across [start, end). Weekly = 'Week 1..N'
     anchored to the range start; monthly = calendar months. The bucket that
-    contains today (UTC) is flagged incomplete."""
-    today = datetime.now(tz=start.tzinfo).date()
+    contains `today` is flagged incomplete. `today` defaults to wall-clock
+    (UTC-relative to `start`'s tzinfo) but can be injected for deterministic
+    testing."""
+    if today is None:
+        today = datetime.now(tz=start.tzinfo).date()
     edges = _bucket_edges(start, end, bucket)
     by_bucket: list[list[ResultView]] = [[] for _ in edges]
     for r in items:
@@ -150,7 +157,7 @@ def aggregate_range(
 ) -> dict:
     """The additive analytics payload: bucketed series, previous-period tally,
     explicit period bounds, per-node groups (incl. Unmapped), reason counts."""
-    series = build_buckets(items, start, end, bucket)
+    series = build_buckets(items, start, end, bucket, today=today)
     last_day = end.date() - timedelta(days=1)
     prev_len_days = (end.date() - start.date()).days
     prev_end = start.date()                      # exclusive
