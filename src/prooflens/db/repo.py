@@ -109,12 +109,18 @@ class PostgresRepo:
 
     def list_results(
         self, *, limit: int = 50, offset: int = 0, band: str | None = None,
-        review: str | None = None,
+        review: str | None = None, reason: str | None = None, rep_id: str | None = None,
         start: datetime | None = None, end: datetime | None = None,
     ) -> tuple[list[ResultView], int]:
+        from ..service.ids import normalize_id
+
         query = self._session.query(Result)
         if band:
             query = query.filter(Result.band == band)
+        if reason is not None:
+            query = query.filter(Result.reason_code == reason)
+        if rep_id is not None:
+            query = query.filter(Result.rep_id == normalize_id(rep_id))
         if review == "pending":
             query = query.filter(Result.review_status.is_(None))
         elif review:

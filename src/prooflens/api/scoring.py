@@ -163,9 +163,24 @@ def list_results(
     offset: int = Query(0, ge=0),
     band: str | None = Query(None),
     review: str | None = Query(None),
+    reason: str | None = Query(None),
+    rep_id: str | None = Query(None),
+    from_: str | None = Query(None, alias="from"),
+    to: str | None = Query(None, alias="to"),
     repo: Repo = Depends(get_repo),
 ) -> dict:
-    items, total = repo.list_results(limit=limit, offset=offset, band=band, review=review)
+    # from/to only constrain the range when provided; absent => no date filter
+    # (preserves the existing unfiltered default).
+    start = end = None
+    if from_ is not None or to is not None:
+        try:
+            start, end = resolve_range(from_, to)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    items, total = repo.list_results(
+        limit=limit, offset=offset, band=band, review=review,
+        reason=reason, rep_id=rep_id, start=start, end=end,
+    )
     return {
         "items": [r.to_dict() for r in items],
         "total": total,

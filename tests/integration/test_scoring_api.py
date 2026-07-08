@@ -324,3 +324,39 @@ def test_analytics_previous_period_present(client):
     assert set(body["period"]) == {"from", "to"}
     assert set(body["previous_period"]) == {"from", "to"}
     assert set(body["previous"]) >= {"clear", "doubtful", "suspect", "total", "avg_score"}
+
+
+def test_results_filter_by_reason_and_rep_id(client, repo):
+    from datetime import UTC, datetime
+
+    from prooflens.service.views import ResultView
+    now = datetime.now(UTC).isoformat()
+    repo.results.extend([
+        ResultView(id="r1", created_at=now, tenant_id="t1", band="Suspect", score=10,
+                   reason="r", reason_code="recycled", rubric_version="v3", rep_id="A1"),
+        ResultView(id="r2", created_at=now, tenant_id="t1", band="Clear", score=90,
+                   reason="r", reason_code="clear", rubric_version="v3", rep_id="A2"),
+    ])
+    by_reason = client.get("/v1/results?reason=recycled").json()
+    assert {i["reason_code"] for i in by_reason["items"]} == {"recycled"}
+    # rep_id is normalized: lower-case query matches the stored upper id
+    by_rep = client.get("/v1/results?rep_id=a1").json()
+    assert {i["rep_id"] for i in by_rep["items"]} == {"A1"}
+
+
+def test_results_filter_by_from_to(client, repo):
+    from datetime import UTC, datetime, timedelta
+
+    from prooflens.service.views import ResultView
+    old = (datetime.now(UTC) - timedelta(days=10)).isoformat()
+    new = datetime.now(UTC).isoformat()
+    repo.results.extend([
+        ResultView(id="old", created_at=old, tenant_id="t1", band="Clear", score=90,
+                   reason="r", reason_code="clear", rubric_version="v3"),
+        ResultView(id="new", created_at=new, tenant_id="t1", band="Clear", score=90,
+                   reason="r", reason_code="clear", rubric_version="v3"),
+    ])
+    from datetime import date
+    today = date.today().isoformat()
+    only_today = client.get(f"/v1/results?from={today}").json()
+    assert {i["id"] for i in only_today["items"]} == {"new"}
