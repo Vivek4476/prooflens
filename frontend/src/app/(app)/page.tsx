@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock, Copy, Gauge, ImageOff, Images, ScanSearch, ShieldAlert } from "lucide-react";
+import { ImageOff, ScanSearch } from "lucide-react";
 import Link from "next/link";
 
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -51,11 +51,11 @@ export default function DashboardPage() {
             <CardsSkeleton />
           ) : (
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
-              <MetricCard label="Images today" value={a.images_today} icon={Images} />
-              <MetricCard label="Suspect %" value={a.suspect_pct} suffix="%" icon={ShieldAlert} accent sub="of all verdicts" />
-              <MetricCard label="Avg score" value={a.avg_score} suffix="/100" icon={Gauge} />
-              <MetricCard label="Avg processing" value={formatMs(a.avg_processing_ms)} icon={Clock} />
-              <MetricCard label="Duplicates caught" value={a.duplicates_caught} icon={Copy} />
+              <MetricCard label="Images today" value={a.images_today} />
+              <MetricCard label="Suspect %" value={a.suspect_pct} suffix="%" accent sub="of all verdicts" />
+              <MetricCard label="Avg score" value={a.avg_score} suffix="/100" />
+              <MetricCard label="Avg processing" value={formatMs(a.avg_processing_ms)} />
+              <MetricCard label="Duplicates caught" value={a.duplicates_caught} />
             </div>
           )}
 

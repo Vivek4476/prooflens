@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, Copy, Gauge, ShieldAlert } from "lucide-react";
+import { BarChart3 } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -134,10 +134,10 @@ export default function AnalyticsPage() {
         <CardsSkeleton count={4} />
       ) : (
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <MetricCard label="Total scored" value={a.total} icon={BarChart3} />
-          <MetricCard label="Suspect %" value={a.suspect_pct} suffix="%" icon={ShieldAlert} accent />
-          <MetricCard label="Avg score" value={a.avg_score} suffix="/100" icon={Gauge} />
-          <MetricCard label="Duplicates caught" value={a.duplicates_caught} icon={Copy} />
+          <MetricCard label="Total scored" value={a.total} />
+          <MetricCard label="Suspect %" value={a.suspect_pct} suffix="%" accent />
+          <MetricCard label="Avg score" value={a.avg_score} suffix="/100" />
+          <MetricCard label="Duplicates caught" value={a.duplicates_caught} />
         </div>
       )}
 
