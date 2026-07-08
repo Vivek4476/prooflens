@@ -153,6 +153,20 @@ export default function AnalyticsPage() {
               <div className="h-full w-full" aria-hidden="true">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={series} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorClear" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--verdict-clear)" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="var(--verdict-clear)" stopOpacity={0.4}/>
+                      </linearGradient>
+                      <linearGradient id="colorDoubtful" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--verdict-doubtful)" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="var(--verdict-doubtful)" stopOpacity={0.4}/>
+                      </linearGradient>
+                      <linearGradient id="colorSuspect" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--verdict-suspect)" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="var(--verdict-suspect)" stopOpacity={0.4}/>
+                      </linearGradient>
+                    </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                     <XAxis dataKey="date" tick={{ fontSize: 12, fill: "var(--text-muted)" }} stroke="var(--border)" />
                     <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "var(--text-muted)" }} stroke="var(--border)" />
@@ -162,9 +176,9 @@ export default function AnalyticsPage() {
                       iconSize={10}
                       wrapperStyle={{ fontSize: 12, color: "var(--text-muted)" }}
                     />
-                    <Bar dataKey="Clear" stackId="b" fill="var(--verdict-clear)" maxBarSize={64} />
-                    <Bar dataKey="Doubtful" stackId="b" fill="var(--verdict-doubtful)" maxBarSize={64} />
-                    <Bar dataKey="Suspect" stackId="b" fill="var(--verdict-suspect)" maxBarSize={64} radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="Clear" stackId="b" fill="url(#colorClear)" maxBarSize={64} />
+                    <Bar dataKey="Doubtful" stackId="b" fill="url(#colorDoubtful)" maxBarSize={64} />
+                    <Bar dataKey="Suspect" stackId="b" fill="url(#colorSuspect)" maxBarSize={64} radius={[3, 3, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -206,7 +220,7 @@ export default function AnalyticsPage() {
               No flags yet — every verdict is Clear.
             </p>
           ) : (
-            <ul className="space-y-4">
+            <ul className="h-full overflow-y-auto pr-1.5 space-y-4 select-none custom-scrollbar">
               {flagReasons.map((r) => (
                 <li
                   key={r.reason_code}
@@ -222,7 +236,7 @@ export default function AnalyticsPage() {
                   </div>
                   <div className="h-2 w-full overflow-hidden rounded-full bg-surface-3">
                     <div
-                      className="h-full rounded-full bg-text-secondary group-hover:bg-text transition-all duration-300"
+                      className="h-full rounded-full bg-gradient-to-r from-text-secondary to-text-muted group-hover:from-brand-crimson group-hover:to-verdict-suspect transition-all duration-300"
                       style={{ width: `${(r.count / maxReason) * 100}%` }}
                     />
                   </div>

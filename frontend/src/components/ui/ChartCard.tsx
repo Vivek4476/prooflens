@@ -13,7 +13,7 @@ export function ChartCard({
   height?: number;
 }) {
   return (
-    <Card>
+    <Card className="hover:shadow-2 hover:-translate-y-0.5 transition-all duration-300">
       <CardHeader title={title} subtitle={subtitle} />
       <div className="p-4" style={{ height }}>
         {children}
