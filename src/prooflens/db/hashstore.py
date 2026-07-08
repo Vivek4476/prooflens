@@ -2,21 +2,48 @@
 
 Stores only the dHash + trail, never images, and is strictly tenant-scoped.
 
-Phase 1 keeps the nearest-neighbour search simple: fetch the tenant's recent
-hashes and compute Hamming distance in Python. This is correct and fine at
-current volumes.
-TODO(scale): replace with a bit-sliced index / BK-tree, or store the dHash as a
-BIGINT and use a popcount(x # y) expression, once a tenant's hash count is large.
+Nearest-neighbour search is done entirely server-side: the 64-bit dHash is
+stored as 16 hex chars, so the Hamming distance is the popcount of the XOR of
+the two hashes. Postgres computes that as ``bit_count(a # b)`` over ``bit(64)``
+casts, and we order by that distance (ties broken toward the most recent row)
+and return only the closest one. This avoids loading a tenant's whole hash
+history into Python — a single indexed scan returns exactly one row.
+
+The Python semantics this replaces: iterate rows newest-first, keep the row with
+the smallest Hamming distance, ties resolved to the first seen (i.e. the most
+recent, highest ``id``). The ``ORDER BY distance ASC, id DESC LIMIT 1`` below is
+exactly that, so authenticity scoring is unchanged.
 """
 
 from __future__ import annotations
 
-from ..engine.hashstore import hamming_hex
+from sqlalchemy import text
+
 from ..engine.types import HashMatch
 from .models import ImageHash
 
-# Cap the candidate scan so a hot tenant can't make a single lookup unbounded.
-_MAX_CANDIDATES = 50_000
+# The nearest-neighbour query. ``('x' || lpad(h, 16, '0'))::bit(64)`` turns the
+# 16-hex-char dHash into a 64-bit bit string; ``a # b`` is XOR and
+# ``bit_count(...)`` (Postgres 14+) is the popcount, i.e. the Hamming distance.
+# Ordering ``distance ASC, id DESC`` reproduces the old "smallest distance, ties
+# to the most recent" behaviour, and LIMIT 1 returns just the closest row.
+_NEAREST_SQL = text(
+    """
+    SELECT
+        dhash,
+        rep_id,
+        opportunity_id,
+        created_at,
+        bit_count(
+            ('x' || lpad(dhash, 16, '0'))::bit(64)
+            # ('x' || lpad(:probe, 16, '0'))::bit(64)
+        ) AS distance
+    FROM image_hashes
+    WHERE tenant_id = :tenant_id
+    ORDER BY distance ASC, id DESC
+    LIMIT 1
+    """
+)
 
 
 class PostgresHashStore:
@@ -26,27 +53,18 @@ class PostgresHashStore:
         self._session = session
 
     def nearest(self, tenant_id: str, dhash_hex: str) -> HashMatch | None:
-        rows = (
-            self._session.query(ImageHash)
-            .filter(ImageHash.tenant_id == tenant_id)
-            .order_by(ImageHash.id.desc())
-            .limit(_MAX_CANDIDATES)
-            .all()
+        row = self._session.execute(
+            _NEAREST_SQL, {"tenant_id": tenant_id, "probe": dhash_hex}
+        ).first()
+        if row is None:
+            return None
+        return HashMatch(
+            distance=int(row.distance),
+            dhash=row.dhash,
+            rep_id=row.rep_id,
+            opportunity_id=row.opportunity_id,
+            created_at=row.created_at.isoformat() if row.created_at else None,
         )
-        best: HashMatch | None = None
-        for row in rows:
-            dist = hamming_hex(dhash_hex, row.dhash)
-            if best is None or dist < best.distance:
-                best = HashMatch(
-                    distance=dist,
-                    dhash=row.dhash,
-                    rep_id=row.rep_id,
-                    opportunity_id=row.opportunity_id,
-                    created_at=row.created_at.isoformat() if row.created_at else None,
-                )
-                if dist == 0:
-                    break
-        return best
 
     def remember(
         self,
