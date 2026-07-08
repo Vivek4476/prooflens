@@ -56,8 +56,10 @@ Whenever ProofLens shows a verdict it must also show:
 3. **Confidence** — the score and which signals are soft vs. hard gates.
 4. **Next action** — retake, review, or accept.
 
-The stub backend is always labelled as a stub; a verdict never implies a real
-model judged the image when it did not.
+The stub backend (test-only, never production) is always labelled as such when it
+appears in dev/CLI output. A verdict never implies a real model judged the image
+when it did not. When no API key is configured, scoring caps to Doubtful (never a
+fake Clear).
 
 ## Non-negotiables (never build)
 

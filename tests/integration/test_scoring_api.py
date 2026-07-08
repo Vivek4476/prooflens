@@ -121,6 +121,35 @@ def test_live_ai_call_failure_surfaces_exact_reason(client, monkeypatch):
     assert "429" in r.json()["detail"]
 
 
+def test_default_path_without_key_caps_to_doubtful(client, monkeypatch):
+    # Default backend groq, but no key configured -> vision unavailable.
+    monkeypatch.setenv("VISION_BACKEND", "groq")
+    monkeypatch.setenv("GROQ_API_KEY", "")
+    import prooflens.config as config
+    config.get_settings.cache_clear()
+    r = _upload(client, "meeting.jpg")
+    assert r.status_code == 200                     # never blocks
+    body = r.json()
+    assert body["band"] != "Clear"                  # never a fake Clear
+    content = next(c for c in body["checks"] if c["name"] == "content")
+    assert content["available"] is False
+    config.get_settings.cache_clear()
+
+
+def test_explicit_override_to_misconfigured_live_backend_503s(client, monkeypatch):
+    monkeypatch.setenv("GROQ_API_KEY", "")
+    import prooflens.config as config
+    config.get_settings.cache_clear()
+    with open(IMAGES_DIR / "meeting.jpg", "rb") as fh:
+        r = client.post(
+            "/v1/score",
+            files={"image": ("meeting.jpg", fh.read(), "image/jpeg")},
+            data={"backend": "groq"},               # operator explicitly asked for groq
+        )
+    assert r.status_code == 503
+    config.get_settings.cache_clear()
+
+
 def test_score_unknown_tenant_404(client):
     with open(IMAGES_DIR / "meeting.jpg", "rb") as fh:
         r = client.post("/v1/score", files={"image": ("m.jpg", fh.read(), "image/jpeg")},

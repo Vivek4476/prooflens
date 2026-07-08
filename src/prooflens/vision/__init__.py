@@ -6,11 +6,13 @@ from .base import VisionBackend, resize_for_model
 from .rubric import RUBRIC_VERSION
 from .schema import ContentAssessment
 from .stub import StubBackend
+from .unavailable import UnavailableVision  # noqa: F401
 
 __all__ = [
     "VisionBackend",
     "ContentAssessment",
     "StubBackend",
+    "UnavailableVision",
     "RUBRIC_VERSION",
     "resize_for_model",
     "get_backend",

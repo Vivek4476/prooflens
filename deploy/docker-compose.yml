@@ -7,7 +7,7 @@ x-app-env: &app-env
   # Dev-only secrets; OVERRIDE in staging/prod (Fernet key + admin token).
   PROOFLENS_SECRET_KEY: ${PROOFLENS_SECRET_KEY:-dev-insecure-key-do-not-use-in-production-0000000000000000=}
   PROOFLENS_ADMIN_TOKEN: ${PROOFLENS_ADMIN_TOKEN:-dev-admin-token}
-  VISION_BACKEND: ${VISION_BACKEND:-stub}
+  VISION_BACKEND: ${VISION_BACKEND:-groq}   # override to 'stub' for a fully offline local run
   LOG_LEVEL: ${LOG_LEVEL:-INFO}
   CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
   # Optional hosted vision keys (passed through when set on the host / .env).
