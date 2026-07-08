@@ -2,6 +2,7 @@
 import axios from "axios";
 
 import type {
+  AnalyticsParams,
   AnalyticsSummary,
   ResultItem,
   ResultsPage,
@@ -55,8 +56,8 @@ export const api = {
     return data;
   },
 
-  async analytics(): Promise<AnalyticsSummary> {
-    const { data } = await http.get("/v1/analytics/summary");
+  async analytics(params?: AnalyticsParams): Promise<AnalyticsSummary> {
+    const { data } = await http.get("/v1/analytics/summary", { params });
     return data;
   },
 

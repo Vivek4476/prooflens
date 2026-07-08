@@ -62,6 +62,7 @@ export interface ResultsPage {
 export interface TopReason {
   reason_code: string;
   reason: string;
+  short_label: string; // NEW — always present now
   count: number;
 }
 
@@ -74,6 +75,42 @@ export interface DaySeries {
   avg_score: number;
 }
 
+export interface AnalyticsBucket {
+  bucket_label: string;
+  start: string; // YYYY-MM-DD
+  end: string; // YYYY-MM-DD
+  clear: number;
+  doubtful: number;
+  suspect: number;
+  total: number;
+  avg_score: number;
+  incomplete: boolean;
+}
+
+export interface PeriodAggregate {
+  clear: number;
+  doubtful: number;
+  suspect: number;
+  total: number;
+  avg_score: number;
+}
+
+export interface PeriodBounds {
+  from: string; // YYYY-MM-DD
+  to: string; // YYYY-MM-DD
+}
+
+export interface AnalyticsGroup {
+  node: string;
+  total: number;
+  clear: number;
+  doubtful: number;
+  suspect: number;
+  avg_score: number;
+  suspect_rate: number;
+  share: number;
+}
+
 export interface AnalyticsSummary {
   total: number;
   images_today: number;
@@ -83,7 +120,23 @@ export interface AnalyticsSummary {
   avg_processing_ms: number;
   duplicates_caught: number;
   top_reasons: TopReason[];
-  series: DaySeries[];
+  series: DaySeries[]; // legacy, unchanged — still used by Dashboard if applicable
+  buckets: AnalyticsBucket[]; // NEW
+  incomplete: boolean; // NEW
+  previous: PeriodAggregate; // NEW
+  period: PeriodBounds; // NEW
+  previous_period: PeriodBounds; // NEW
+  groups: AnalyticsGroup[]; // NEW — unused by Phase A UI, present for type completeness
+}
+
+export type Bucket = "daily" | "weekly" | "monthly";
+export type GroupBy = "none" | "zone" | "srsm" | "rsm" | "sm" | "branch" | "city";
+
+export interface AnalyticsParams {
+  start_date?: string; // YYYY-MM-DD
+  end_date?: string; // YYYY-MM-DD
+  bucket?: Bucket;
+  group_by?: GroupBy;
 }
 
 export interface ScoringConfig {

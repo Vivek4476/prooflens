@@ -3,7 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { api } from "./client";
-import type { HealthState } from "./types";
+import type { AnalyticsParams, HealthState } from "./types";
+import { useDebouncedValue } from "./useDebouncedValue";
 
 export function useHealth() {
   const query = useQuery({
@@ -52,10 +53,15 @@ export function useResult(id: string | undefined) {
   });
 }
 
-export function useAnalytics() {
+export function useAnalytics(params: AnalyticsParams = {}) {
+  const debounced = useDebouncedValue(params, 300);
   return useQuery({
-    queryKey: ["analytics"],
-    queryFn: () => api.analytics(),
+    queryKey: ["analytics", debounced],
+    queryFn: () => api.analytics(debounced),
+    // Keep the previous page's data visible while the debounced params refetch,
+    // so widgets show a subtle in-place update rather than a full unmount —
+    // pairs with Task 8's "skeleton only on first load" rule.
+    placeholderData: (prev) => prev,
     refetchInterval: 30_000,
   });
 }
