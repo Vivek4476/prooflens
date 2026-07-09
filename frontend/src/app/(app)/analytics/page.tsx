@@ -15,6 +15,7 @@ import { KpiRow } from "@/components/analytics/KpiRow";
 import { CaptureRiskTrend } from "@/components/analytics/CaptureRiskTrend";
 import { BandMixChart } from "@/components/analytics/BandMixChart";
 import { TopFlagReasons } from "@/components/analytics/TopFlagReasons";
+import { ByTeamPanel } from "@/components/analytics/ByTeamPanel";
 import { useAnalytics } from "@/lib/api/hooks";
 import { useAnalyticsFilters } from "@/lib/analytics/useAnalyticsFilters";
 import type { AnalyticsParams } from "@/lib/api/types";
@@ -105,7 +106,10 @@ function AnalyticsPageInner() {
             <CaptureRiskTrend buckets={a.buckets} previous={a.previous} />
             <BandMixChart buckets={a.buckets} />
           </div>
-          <TopFlagReasons topReasons={a.top_reasons} />
+          <div className="grid gap-6 lg:grid-cols-2">
+            <TopFlagReasons topReasons={a.top_reasons} />
+            <ByTeamPanel startDate={a.period.from} endDate={a.period.to} />
+          </div>
         </div>
       )}
     </div>
