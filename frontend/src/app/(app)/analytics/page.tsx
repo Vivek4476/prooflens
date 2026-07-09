@@ -17,6 +17,7 @@ import { CaptureRiskTrend } from "@/components/analytics/CaptureRiskTrend";
 import { BandMixChart } from "@/components/analytics/BandMixChart";
 import { TopFlagReasons } from "@/components/analytics/TopFlagReasons";
 import { ByTeamPanel } from "@/components/analytics/ByTeamPanel";
+import { ExportControls } from "@/components/analytics/ExportControls";
 import { useAnalytics } from "@/lib/api/hooks";
 import { useAnalyticsFilters } from "@/lib/analytics/useAnalyticsFilters";
 import type { AnalyticsParams } from "@/lib/api/types";
@@ -70,17 +71,21 @@ function AnalyticsPageInner() {
         title="Analytics"
         description="Is capture risk trending up, and where should you look?"
         actions={
-          // Primary next-action for the page (BRAND: one decision, one primary action).
-          // Links to the full review queue — it isn't period-filterable, so the label
-          // doesn't promise a filter the queue can't honour. Classes mirror Button's
-          // primary (Focus Indigo); a Link can't wrap <button> as valid HTML.
-          <Link
-            href="/review"
-            className="inline-flex h-10 min-h-[44px] items-center justify-center gap-2 rounded-md bg-accent px-4 text-body-sm font-medium text-accent-fg transition-colors hover:bg-accent-hover sm:min-h-0"
-          >
-            Review flagged captures
-            <ArrowRight aria-hidden className="h-4 w-4" />
-          </Link>
+          <>
+            {/* Export the current view (CSV + print/PDF) — only once data has loaded. */}
+            {a && <ExportControls buckets={a.buckets} period={a.period} />}
+            {/* Primary next-action for the page (BRAND: one decision, one primary action).
+                Links to the full review queue — it isn't period-filterable, so the label
+                doesn't promise a filter the queue can't honour. Classes mirror Button's
+                primary (Focus Indigo); a Link can't wrap <button> as valid HTML. */}
+            <Link
+              href="/review"
+              className="no-print inline-flex h-10 min-h-[44px] items-center justify-center gap-2 rounded-md bg-accent px-4 text-body-sm font-medium text-accent-fg transition-colors hover:bg-accent-hover sm:min-h-0"
+            >
+              Review flagged captures
+              <ArrowRight aria-hidden className="h-4 w-4" />
+            </Link>
+          </>
         }
       />
       <FilterBar

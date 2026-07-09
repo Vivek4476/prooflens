@@ -62,3 +62,25 @@
     animation: shimmer 1.4s infinite;
   }
 }
+
+/* Print / Save-as-PDF: strip the app chrome and interactive controls, keep the data.
+   (Best results in light mode; dark theme prints its dark surfaces.) */
+@media print {
+  aside,
+  header,
+  .no-print {
+    display: none !important;
+  }
+  main {
+    height: auto !important;
+    overflow: visible !important;
+  }
+  html,
+  body {
+    background: #fff !important;
+  }
+  .card {
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+}
