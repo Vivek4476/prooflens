@@ -26,7 +26,9 @@ function AnalyticsSkeleton() {
   return (
     <div className="space-y-8">
       <Skeleton className="h-24 w-full" />
-      <CardsSkeleton count={4} />
+      {/* grid matches KpiRow exactly (grid-cols-2 lg:grid-cols-4, no md: step) so the
+          loading state doesn't reflow once real data replaces the skeleton. */}
+      <CardsSkeleton count={4} className="grid-cols-2 gap-4 md:grid-cols-2 lg:grid-cols-4" />
       <div className="grid gap-6 lg:grid-cols-2">
         <Skeleton className="h-[340px] w-full" />
         <Skeleton className="h-[340px] w-full" />
