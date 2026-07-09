@@ -1,5 +1,5 @@
 import type { AnalyticsSummary } from "@/lib/api/types";
-import { relativeChangePct } from "./deltas";
+import { MIN_PREV_N, relativeChangePct } from "./deltas";
 import { formatCount } from "@/lib/format";
 
 export type InsightSeverity = "info" | "warn" | "high";
@@ -12,13 +12,19 @@ export interface Insight {
 
 const MAX_INSIGHTS = 5;
 
-/** Rule 1: suspect-rate delta >= 20% relative AND >= 10 absolute suspects in current period. */
+/**
+ * Rule 1: suspect-rate delta >= 20% relative AND >= 10 absolute suspects in current period.
+ * Same small-sample basis as the KPI cards: if `previous.total` is below MIN_PREV_N, the
+ * prior period can't be trusted as a comparison basis, so no relative-% claim is made
+ * (matches computeDelta's insufficientHistory guard — never contradicts the KPI cards).
+ */
 function suspectRateShift(a: AnalyticsSummary): Insight | null {
+  if (a.previous.total < MIN_PREV_N) return null;
   const cur = a.band_distribution.Suspect;
   const prev = a.previous.suspect;
   if (cur < 10) return null;
   const rel = relativeChangePct(cur, prev);
-  if (!Number.isFinite(rel) && rel !== Infinity) return null;
+  if (!Number.isFinite(rel)) return null;
   if (Math.abs(rel) < 20) return null;
   const rising = rel > 0;
   return {
@@ -60,12 +66,18 @@ function avgScoreShift(a: AnalyticsSummary): Insight | null {
   };
 }
 
-/** Rule 4: duplicates_caught relative delta >= 20% (needs previous.duplicates_caught —
- *  passed in explicitly since it isn't on `previous`). */
-function duplicatesShift(current: number, previous: number): Insight | null {
+/**
+ * Rule 4: duplicates_caught relative delta >= 20% (needs previous.duplicates_caught —
+ * passed in explicitly since it isn't on `previous`). `prevN` is the same
+ * `previous.total` basis the KPI cards use for their insufficient-history guard —
+ * duplicates_caught has no sample size of its own, so we borrow the period's overall
+ * prior-sample size to decide whether the prior period is trustworthy at all.
+ */
+function duplicatesShift(current: number, previous: number, prevN: number): Insight | null {
+  if (prevN < MIN_PREV_N) return null;
   if (current < 5 && previous < 5) return null; // both negligible, not worth a bullet
   const rel = relativeChangePct(current, previous);
-  if (!Number.isFinite(rel) && rel !== Infinity) return null;
+  if (!Number.isFinite(rel)) return null;
   if (Math.abs(rel) < 20) return null;
   const rising = rel > 0;
   return {
@@ -87,7 +99,7 @@ export function computeInsights(
     avgScoreShift(a),
     prevDuplicatesCaught == null
       ? null
-      : duplicatesShift(a.duplicates_caught, prevDuplicatesCaught),
+      : duplicatesShift(a.duplicates_caught, prevDuplicatesCaught, a.previous.total),
   ].filter((x): x is Insight => x !== null);
 
   // Stable order: high severity first, then warn, then info; cap at 5.
