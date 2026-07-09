@@ -138,11 +138,15 @@ On-page faceting is fenced (drill-out to /history instead), so the "facet" colum
 
 ## Independent review
 
-Two adversarial reviews (whole-branch code + live-page visual) were run mid-project. They confirmed
-the data layer holds up and caught real bugs the author had missed — the "Last 90 days" `Infinity%`
-honesty bug (fixed `504e58e`) and the reasons overflow / chart clipping (fixed `aa284d8`). The
-"Unmapped 50% hotspot" honesty issue was caught on the live By-Team panel and fixed (excluded from
-ranking, noted as coverage).
+Three adversarial reviews (two whole-branch code + one live-page visual) were run across the project.
+They confirmed the data layer holds up and caught real bugs the author had missed — the "Last 90 days"
+`Infinity%` honesty bug (fixed `504e58e`), the reasons overflow / chart clipping (fixed `aa284d8`),
+the "Unmapped 50% hotspot" (excluded from ranking, noted as coverage), and — in the final pre-PR
+review — a **Critical** URL-state clobber where the three `useUrlState` instances wiped each other's
+params (per-card override snapped the page back to defaults); fixed by merging patches onto the full
+querystring (`87a8ef6`, verified live). Two minors from that review were also fixed (favicon hex,
+median including 0-ms rows). *Demo note:* the seed uses stub (instant) scoring, so "median
+time-to-score" reads 0 ms in the demo — honest for stub data; a real deployment shows real times.
 
 ## Test + build state
 
