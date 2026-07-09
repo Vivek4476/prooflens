@@ -128,6 +128,17 @@ export interface AnalyticsSummary {
   previous_period: PeriodBounds; // NEW
   groups: AnalyticsGroup[]; // NEW — unused by Phase A UI, present for type completeness
   flag_precision?: FlagPrecision; // Gate 3 — optional so older API responses still type-check
+  system_health?: SystemHealth; // Pain 9 — optional for backward-compat
+}
+
+/**
+ * System-health signals (Pain 9), so a vision-backend outage can't masquerade as a fraud
+ * trend. scored_without_content_pct = fail-open degradation rate; median_processing_ms =
+ * time-to-score. Both null when the period has no results.
+ */
+export interface SystemHealth {
+  scored_without_content_pct: number | null;
+  median_processing_ms: number | null;
 }
 
 /**

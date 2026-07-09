@@ -19,6 +19,7 @@ import { TopFlagReasons } from "@/components/analytics/TopFlagReasons";
 import { ByTeamPanel } from "@/components/analytics/ByTeamPanel";
 import { ExportControls } from "@/components/analytics/ExportControls";
 import { ReviewQuality } from "@/components/analytics/ReviewQuality";
+import { SystemHealthLine } from "@/components/analytics/SystemHealthLine";
 import { useAnalytics } from "@/lib/api/hooks";
 import { useAnalyticsFilters } from "@/lib/analytics/useAnalyticsFilters";
 import type { AnalyticsParams } from "@/lib/api/types";
@@ -131,6 +132,8 @@ function AnalyticsPageInner() {
               prevDuplicatesCaught={prevDuplicatesCaught}
               prevDuplicatesUnavailable={prevDuplicatesUnavailable}
             />
+            {/* Two quiet system-health signals under the KPIs (Pain 9). */}
+            {a.system_health && <SystemHealthLine health={a.system_health} />}
             {/* Below xl the insights rail is a full-width block directly after the KPIs. */}
             <div className="xl:hidden">
               <InsightsRail analytics={a} prevDuplicatesCaught={prevDuplicatesCaught} dataUpdatedAt={dataUpdatedAt} />
