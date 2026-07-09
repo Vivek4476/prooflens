@@ -45,8 +45,11 @@ class Repo(Protocol):
         *,
         opportunity_id: str | None = None,
         rep_id: str | None = None,
+        source: str | None = None,
     ) -> str:
-        """Persist a result and return its id. job_id None => a direct /v1/score."""
+        """Persist a result and return its id. job_id None => a direct /v1/score.
+        source defaults from job_id ("webhook" if set else "direct") unless a
+        caller (e.g. the seed script) explicitly overrides it (e.g. "seed")."""
         ...
 
     def list_results(
@@ -156,6 +159,7 @@ class InMemoryRepo:
         *,
         opportunity_id: str | None = None,
         rep_id: str | None = None,
+        source: str | None = None,
     ) -> str:
         rid = str(next(self._ids))
         self.results.append(
@@ -170,7 +174,7 @@ class InMemoryRepo:
                 rubric_version=verdict.rubric_version,
                 checks=[c.to_dict() for c in verdict.checks],
                 processing_ms=processing_ms(verdict),
-                source="webhook" if job_id else "direct",
+                source=source or ("webhook" if job_id else "direct"),
                 opportunity_id=opportunity_id,
                 rep_id=normalize_id(rep_id),
             )

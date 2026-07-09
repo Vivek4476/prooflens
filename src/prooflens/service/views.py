@@ -41,7 +41,7 @@ class ResultView:
     rubric_version: str
     checks: list = field(default_factory=list)
     processing_ms: float = 0.0
-    source: str = "direct"   # "webhook" (came via LSQ) | "direct" (scored via /v1/score)
+    source: str = "direct"   # "webhook" (LSQ) | "direct" (/v1/score) | "seed" (demo data)
     opportunity_id: str | None = None
     rep_id: str | None = None
     review_status: str | None = None   # approve|reject|false_positive|escalate; None = pending

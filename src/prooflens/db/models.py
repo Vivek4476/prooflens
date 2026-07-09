@@ -141,6 +141,9 @@ class Result(Base):
     rubric_version: Mapped[str] = mapped_column(String(16))
     checks: Mapped[list] = mapped_column(JSONB, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Provenance: "direct" (/v1/score) | "webhook" (LSQ job) | "seed" (demo data).
+    # Stored (not derived) so the realistic-seed script can mark rows honestly.
+    source: Mapped[str] = mapped_column(String(16), default="direct")
 
     review_status: Mapped[str | None] = mapped_column(String(24), nullable=True)
     review_note: Mapped[str | None] = mapped_column(String(500), nullable=True)

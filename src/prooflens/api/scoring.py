@@ -131,6 +131,8 @@ def _score_direct(data: bytes, tenant: str, backend: str | None, repo: Repo) -> 
 
     # Keeper verdict — remember the hash now, then persist.
     _remember_hash(ctx, verdict)
+    # source defaults from job_id ("direct" since job_id is None here); no
+    # override needed — only the seed script passes source explicitly.
     result_id = repo.record_result(tenant_view.id, None, verdict)
 
     payload = verdict.to_dict()

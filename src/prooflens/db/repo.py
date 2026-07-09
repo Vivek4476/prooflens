@@ -88,6 +88,7 @@ class PostgresRepo:
         *,
         opportunity_id: str | None = None,
         rep_id: str | None = None,
+        source: str | None = None,
     ) -> str:
         from ..service.ids import normalize_id
 
@@ -102,6 +103,7 @@ class PostgresRepo:
             reason_code=verdict.reason_code,
             rubric_version=verdict.rubric_version,
             checks=[c.to_dict() for c in verdict.checks],
+            source=source or ("webhook" if job_id else "direct"),
         )
         self._session.add(row)
         self._session.flush()
@@ -259,7 +261,10 @@ class PostgresRepo:
             processing_ms=round(
                 sum(float(c.get("latency_ms") or 0.0) for c in (r.checks or [])), 1
             ),
-            source="webhook" if r.job_id else "direct",
+            # Prefer the stored column (set by the migration backfill / this
+            # repo going forward); fall back to the job_id derivation only for
+            # legacy rows the backfill somehow missed.
+            source=r.source if r.source else ("webhook" if r.job_id else "direct"),
             opportunity_id=opportunity_id,
             rep_id=rep_id,
             review_status=r.review_status,
