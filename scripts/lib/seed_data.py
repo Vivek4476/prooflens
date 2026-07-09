@@ -27,6 +27,48 @@ from prooflens.service.ids import normalize_id
 from prooflens.vision.rubric import RUBRIC_VERSION
 
 # ---------------------------------------------------------------------------
+# Review decisions — realistic outcomes for flagged (Doubtful/Suspect) results
+# ---------------------------------------------------------------------------
+
+# Fraction of flagged items that get reviewed at all (rest stay pending/None).
+_REVIEWED_FRACTION = 0.60
+
+# Among REVIEWED flagged items, the outcome mix. Weighted so a working
+# detector's flags are mostly correct ("reject" confirms the flag) with a
+# minority overturned ("approve"/"false_positive") and a few escalated —
+# this lands flag_precision (confirmed / (confirmed+overturned)) around
+# 78-85%, per the brief. "escalate" and pending are excluded from precision
+# entirely (see api/analytics.py::flag_precision), so they don't move it.
+_REVIEW_OUTCOME_WEIGHTS: tuple[tuple[str, float], ...] = (
+    ("reject", 0.80),
+    ("approve", 0.10),
+    ("false_positive", 0.06),
+    ("escalate", 0.04),
+)
+
+
+def sample_review_decision(verdict: Verdict, rng: Random) -> str | None:
+    """Draw a review outcome for a single flagged (Doubtful/Suspect) verdict:
+    one of "reject"/"approve"/"false_positive"/"escalate", or None (still
+    pending). Pure and deterministic given `rng` — no module-level randomness.
+
+    Clear verdicts are NEVER reviewed in the realistic demo dataset (moderators
+    don't spend time re-checking images the system already cleared), so this
+    always returns None for BAND_CLEAR."""
+    if verdict.band == BAND_CLEAR:
+        return None
+    if rng.random() >= _REVIEWED_FRACTION:
+        return None
+    total = sum(w for _, w in _REVIEW_OUTCOME_WEIGHTS)
+    pick = rng.uniform(0.0, total)
+    running = 0.0
+    for outcome, w in _REVIEW_OUTCOME_WEIGHTS:
+        running += w
+        if pick <= running:
+            return outcome
+    return _REVIEW_OUTCOME_WEIGHTS[-1][0]  # pragma: no cover - float rounding fallback
+
+# ---------------------------------------------------------------------------
 # Agent pool
 # ---------------------------------------------------------------------------
 
@@ -242,6 +284,7 @@ __all__ = [
     "generate_agent_pool",
     "generate_seed_plan",
     "is_weekend",
+    "sample_review_decision",
     "sample_timestamp",
     "sample_verdict",
 ]

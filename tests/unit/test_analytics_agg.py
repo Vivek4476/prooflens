@@ -3,11 +3,11 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime
 
-from prooflens.api.analytics import aggregate_range, build_buckets
+from prooflens.api.analytics import aggregate_range, build_buckets, flag_precision
 from prooflens.service.views import ResultView
 
 
-def _r(day: date, band="Clear", score=90.0, reason=None, rep_id=None):
+def _r(day: date, band="Clear", score=90.0, reason=None, rep_id=None, review_status=None):
     # reason_code defaults to band.lower() ("clear"/"doubtful"/"suspect") when
     # not given explicitly, so items built with only (day, band, score) get a
     # reason_code consistent with their band.
@@ -15,7 +15,7 @@ def _r(day: date, band="Clear", score=90.0, reason=None, rep_id=None):
     return ResultView(
         id="x", created_at=datetime(day.year, day.month, day.day, 12, tzinfo=UTC).isoformat(),
         tenant_id="t1", band=band, score=score, reason="r", reason_code=reason_code,
-        rubric_version="v3", rep_id=rep_id,
+        rubric_version="v3", rep_id=rep_id, review_status=review_status,
     )
 
 
@@ -148,3 +148,95 @@ def test_weekly_bucket_end_clamped_to_range_end_when_not_multiple_of_7():
         b[1]["end"] == "2026-06-10"
     ), f"Week 2 end should be clamped to 2026-06-10, got {b[1]['end']}"
     assert b[1]["total"] == 1 and b[1]["suspect"] == 1
+
+
+# ---------------------------------------------------------------------------
+# flag_precision
+# ---------------------------------------------------------------------------
+
+
+def test_flag_precision_worked_example_from_spec():
+    day = date(2026, 6, 1)
+    items = [
+        _r(day, "Suspect", 10, review_status="reject"),
+        _r(day, "Suspect", 10, review_status="reject"),
+        _r(day, "Doubtful", 50, review_status="reject"),
+        _r(day, "Suspect", 10, review_status="approve"),
+        _r(day, "Doubtful", 50, review_status="false_positive"),
+    ]
+    out = flag_precision(items)
+    assert out == {
+        "reviewed": 5, "confirmed": 3, "overturned": 2, "precision_pct": 60.0,
+    }
+
+
+def test_flag_precision_excludes_escalate_and_pending():
+    day = date(2026, 6, 1)
+    items = [
+        _r(day, "Suspect", 10, review_status="reject"),
+        _r(day, "Suspect", 10, review_status="escalate"),
+        _r(day, "Doubtful", 50, review_status=None),
+    ]
+    out = flag_precision(items)
+    assert out == {
+        "reviewed": 1, "confirmed": 1, "overturned": 0, "precision_pct": 100.0,
+    }
+
+
+def test_flag_precision_excludes_clear_even_if_reviewed():
+    day = date(2026, 6, 1)
+    items = [
+        _r(day, "Clear", 90, review_status="reject"),
+        _r(day, "Clear", 90, review_status="approve"),
+        _r(day, "Suspect", 10, review_status="reject"),
+    ]
+    out = flag_precision(items)
+    assert out == {
+        "reviewed": 1, "confirmed": 1, "overturned": 0, "precision_pct": 100.0,
+    }
+
+
+def test_flag_precision_reviewed_zero_gives_null_precision():
+    day = date(2026, 6, 1)
+    items = [
+        _r(day, "Suspect", 10, review_status=None),
+        _r(day, "Doubtful", 50, review_status="escalate"),
+        _r(day, "Clear", 90, review_status="reject"),
+    ]
+    out = flag_precision(items)
+    assert out == {
+        "reviewed": 0, "confirmed": 0, "overturned": 0, "precision_pct": None,
+    }
+
+
+def test_flag_precision_overturned_counts_both_approve_and_false_positive():
+    day = date(2026, 6, 1)
+    items = [
+        _r(day, "Suspect", 10, review_status="approve"),
+        _r(day, "Suspect", 10, review_status="false_positive"),
+    ]
+    out = flag_precision(items)
+    assert out == {
+        "reviewed": 2, "confirmed": 0, "overturned": 2, "precision_pct": 0.0,
+    }
+
+
+def test_flag_precision_empty_items():
+    out = flag_precision([])
+    assert out == {
+        "reviewed": 0, "confirmed": 0, "overturned": 0, "precision_pct": None,
+    }
+
+
+def test_aggregate_range_includes_flag_precision_block():
+    start, end = _dt(date(2026, 6, 8)), _dt(date(2026, 6, 15))
+    items = [
+        _r(date(2026, 6, 10), "Suspect", 10, review_status="reject"),
+        _r(date(2026, 6, 11), "Suspect", 10, review_status="approve"),
+        _r(date(2026, 6, 12), "Clear", 90, review_status="reject"),
+    ]
+    out = aggregate_range(items, [], [], start=start, end=end, bucket="daily",
+                          group_by="none", today=date(2026, 6, 20))
+    assert out["flag_precision"] == {
+        "reviewed": 2, "confirmed": 1, "overturned": 1, "precision_pct": 50.0,
+    }

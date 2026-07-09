@@ -116,6 +116,36 @@ def build_buckets(
     return out
 
 
+# review_status values that count as a completed decision on a flagged result.
+# "escalate" and pending (None) are deliberately excluded from `reviewed`.
+_CONFIRMED_STATUSES = {"reject"}
+_OVERTURNED_STATUSES = {"approve", "false_positive"}
+
+
+def flag_precision(items: list[ResultView]) -> dict:
+    """Flag-precision KPI over `items`: a "flag" is any non-"Clear" band
+    (Doubtful or Suspect) — reuses the same band check `_tally` uses. Among
+    flagged results, only "reject"/"approve"/"false_positive" reviews count
+    toward `reviewed`; "escalate" and pending (None) are excluded entirely."""
+    confirmed = 0
+    overturned = 0
+    for r in items:
+        if r.band == "Clear":
+            continue
+        if r.review_status in _CONFIRMED_STATUSES:
+            confirmed += 1
+        elif r.review_status in _OVERTURNED_STATUSES:
+            overturned += 1
+    reviewed = confirmed + overturned
+    precision_pct = round(confirmed / reviewed * 100, 1) if reviewed > 0 else None
+    return {
+        "reviewed": reviewed,
+        "confirmed": confirmed,
+        "overturned": overturned,
+        "precision_pct": precision_pct,
+    }
+
+
 def _node_label(rows: list[dict], r: ResultView, field: str) -> str:
     node = resolve_node(rows, r.rep_id, _scored_date(r))
     if node is None:
@@ -181,4 +211,5 @@ def aggregate_range(
         },
         "groups": groups,
         "reason_counts": reason_counts,
+        "flag_precision": flag_precision(items),
     }

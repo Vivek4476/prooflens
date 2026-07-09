@@ -79,6 +79,15 @@ response keeps every existing key and adds:
 - `groups[]` — when `group_by != none`, one per node (incl. `"Unmapped"`): `{node, total, clear, doubtful, suspect, suspect_rate, avg_score, share}`.
 - `top_reasons[]` entries now also carry `short_label`.
 - The legacy per-day `series[]` is unchanged.
+- `flag_precision` — `{reviewed, confirmed, overturned, precision_pct}` over the
+  period's results. A "flag" is any result whose band is NOT `"Clear"`
+  (Doubtful or Suspect). Among flagged results, only reviews with
+  `review_status` in `{"reject", "approve", "false_positive"}` count:
+  `confirmed` = count of `"reject"` (the flag was correct), `overturned` =
+  count of `"approve"`/`"false_positive"` (the flag was wrong), `reviewed` =
+  `confirmed + overturned`. `"escalate"` and pending (unreviewed) flags are
+  excluded entirely — they don't count toward `reviewed`. `precision_pct` =
+  `round(confirmed / reviewed * 100, 1)`, or `null` when `reviewed == 0`.
 
 **`GET /v1/results`** — now also accepts `reason` (exact `reason_code`),
 `rep_id` (normalized exact), and `from`/`to` (date range). Existing filters

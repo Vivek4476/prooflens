@@ -290,4 +290,5 @@ def analytics_summary(
         "period": agg["period"],
         "previous_period": agg["previous_period"],
         "groups": agg["groups"],
+        "flag_precision": agg["flag_precision"],
     }

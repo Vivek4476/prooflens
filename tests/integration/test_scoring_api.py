@@ -279,6 +279,21 @@ def test_analytics_additive_keys_present(client):
         assert k in body
     assert body["groups"] == []                       # group_by defaults to none
     assert "short_label" in body["top_reasons"][0]
+    assert set(body["flag_precision"]) == {
+        "reviewed", "confirmed", "overturned", "precision_pct",
+    }
+
+
+def test_analytics_flag_precision_reflects_reviewed_flags(client, repo):
+    _backdate(repo, "A1", "Suspect", 10, "recycled", 2)
+    _backdate(repo, "A2", "Suspect", 10, "recycled", 2)
+    flagged = [r for r in repo.results if r.band == "Suspect"]
+    flagged[0].review_status = "reject"       # confirmed
+    flagged[1].review_status = "approve"      # overturned
+    body = client.get("/v1/analytics/summary").json()
+    assert body["flag_precision"] == {
+        "reviewed": 2, "confirmed": 1, "overturned": 1, "precision_pct": 50.0,
+    }
 
 
 def test_analytics_from_to_aliases(client):

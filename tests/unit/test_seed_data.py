@@ -14,6 +14,7 @@ from scripts.lib.seed_data import (
     generate_agent_pool,
     generate_seed_plan,
     is_weekend,
+    sample_review_decision,
     sample_timestamp,
     sample_verdict,
 )
@@ -261,3 +262,71 @@ def test_generate_seed_plan_rejects_empty_agent_pool():
 def test_generate_seed_plan_rejects_nonpositive_days():
     with pytest.raises(ValueError):
         generate_seed_plan(0, (30, 90), ["A1"], Random(1))
+
+
+# ---------------------------------------------------------------------------
+# sample_review_decision — realistic review outcomes for flagged results
+# ---------------------------------------------------------------------------
+
+
+def _verdict(band: str) -> Verdict:
+    reason_code = Reason.CLEAR if band == BAND_CLEAR else Reason.RECYCLED
+    return Verdict(
+        score=10.0, band=band, reason=REASON_TEXT[reason_code],
+        reason_code=reason_code.value, checks=[], rubric_version=RUBRIC_VERSION,
+    )
+
+
+def test_sample_review_decision_is_deterministic_for_same_seed():
+    v = _verdict(BAND_SUSPECT)
+    d1 = sample_review_decision(v, Random(42))
+    d2 = sample_review_decision(v, Random(42))
+    assert d1 == d2
+
+
+def test_sample_review_decision_clear_band_never_reviewed():
+    rng = Random(11)
+    v = _verdict(BAND_CLEAR)
+    for _ in range(2000):
+        assert sample_review_decision(v, rng) is None
+
+
+def test_sample_review_decision_returns_only_valid_outcomes():
+    rng = Random(5)
+    valid = {"reject", "approve", "false_positive", "escalate", None}
+    for band in (BAND_SUSPECT, BAND_DOUBTFUL):
+        v = _verdict(band)
+        for _ in range(2000):
+            assert sample_review_decision(v, rng) in valid
+
+
+def test_sample_review_decision_distribution_realistic():
+    rng = Random(2026)
+    n = 20_000
+    outcomes = [sample_review_decision(_verdict(BAND_SUSPECT), rng) for _ in range(n)]
+    reviewed = [o for o in outcomes if o is not None]
+    reviewed_frac = len(reviewed) / n
+    # ~60% of flagged items get reviewed.
+    assert 0.45 <= reviewed_frac <= 0.75, reviewed_frac
+
+    reject_frac = reviewed.count("reject") / len(reviewed)
+    approve_frac = reviewed.count("approve") / len(reviewed)
+    fp_frac = reviewed.count("false_positive") / len(reviewed)
+    escalate_frac = reviewed.count("escalate") / len(reviewed)
+
+    # Mostly "reject" (flag was right) so precision lands ~78-85%.
+    assert 0.70 <= reject_frac <= 0.92, reject_frac
+    assert escalate_frac < 0.15, escalate_frac
+    assert (approve_frac + fp_frac) > 0.0
+    assert abs(reject_frac + approve_frac + fp_frac + escalate_frac - 1.0) < 1e-9
+
+
+def test_sample_review_decision_precision_lands_in_target_band():
+    rng = Random(777)
+    n = 20_000
+    outcomes = [sample_review_decision(_verdict(BAND_DOUBTFUL), rng) for _ in range(n)]
+    confirmed = sum(1 for o in outcomes if o == "reject")
+    overturned = sum(1 for o in outcomes if o in ("approve", "false_positive"))
+    reviewed = confirmed + overturned
+    precision_pct = 100.0 * confirmed / reviewed
+    assert 78.0 <= precision_pct <= 85.0, precision_pct

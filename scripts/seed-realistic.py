@@ -45,7 +45,12 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO_ROOT))
 sys.path.insert(0, str(_REPO_ROOT / "src"))  # belt-and-suspenders vs. an editable install
 
-from scripts.lib.seed_data import SeedRecord, generate_agent_pool, generate_seed_plan  # noqa: E402
+from scripts.lib.seed_data import (  # noqa: E402
+    SeedRecord,
+    generate_agent_pool,
+    generate_seed_plan,
+    sample_review_decision,
+)
 
 if TYPE_CHECKING:
     from prooflens.service.repo import Repo
@@ -54,6 +59,8 @@ DEFAULT_TENANT_SLUG = "dev"  # matches scripts/seed_dev_tenant.py's DEV_SLUG
 DEFAULT_HIERARCHY_CSV = Path(__file__).resolve().parent / "sample-hierarchy.csv"
 RECORDS_PER_DAY_RANGE = (30, 90)
 COMMIT_BATCH_SIZE = 500
+REVIEWER = "Demo Operator"  # matches api/scoring.py's placeholder reviewer identity
+REVIEW_NOTE = "seed: simulated review decision"
 
 
 def _brand_error(message: str) -> None:
@@ -145,6 +152,12 @@ def _seed(args: argparse.Namespace, plan: list[SeedRecord]) -> None:
     from prooflens.db.models import Result
     from prooflens.db.repo import PostgresRepo
 
+    # Separate RNG stream from plan generation (which already consumed
+    # args.seed via _generate_plan) so review-decision sampling doesn't
+    # perturb the verdict/timestamp plan if this function's call order ever
+    # changes. Still fully deterministic for a given --seed.
+    review_rng = Random(args.seed + 1) if args.seed is not None else Random()
+
     session = session_scope()
     try:
         repo: Repo = PostgresRepo(session)
@@ -193,6 +206,15 @@ def _seed(args: argparse.Namespace, plan: list[SeedRecord]) -> None:
             session.query(Result).filter(
                 Result.id == uuid.UUID(result_id),
             ).update({Result.created_at: record.created_at}, synchronize_session=False)
+
+            # Flagged (Doubtful/Suspect) results get a realistic review
+            # outcome so flag_precision isn't empty on the demo; Clear results
+            # are never reviewed (sample_review_decision returns None for
+            # them). Reuses the same repo.record_review the /review endpoint
+            # calls — no new column, no new endpoint.
+            decision = sample_review_decision(record.verdict, review_rng)
+            if decision is not None:
+                repo.record_review(result_id, decision, REVIEW_NOTE, REVIEWER)
 
             if i % COMMIT_BATCH_SIZE == 0:
                 repo.commit()
