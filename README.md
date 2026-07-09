@@ -122,6 +122,11 @@ docker compose -f deploy/docker-compose.yml up --build
 # Populate the demo with REAL verdicts (pushes sample images through /v1/score):
 python scripts/generate_demo_images.py
 cd frontend && npm install && npm run seed:demo
+
+# Populate Analytics/History/By-Team with several thousand realistic historical
+# results + a sample org hierarchy (distinct from the demo images above — see
+# "Realistic historical data" below):
+python scripts/seed-realistic.py --days 75
 ```
 
 The default is `VISION_BACKEND=groq` with a `GROQ_API_KEY` in `.env` (required for
@@ -132,6 +137,28 @@ also has a per-request **Demo model / Live AI** switch.
 
 The frontend is a separate Next.js app in `frontend/` (see
 `frontend/BACKEND_REQUIREMENTS.md` for the exact API contract it consumes).
+
+### Realistic historical data
+
+`scripts/seed-realistic.py` and `scripts/generate_demo_images.py`/`seed:demo` solve
+different problems. `generate_demo_images.py` pushes a handful of real images through
+the live vision model, for demoing the Analyze page with genuine scoring. `seed-realistic.py`
+instead writes several thousand historical results (plus a 266-agent sample hierarchy)
+directly to the database, spanning a configurable window ending today, so Analytics,
+History, and By-Team views have credible data immediately. It never calls the vision
+backend and needs no `GROQ_API_KEY`.
+
+```bash
+export DATABASE_URL=postgresql+psycopg://prooflens:prooflens@localhost:5432/prooflens
+python scripts/seed-realistic.py --days 75
+```
+
+Requires the `dev` tenant to exist first (`python scripts/seed_dev_tenant.py`). Run
+`python scripts/seed-realistic.py --dry-run --days 75` to preview the planned record
+count and band/reason distribution without touching the database at all. This script
+is **not idempotent** — re-running it adds more rows. Use `--wipe-existing-seed` to
+delete only the previously seeded rows (`source='seed'`) before seeding again; it never
+touches `direct` or `webhook` rows.
 
 ### API only
 
@@ -156,6 +183,7 @@ pip install -e ".[service]"
 export DATABASE_URL=postgresql+psycopg://prooflens:prooflens@localhost:5432/prooflens
 alembic upgrade head                       # build the schema
 python scripts/seed_dev_tenant.py          # seed one dev tenant
+python scripts/seed-realistic.py --days 75 # optional: realistic historical data
 uvicorn prooflens.api.app:app --port 8000  # api  (separate shell:)
 python -m prooflens.worker                 # worker
 ```
