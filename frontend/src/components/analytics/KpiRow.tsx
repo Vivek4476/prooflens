@@ -15,9 +15,11 @@ import type { AnalyticsSummary } from "@/lib/api/types";
 export function KpiRow({
   analytics,
   prevDuplicatesCaught,
+  prevDuplicatesUnavailable = false,
 }: {
   analytics: AnalyticsSummary;
   prevDuplicatesCaught: number | null;
+  prevDuplicatesUnavailable?: boolean;
 }) {
   const a = analytics;
   const totalDelta = computeDelta(a.total, a.previous.total, a.previous.total, {
@@ -65,7 +67,13 @@ export function KpiRow({
       <MetricCard
         label="Duplicates caught"
         value={formatCount(a.duplicates_caught)}
-        sub={dupDelta ? deltaSub(dupDelta) : "Loading previous period…"}
+        sub={
+          dupDelta
+            ? deltaSub(dupDelta)
+            : prevDuplicatesUnavailable
+              ? "Comparison unavailable"
+              : "Loading previous period…"
+        }
         subTone={dupDelta ? dupDelta.sentiment : "neutral"}
       />
     </div>

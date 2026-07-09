@@ -57,8 +57,10 @@ function AnalyticsPageInner() {
     };
   }, [prevPeriodFrom, prevPeriodTo]);
   const hasPrevWindow = Boolean(a);
-  const { data: prevA } = useAnalytics(prevParams, Boolean(prevPeriodFrom && prevPeriodTo));
+  const prevEnabled = Boolean(prevPeriodFrom && prevPeriodTo);
+  const { data: prevA, isError: prevIsError } = useAnalytics(prevParams, prevEnabled);
   const prevDuplicatesCaught = hasPrevWindow ? (prevA?.duplicates_caught ?? null) : null;
+  const prevDuplicatesUnavailable = prevEnabled && prevIsError;
 
   return (
     <div className="space-y-8">
@@ -94,7 +96,11 @@ function AnalyticsPageInner() {
       ) : (
         <div className={cn("space-y-8 transition-opacity", isPlaceholderData && "opacity-60")}>
           <InsightsPanel analytics={a} prevDuplicatesCaught={prevDuplicatesCaught} />
-          <KpiRow analytics={a} prevDuplicatesCaught={prevDuplicatesCaught} />
+          <KpiRow
+            analytics={a}
+            prevDuplicatesCaught={prevDuplicatesCaught}
+            prevDuplicatesUnavailable={prevDuplicatesUnavailable}
+          />
           <div className="grid gap-6 lg:grid-cols-2">
             <CaptureRiskTrend buckets={a.buckets} previous={a.previous} />
             <BandMixChart buckets={a.buckets} />

@@ -62,7 +62,7 @@ export function CaptureRiskTrend({
                 value: "Previous avg",
                 position: "insideBottomLeft",
                 dy: 10,
-                fontSize: 11,
+                fontSize: 12,
                 fill: "var(--text-muted)",
               }}
             />
