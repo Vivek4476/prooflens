@@ -45,6 +45,10 @@ export const api = {
     offset?: number;
     band?: string;
     review?: string;
+    reason?: string;
+    rep_id?: string;
+    from?: string;
+    to?: string;
   }): Promise<ResultsPage> {
     const { data } = await http.get("/v1/results", { params });
     return data;

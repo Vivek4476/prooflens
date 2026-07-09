@@ -29,12 +29,15 @@ const DIMENSIONS: { value: GroupBy; label: string }[] = [
 ];
 
 /**
- * Row click is a future drill-down into filtered history (e.g. `/history?branch=…`), but
- * no such URL-param contract exists on `/history` yet — deferred no-op, same as
- * TopFlagReasons, rather than inventing a route the history page doesn't honor.
+ * Row click would ideally drill down into filtered history (e.g. `/history?branch=…`),
+ * but /v1/results has no team/branch/node filter — only band, reason, rep_id, from, to
+ * (see api/scoring.py's list_results). Unlike TopFlagReasons and the suspect-rate/
+ * dominant-reason/duplicates insights (which now navigate to /history?band=…&reason=…,
+ * filters the backend genuinely honours), a team drill-down here would build a URL
+ * /history can't apply — deferred no-op until /v1/results grows a node filter.
  */
 function onRowSelect(_node: string) {
-  // Intentionally deferred — no /history?node= contract exists yet.
+  // Intentionally deferred — /v1/results has no node/branch filter to honour yet.
 }
 
 export function ByTeamPanel({ startDate, endDate }: { startDate?: string; endDate?: string }) {

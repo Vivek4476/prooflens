@@ -141,7 +141,7 @@ function AnalyticsPageInner() {
               <BandMixChart buckets={a.buckets} />
             </div>
             <div className="grid gap-6 lg:grid-cols-2">
-              <TopFlagReasons topReasons={a.top_reasons} />
+              <TopFlagReasons topReasons={a.top_reasons} from={a.period.from} to={a.period.to} />
               <ByTeamPanel startDate={a.period.from} endDate={a.period.to} />
             </div>
           </div>

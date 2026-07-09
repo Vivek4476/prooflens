@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { Card, CardHeader } from "@/components/ui/Card";
 import type { AnalyticsSummary } from "@/lib/api/types";
 import { computeInsights, NO_SHIFTS_FALLBACK, type InsightSeverity } from "@/lib/analytics/insights";
@@ -55,7 +57,13 @@ export function InsightsRail({
             {insights.map((i) => (
               <li key={i.id} className="flex items-start gap-2.5 text-body-sm text-text">
                 <span className={cn("mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full", DOT[i.severity])} aria-hidden />
-                <span>{i.text}</span>
+                {i.href ? (
+                  <Link href={i.href} className="underline decoration-dotted underline-offset-2 hover:text-accent hover:decoration-solid">
+                    {i.text}
+                  </Link>
+                ) : (
+                  <span>{i.text}</span>
+                )}
               </li>
             ))}
           </ul>

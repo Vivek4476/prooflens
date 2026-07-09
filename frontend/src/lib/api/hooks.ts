@@ -36,6 +36,10 @@ export function useResults(params?: {
   offset?: number;
   band?: string;
   review?: string;
+  reason?: string;
+  rep_id?: string;
+  from?: string;
+  to?: string;
 }) {
   return useQuery({
     queryKey: ["results", params],

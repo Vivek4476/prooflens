@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { ChartCard } from "@/components/ui/ChartCard";
@@ -17,18 +18,28 @@ import { formatCount, formatPct } from "@/lib/format";
  *  row count exceeds the card — it never spills out of the box. */
 const CARD_HEIGHT = 280;
 
-/**
- * Row click is a future drill-down into filtered history (e.g. `/history?reason=blur`),
- * but no such URL-param contract exists on `/history` yet (confirmed: it only supports a
- * free-text `q` search client-side). Rather than invent a route the backend/history page
- * doesn't honor, this is a deferred no-op — swap in real navigation once the contract
- * exists (see Task 6's carried-forward note on the same gap for InsightsPanel).
- */
-function onRowSelect(_reasonCode: string) {
-  // Intentionally deferred — no /history?reason= contract exists yet.
+/** Builds the /history drill-down target for a reason row — reason + the same
+ *  period the analytics page is currently showing, both filters /v1/results honours. */
+function historyHref(reasonCode: string, from?: string, to?: string): string {
+  const qs = new URLSearchParams();
+  qs.set("reason", reasonCode);
+  if (from) qs.set("from", from);
+  if (to) qs.set("to", to);
+  return `/history?${qs.toString()}`;
 }
 
-export function TopFlagReasons({ topReasons }: { topReasons: TopReason[] }) {
+export function TopFlagReasons({
+  topReasons,
+  from,
+  to,
+}: {
+  topReasons: TopReason[];
+  /** Current analytics period bounds (a.period.from/to) — threaded into the row's
+   *  /history drill-down link so it filters the same window being viewed. */
+  from?: string;
+  to?: string;
+}) {
+  const router = useRouter();
   const [limit, setLimit] = useState<TopReasonsLimit>(5);
   const rows = rankTopReasons(topReasons, limit);
   const hasMoreThanDefault = rankTopReasons(topReasons, "all").length > 5;
@@ -75,7 +86,7 @@ export function TopFlagReasons({ topReasons }: { topReasons: TopReason[] }) {
               <button
                 type="button"
                 title={r.reason}
-                onClick={() => onRowSelect(r.reason_code)}
+                onClick={() => router.push(historyHref(r.reason_code, from, to))}
                 className="group relative flex w-full items-center gap-3 overflow-hidden rounded-md px-2.5 py-2 text-left transition-colors hover:bg-surface-2"
               >
                 {/* Magnitude bar — width relative to the top reason. Soft accent wash (the

@@ -8,9 +8,24 @@ export interface Insight {
   id: string;
   text: string; // full sentence, ready to render — plain language, no jargon
   severity: InsightSeverity;
+  // Optional drill-down target — only set when the filter it names is one /v1/results
+  // actually honours (band/reason/from/to). Omitted entirely when no honest target
+  // exists (e.g. avg-score-shift has no corresponding /v1/results filter).
+  href?: string;
 }
 
 const MAX_INSIGHTS = 5;
+
+/** Builds a /history querystring from the filters that are actually honoured by
+ *  /v1/results — band, reason, from, to. Drops undefined pieces. */
+function historyHref(filters: { band?: string; reason?: string }, period: { from: string; to: string }): string {
+  const qs = new URLSearchParams();
+  if (filters.band) qs.set("band", filters.band);
+  if (filters.reason) qs.set("reason", filters.reason);
+  qs.set("from", period.from);
+  qs.set("to", period.to);
+  return `/history?${qs.toString()}`;
+}
 
 /**
  * Rule 1: suspect-rate delta >= 20% relative AND >= 10 absolute suspects in current period.
@@ -33,6 +48,7 @@ function suspectRateShift(a: AnalyticsSummary): Insight | null {
     text: rising
       ? `Suspect volume rose ${Math.round(rel)}% vs the previous period (${formatCount(cur)} vs ${formatCount(prev)}).`
       : `Suspect volume fell ${Math.round(Math.abs(rel))}% vs the previous period (${formatCount(cur)} vs ${formatCount(prev)}).`,
+    href: historyHref({ band: "Suspect" }, a.period),
   };
 }
 
@@ -48,6 +64,7 @@ function dominantReason(a: AnalyticsSummary): Insight | null {
     id: "dominant-reason",
     severity: "warn",
     text: `"${top.short_label}" accounts for ${Math.round(share)}% of flagged verdicts (${formatCount(top.count)} of ${formatCount(totalFlagged)}).`,
+    href: historyHref({ reason: top.reason_code }, a.period),
   };
 }
 
@@ -73,7 +90,12 @@ function avgScoreShift(a: AnalyticsSummary): Insight | null {
  * duplicates_caught has no sample size of its own, so we borrow the period's overall
  * prior-sample size to decide whether the prior period is trustworthy at all.
  */
-function duplicatesShift(current: number, previous: number, prevN: number): Insight | null {
+function duplicatesShift(
+  current: number,
+  previous: number,
+  prevN: number,
+  period: { from: string; to: string },
+): Insight | null {
   if (prevN < MIN_PREV_N) return null;
   if (current < 5 && previous < 5) return null; // both negligible, not worth a bullet
   const rel = relativeChangePct(current, previous);
@@ -83,6 +105,7 @@ function duplicatesShift(current: number, previous: number, prevN: number): Insi
   return {
     id: "duplicates-shift",
     severity: rising ? "warn" : "info",
+    href: historyHref({ reason: "recycled" }, period),
     text: rising
       ? `Duplicate captures rose ${Math.round(rel)}% vs the previous period (${formatCount(current)} vs ${formatCount(previous)}).`
       : `Duplicate captures fell ${Math.round(Math.abs(rel))}% vs the previous period (${formatCount(current)} vs ${formatCount(previous)}).`,
@@ -99,7 +122,7 @@ export function computeInsights(
     avgScoreShift(a),
     prevDuplicatesCaught == null
       ? null
-      : duplicatesShift(a.duplicates_caught, prevDuplicatesCaught, a.previous.total),
+      : duplicatesShift(a.duplicates_caught, prevDuplicatesCaught, a.previous.total, a.period),
   ].filter((x): x is Insight => x !== null);
 
   // Stable order: high severity first, then warn, then info; cap at 5.

@@ -332,6 +332,49 @@ describe("computeInsights — fallback, ordering, and cap", () => {
   });
 });
 
+describe("computeInsights — drill-down href", () => {
+  it("suspect-rate-shift links to /history?band=Suspect with the current period", () => {
+    const a = makeSummary({
+      band_distribution: { Clear: 80, Doubtful: 10, Suspect: 10 },
+      previous: { clear: 80, doubtful: 12, suspect: 8, total: 100, avg_score: 75 },
+      period: { from: "2026-06-09", to: "2026-07-08" },
+    });
+    const hit = computeInsights(a, null).find((i) => i.id === "suspect-rate-shift");
+    expect(hit?.href).toBe("/history?band=Suspect&from=2026-06-09&to=2026-07-08");
+  });
+
+  it("dominant-reason links to /history?reason=<code> with the current period", () => {
+    const a = makeSummary({
+      top_reasons: [
+        reason({ reason_code: "screen_recapture", short_label: "Photo of a screen", count: 30 }),
+        reason({ reason_code: "blur", short_label: "Blurry", count: 70 }),
+      ],
+      period: { from: "2026-06-09", to: "2026-07-08" },
+    });
+    const hit = computeInsights(a, null).find((i) => i.id === "dominant-reason");
+    expect(hit?.href).toBe("/history?reason=screen_recapture&from=2026-06-09&to=2026-07-08");
+  });
+
+  it("duplicates-shift links to /history?reason=recycled (the real reason_code) with the current period", () => {
+    const a = makeSummary({
+      duplicates_caught: 5,
+      period: { from: "2026-06-09", to: "2026-07-08" },
+    });
+    const hit = computeInsights(a, 4).find((i) => i.id === "duplicates-shift");
+    expect(hit?.href).toBe("/history?reason=recycled&from=2026-06-09&to=2026-07-08");
+  });
+
+  it("avg-score-shift has no href — /v1/results has no avg-score filter to honour", () => {
+    const a = makeSummary({
+      avg_score: 65,
+      previous: { clear: 20, doubtful: 5, suspect: 5, total: 30, avg_score: 75 },
+    });
+    const hit = computeInsights(a, null).find((i) => i.id === "avg-score-shift");
+    expect(hit).toBeDefined();
+    expect(hit?.href).toBeUndefined();
+  });
+});
+
 describe("NO_SHIFTS_FALLBACK", () => {
   it("is a non-empty fallback string for when computeInsights returns []", () => {
     expect(typeof NO_SHIFTS_FALLBACK).toBe("string");
