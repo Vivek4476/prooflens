@@ -16,6 +16,11 @@
   /* Accent — Focus Indigo (interaction: buttons, links, focus rings, selection) */
   --accent: #4c5fd5;
   --accent-hover: #3d4ec2;
+  /* Text placed ON a bg-accent fill (e.g. primary buttons). White passes AA on
+     the light-mode --accent; dark-mode --accent is a deliberately light
+     indigo (correct for accent-as-text on dark surfaces), so on-accent text
+     must flip dark to keep >=4.5:1 contrast. */
+  --accent-fg: #ffffff;
 
   /* Verdict semantics (always paired with the word) */
   --verdict-clear: #1f9d57;
@@ -60,6 +65,7 @@
 
   --accent: #7b8cff;
   --accent-hover: #93a1ff;
+  --accent-fg: #101012; /* dark text on light-indigo fill: ~7:1 contrast */
 
   --verdict-clear: #35c47e;
   --verdict-doubtful: #f0a83c;

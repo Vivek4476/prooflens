@@ -11,7 +11,11 @@ const config: Config = {
           "crimson-hover": "var(--brand-crimson-hover)",
           gold: "var(--brand-gold)",
         },
-        accent: { DEFAULT: "var(--accent)", hover: "var(--accent-hover)" },
+        accent: {
+          DEFAULT: "var(--accent)",
+          hover: "var(--accent-hover)",
+          fg: "var(--accent-fg)",
+        },
         verdict: {
           clear: "var(--verdict-clear)",
           doubtful: "var(--verdict-doubtful)",
