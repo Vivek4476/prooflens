@@ -47,9 +47,8 @@ export function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
         })}
       </nav>
 
-      <div className="space-y-3 border-t border-border p-4">
+      <div className="border-t border-border p-4">
         <TenantChip />
-        <p className="text-caption text-text-muted">Scores &amp; flags — never blocks. Images are never stored.</p>
       </div>
     </div>
   );

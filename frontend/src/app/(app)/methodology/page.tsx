@@ -24,7 +24,7 @@ export default function MethodologyPage() {
     <div className="space-y-8">
       <PageHeader
         title="How scores work"
-        description="ProofLens scores and flags capture integrity. It never blocks an upload and never claims to prove a meeting happened."
+        description="ProofLens scores and flags capture integrity. It never blocks an upload, never stores your images, and never claims to prove a meeting happened."
       />
 
       <Card>
