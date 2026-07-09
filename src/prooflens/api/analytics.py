@@ -159,7 +159,7 @@ def system_health(items: list[ResultView]) -> dict:
     no_content = sum(
         1 for r in items if r.reason_code == Reason.NO_CONTENT_ANALYSIS.value
     )
-    proc = [r.processing_ms for r in items if r.processing_ms]
+    proc = [r.processing_ms for r in items if r.processing_ms is not None]
     return {
         "scored_without_content_pct": round(no_content / total * 100, 1),
         "median_processing_ms": round(median(proc), 1) if proc else None,
