@@ -1,12 +1,8 @@
+import { ArrowDownRight, ArrowUpRight } from "lucide-react";
+
 import { cn } from "@/lib/utils";
 
-export type MetricSubTone = "good" | "bad" | "neutral";
-
-const SUB_TONE_CLASS: Record<MetricSubTone, string> = {
-  good: "text-verdict-clear-fg",
-  bad: "text-verdict-suspect-fg",
-  neutral: "text-text-muted",
-};
+export type MetricSubDirection = "up" | "down" | "flat";
 
 /** A KPI card — headline number gets the space; label never competes with value. */
 export function MetricCard({
@@ -14,15 +10,20 @@ export function MetricCard({
   value,
   suffix,
   sub,
-  subTone = "neutral",
+  subDirection,
   accent,
 }: {
   label: string;
   value: string | number;
   suffix?: string;
   sub?: string;
-  /** Color affordance for `sub` — always paired with worded text, never color alone. */
-  subTone?: MetricSubTone;
+  /**
+   * Direction of the sub-line delta. Rendered as a neutral ↗/↘ glyph — never a verdict
+   * colour. Verdict green/red is reserved for genuine integrity semantics (Clear/Suspect);
+   * a volume or score movement is not a verdict, so it stays neutral (BRAND "colour is
+   * meaning"). Omit for non-delta sub-lines (e.g. "Insufficient history for comparison").
+   */
+  subDirection?: MetricSubDirection;
   accent?: boolean; // subtle emphasis for the single most important KPI
 }) {
   return (
@@ -32,7 +33,13 @@ export function MetricCard({
         <span className="text-display leading-none tabular-nums text-text">{value}</span>
         {suffix && <span className="text-body-sm text-text-muted">{suffix}</span>}
       </div>
-      {sub && <span className={cn("text-caption", SUB_TONE_CLASS[subTone])}>{sub}</span>}
+      {sub && (
+        <span className="flex items-center gap-1 text-caption text-text-secondary">
+          {subDirection === "up" && <ArrowUpRight aria-hidden className="h-3.5 w-3.5 shrink-0 text-text-muted" />}
+          {subDirection === "down" && <ArrowDownRight aria-hidden className="h-3.5 w-3.5 shrink-0 text-text-muted" />}
+          {sub}
+        </span>
+      )}
     </div>
   );
 }
