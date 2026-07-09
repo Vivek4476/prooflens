@@ -1,7 +1,7 @@
 "use client";
 import {
-  Line,
-  LineChart,
+  Area,
+  AreaChart,
   CartesianGrid,
   ReferenceLine,
   ResponsiveContainer,
@@ -43,41 +43,57 @@ export function CaptureRiskTrend({
         </p>
       ) : (
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+          <AreaChart data={data} margin={{ top: 12, right: 14, left: 0, bottom: 0 }}>
+            <defs>
+              <linearGradient id="captureRiskFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.16} />
+                <stop offset="92%" stopColor="var(--accent)" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="2 4" stroke="var(--border)" vertical={false} />
             <XAxis
               dataKey="label"
-              tick={{ fontSize: 12, fill: "var(--text-muted)" }}
-              stroke="var(--border)"
+              tickLine={false}
+              axisLine={{ stroke: "var(--border)" }}
+              tick={{ fontSize: 11, fill: "var(--text-muted)" }}
+              minTickGap={28}
             />
             <YAxis
               tickFormatter={(v) => `${Math.round(v)}%`}
-              tick={{ fontSize: 12, fill: "var(--text-muted)" }}
-              stroke="var(--border)"
+              tickLine={false}
+              axisLine={false}
+              width={40}
+              tick={{ fontSize: 11, fill: "var(--text-muted)" }}
             />
             <ReferenceLine
               y={prevRate}
               stroke="var(--text-muted)"
               strokeDasharray="4 4"
+              strokeOpacity={0.7}
               label={{
-                value: "Previous avg",
-                position: "insideBottomLeft",
-                dy: 10,
-                fontSize: 12,
+                value: "Prev avg",
+                position: "insideTopLeft",
+                dy: -4,
+                fontSize: 11,
                 fill: "var(--text-muted)",
               }}
             />
-            <Tooltip content={<TrendTooltip prevRate={prevRate} />} />
-            <Line
+            <Tooltip
+              content={<TrendTooltip prevRate={prevRate} />}
+              cursor={{ stroke: "var(--border-strong)", strokeWidth: 1 }}
+            />
+            <Area
               type="monotone"
               dataKey="rate"
               stroke="var(--accent)"
               strokeWidth={2}
+              fill="url(#captureRiskFill)"
               dot={(props: DotProps & { payload?: TrendPoint }) => <TrendDot {...props} />}
+              activeDot={{ r: 4, fill: "var(--accent)", stroke: "var(--surface)", strokeWidth: 2 }}
               isAnimationActive={!reducedMotion}
               animationDuration={ANIMATION_DURATION_MS}
             />
-          </LineChart>
+          </AreaChart>
         </ResponsiveContainer>
       )}
     </ChartCard>
@@ -85,23 +101,23 @@ export function CaptureRiskTrend({
 }
 
 /**
- * Hollow, lighter dot for the current in-progress bucket so an unfinished period never
- * reads as a completed decline — filled dot for complete buckets.
+ * Static dots are suppressed to keep dense daily trends clean; the line + area carries the
+ * shape and hovering reveals per-point values. The one exception is the current in-progress
+ * bucket, which gets a hollow marker so an unfinished period never reads as a completed dip.
  */
 function TrendDot(props: DotProps & { payload?: TrendPoint }) {
   const { cx, cy, payload, key } = props;
-  if (cx == null || cy == null) return <g key={key} />;
-  const incomplete = payload?.incomplete ?? false;
+  if (cx == null || cy == null || !payload?.incomplete) return <g key={key} />;
   return (
     <circle
       key={key}
       cx={cx}
       cy={cy}
       r={4}
-      fill={incomplete ? "var(--surface)" : "var(--accent)"}
+      fill="var(--surface)"
       stroke="var(--accent)"
       strokeWidth={2}
-      opacity={incomplete ? 0.6 : 1}
+      opacity={0.9}
     />
   );
 }

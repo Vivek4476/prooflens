@@ -6,7 +6,6 @@ import { ChartCard } from "@/components/ui/ChartCard";
 import type { TopReason } from "@/lib/api/types";
 import {
   rankTopReasons,
-  shouldScroll,
   TOP_REASONS_LIMIT_LABELS,
   TOP_REASONS_LIMIT_OPTIONS,
   type TopReasonsLimit,
@@ -14,7 +13,8 @@ import {
 import { formatCount, formatPct } from "@/lib/format";
 
 /** Fixed height, matched to CaptureRiskTrend/BandMixChart's 280px `ChartCard` so the
- *  two-up analytics grid stays row-aligned. */
+ *  two-up analytics grid stays row-aligned. The list scrolls internally when the chosen
+ *  row count exceeds the card — it never spills out of the box. */
 const CARD_HEIGHT = 280;
 
 /**
@@ -32,65 +32,69 @@ export function TopFlagReasons({ topReasons }: { topReasons: TopReason[] }) {
   const [limit, setLimit] = useState<TopReasonsLimit>(5);
   const rows = rankTopReasons(topReasons, limit);
   const hasMoreThanDefault = rankTopReasons(topReasons, "all").length > 5;
-  const scrolling = shouldScroll(limit);
+
+  // The row-count control lives in the card header, opposite the title — not floating
+  // above the list. Only shown when there is actually something to expand.
+  const selector = (
+    <label className="flex shrink-0 items-center gap-2 text-caption text-text-muted">
+      Show
+      <select
+        value={String(limit)}
+        onChange={(e) => {
+          const v = e.target.value;
+          setLimit(v === "all" ? "all" : (Number(v) as TopReasonsLimit));
+        }}
+        disabled={!hasMoreThanDefault}
+        aria-label="Number of flag reasons to show"
+        className="h-8 rounded-md border border-border bg-surface px-2 text-caption text-text disabled:opacity-50"
+      >
+        {TOP_REASONS_LIMIT_OPTIONS.map((opt) => (
+          <option key={String(opt)} value={String(opt)}>
+            {TOP_REASONS_LIMIT_LABELS[opt]}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 
   return (
-    <ChartCard title="Top flag reasons" subtitle="What is actually driving Doubtful and Suspect verdicts." height={CARD_HEIGHT}>
-      <div className="flex h-full flex-col">
-        <div className="flex shrink-0 items-center justify-end pb-3">
-          <label className="flex items-center gap-2 text-caption text-text-muted">
-            Show
-            <select
-              value={String(limit)}
-              onChange={(e) => {
-                const v = e.target.value;
-                setLimit(v === "all" ? "all" : (Number(v) as TopReasonsLimit));
-              }}
-              disabled={!hasMoreThanDefault}
-              aria-label="Number of flag reasons to show"
-              className="h-8 min-h-[44px] rounded-md border border-border bg-surface px-2 text-caption text-text disabled:opacity-50 sm:min-h-0"
-            >
-              {TOP_REASONS_LIMIT_OPTIONS.map((opt) => (
-                <option key={String(opt)} value={String(opt)}>
-                  {TOP_REASONS_LIMIT_LABELS[opt]}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        {rows.length === 0 ? (
-          <p className="grid flex-1 place-items-center text-center text-body-sm text-text-muted">
-            No flags yet — every verdict is Clear.
-          </p>
-        ) : (
-          <ol className={scrolling ? "min-h-0 flex-1 space-y-3 overflow-y-auto pr-1" : "min-h-0 flex-1 space-y-3"}>
-            {rows.map((r) => (
-              <li key={r.reason_code}>
-                <button
-                  type="button"
-                  title={r.reason}
-                  onClick={() => onRowSelect(r.reason_code)}
-                  className="w-full space-y-1.5 rounded-lg p-1.5 text-left transition-colors hover:bg-surface-2"
-                >
-                  <div className="flex items-baseline justify-between gap-3 text-body-sm">
-                    <span className="flex min-w-0 items-center gap-2 text-text">
-                      <span className="w-4 shrink-0 text-caption tabular-nums text-text-muted">{r.rank}</span>
-                      <span className="truncate">{r.short_label}</span>
-                    </span>
-                    <span className="shrink-0 tabular-nums text-text-secondary">
-                      {formatCount(r.count)} · {formatPct(r.pctOfFlags)}
-                    </span>
-                  </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-surface-3">
-                    <div className="h-full rounded-full bg-text-muted" style={{ width: `${r.barPct}%` }} />
-                  </div>
-                </button>
-              </li>
-            ))}
-          </ol>
-        )}
-      </div>
+    <ChartCard
+      title="Top flag reasons"
+      subtitle="What is actually driving Doubtful and Suspect verdicts."
+      height={CARD_HEIGHT}
+      action={rows.length > 0 ? selector : undefined}
+    >
+      {rows.length === 0 ? (
+        <p className="grid h-full place-items-center text-center text-body-sm text-text-muted">
+          No flags yet — every verdict is Clear.
+        </p>
+      ) : (
+        <ol className="flex h-full flex-col gap-1 overflow-y-auto pr-1">
+          {rows.map((r) => (
+            <li key={r.reason_code} className="shrink-0">
+              <button
+                type="button"
+                title={r.reason}
+                onClick={() => onRowSelect(r.reason_code)}
+                className="group relative flex w-full items-center gap-3 overflow-hidden rounded-md px-2.5 py-2 text-left transition-colors hover:bg-surface-2"
+              >
+                {/* Magnitude bar — width relative to the top reason. Soft accent wash (the
+                    same data colour as the trend line), never a verdict hue. */}
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-y-1 left-0 rounded-[6px] bg-[color-mix(in_srgb,var(--accent)_11%,transparent)] transition-[width] duration-500 ease-out group-hover:bg-[color-mix(in_srgb,var(--accent)_18%,transparent)]"
+                  style={{ width: `${Math.max(r.barPct, 2)}%` }}
+                />
+                <span className="relative z-10 w-4 shrink-0 text-caption tabular-nums text-text-muted">{r.rank}</span>
+                <span className="relative z-10 min-w-0 flex-1 truncate text-body-sm text-text">{r.short_label}</span>
+                <span className="relative z-10 shrink-0 text-body-sm tabular-nums text-text-secondary">
+                  {formatCount(r.count)} · {formatPct(r.pctOfFlags)}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
     </ChartCard>
   );
 }

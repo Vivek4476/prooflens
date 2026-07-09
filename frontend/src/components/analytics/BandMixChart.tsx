@@ -36,22 +36,36 @@ export function BandMixChart({ buckets }: { buckets: AnalyticsBucket[] }) {
       <div className="flex h-full flex-col">
         <div className="min-h-0 flex-1">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 12, fill: "var(--text-muted)" }} stroke="var(--border)" />
+            <BarChart
+              data={data}
+              margin={{ top: 12, right: 8, left: 0, bottom: 0 }}
+              barCategoryGap={data.length > 20 ? "8%" : "24%"}
+              maxBarSize={40}
+            >
+              <CartesianGrid strokeDasharray="2 4" stroke="var(--border)" vertical={false} />
+              <XAxis
+                dataKey="label"
+                tickLine={false}
+                axisLine={{ stroke: "var(--border)" }}
+                tick={{ fontSize: 11, fill: "var(--text-muted)" }}
+                minTickGap={24}
+              />
               <YAxis
                 tickFormatter={(v) => `${Math.round(v)}%`}
                 domain={[0, 100]}
                 ticks={[0, 25, 50, 75, 100]}
-                tick={{ fontSize: 12, fill: "var(--text-muted)" }}
-                stroke="var(--border)"
+                tickLine={false}
+                axisLine={false}
+                width={42}
+                tick={{ fontSize: 11, fill: "var(--text-muted)" }}
               />
-              <Tooltip content={<BandMixTooltip />} />
+              <Tooltip content={<BandMixTooltip />} cursor={{ fill: "var(--text-muted)", opacity: 0.08 }} />
               <Legend
-                iconType="square"
-                iconSize={10}
+                iconType="circle"
+                iconSize={8}
                 verticalAlign="bottom"
-                wrapperStyle={{ fontSize: 12, color: "var(--text-muted)" }}
+                height={28}
+                wrapperStyle={{ fontSize: 11, color: "var(--text-muted)", paddingTop: 4 }}
               />
               <Bar
                 dataKey="Clear"
