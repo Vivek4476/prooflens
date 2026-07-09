@@ -2,6 +2,7 @@
 import type { AnalyticsSummary } from "@/lib/api/types";
 import { computeInsights, NO_SHIFTS_FALLBACK, type InsightSeverity } from "@/lib/analytics/insights";
 import { Card, CardHeader } from "@/components/ui/Card";
+import { formatDateRange } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 // "warn"/"high" borrow verdict hues because they genuinely mean "worth attention" /
@@ -21,9 +22,10 @@ export function InsightsPanel({
   prevDuplicatesCaught: number | null;
 }) {
   const insights = computeInsights(analytics, prevDuplicatesCaught);
+  const subtitle = `Computed from ${formatDateRange(analytics.period.from, analytics.period.to)}, vs the previous period.`;
   return (
     <Card>
-      <CardHeader title="What changed" subtitle="Computed from your data · vs previous period." />
+      <CardHeader title="What changed" subtitle={subtitle} />
       <div className="p-4">
         {insights.length === 0 ? (
           <p className="text-body-sm text-text-secondary">{NO_SHIFTS_FALLBACK}</p>
