@@ -138,6 +138,14 @@ The following are P2 doctrine/platform seams from the Analytics v4 spec
 **none of it is built** — no schema migration, no route, no UI. They stay
 fenced until a follow-up gate explicitly picks them up.
 
+**Pain 8 seam — per-card Quarterly aggregation.** The per-card override on
+Capture-Risk Trend and Band Mix (Pain 8) offers Daily/Weekly/Monthly only,
+because `GET /v1/analytics/summary`'s `bucket` param only accepts
+`daily|weekly|monthly` (see `Bucket` in `src/prooflens/api/analytics.py`);
+offering Quarterly needs that endpoint to grow `bucket=quarterly` (calendar-
+quarter edges, same `AnalyticsBucket[]` shape) before the frontend control can
+add the option. Not built.
+
 ### Pain 11 — On-page faceting
 
 Clicking a Band Mix segment or a Top Flag Reasons row would re-filter the

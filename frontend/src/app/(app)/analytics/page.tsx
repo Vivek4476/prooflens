@@ -140,8 +140,14 @@ function AnalyticsPageInner() {
             </div>
             {a.flag_precision && <ReviewQuality flagPrecision={a.flag_precision} />}
             <div className="grid gap-6 lg:grid-cols-2">
-              <CaptureRiskTrend buckets={a.buckets} previous={a.previous} />
-              <BandMixChart buckets={a.buckets} />
+              <CaptureRiskTrend
+                buckets={a.buckets}
+                previous={a.previous}
+                bucket={bucket}
+                from={a.period.from}
+                to={a.period.to}
+              />
+              <BandMixChart buckets={a.buckets} bucket={bucket} from={a.period.from} to={a.period.to} />
             </div>
             <div className="grid gap-6 lg:grid-cols-2">
               <TopFlagReasons topReasons={a.top_reasons} from={a.period.from} to={a.period.to} />
