@@ -5,9 +5,10 @@ import { cn } from "@/lib/utils";
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 
 const VARIANTS: Record<Variant, string> = {
-  // Brand crimson is reserved for primary actions.
-  primary:
-    "bg-brand-crimson text-white hover:bg-brand-crimson-hover disabled:opacity-50",
+  // Focus Indigo is the product's one accent — primary actions, never tenant
+  // crimson (BRAND.md §6/§9: tenant brand is a guest, confined to the tenant
+  // identity chip; it is never interface chrome or a button).
+  primary: "bg-accent text-white hover:bg-accent-hover disabled:opacity-50",
   secondary:
     "border border-border-strong bg-surface text-text hover:bg-surface-2 disabled:opacity-50",
   ghost: "text-text-secondary hover:bg-surface-2 hover:text-text disabled:opacity-50",

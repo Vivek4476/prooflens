@@ -32,7 +32,16 @@ export function MobileNav() {
   }, [open]);
 
   // Move focus into the drawer on open; restore it to the trigger on close.
+  // Skip on mount — only run this in response to an actual open/close
+  // transition, never on first render (otherwise the hamburger trigger
+  // steals focus from the page on every load, before the user has done
+  // anything).
+  const mounted = useRef(false);
   useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
     if (open) {
       closeRef.current?.focus();
       return;

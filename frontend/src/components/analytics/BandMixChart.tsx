@@ -35,12 +35,13 @@ export function BandMixChart({ buckets }: { buckets: AnalyticsBucket[] }) {
       <div className="flex h-full flex-col">
         <div className="min-h-0 flex-1">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+            <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 12, fill: "var(--text-muted)" }} stroke="var(--border)" />
               <YAxis
-                tickFormatter={(v) => `${v}%`}
+                tickFormatter={(v) => `${Math.round(v)}%`}
                 domain={[0, 100]}
+                ticks={[0, 25, 50, 75, 100]}
                 tick={{ fontSize: 12, fill: "var(--text-muted)" }}
                 stroke="var(--border)"
               />

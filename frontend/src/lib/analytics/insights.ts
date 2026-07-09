@@ -1,5 +1,6 @@
 import type { AnalyticsSummary } from "@/lib/api/types";
 import { relativeChangePct } from "./deltas";
+import { formatCount } from "@/lib/format";
 
 export type InsightSeverity = "info" | "warn" | "high";
 
@@ -24,8 +25,8 @@ function suspectRateShift(a: AnalyticsSummary): Insight | null {
     id: "suspect-rate-shift",
     severity: rising ? "high" : "info",
     text: rising
-      ? `Suspect volume rose ${Math.round(rel)}% vs the previous period (${cur} vs ${prev}).`
-      : `Suspect volume fell ${Math.round(Math.abs(rel))}% vs the previous period (${cur} vs ${prev}).`,
+      ? `Suspect volume rose ${Math.round(rel)}% vs the previous period (${formatCount(cur)} vs ${formatCount(prev)}).`
+      : `Suspect volume fell ${Math.round(Math.abs(rel))}% vs the previous period (${formatCount(cur)} vs ${formatCount(prev)}).`,
   };
 }
 
@@ -40,7 +41,7 @@ function dominantReason(a: AnalyticsSummary): Insight | null {
   return {
     id: "dominant-reason",
     severity: "warn",
-    text: `"${top.short_label}" accounts for ${Math.round(share)}% of flagged verdicts (${top.count} of ${totalFlagged}).`,
+    text: `"${top.short_label}" accounts for ${Math.round(share)}% of flagged verdicts (${formatCount(top.count)} of ${formatCount(totalFlagged)}).`,
   };
 }
 
@@ -71,8 +72,8 @@ function duplicatesShift(current: number, previous: number): Insight | null {
     id: "duplicates-shift",
     severity: rising ? "warn" : "info",
     text: rising
-      ? `Duplicate captures rose ${Math.round(rel)}% vs the previous period (${current} vs ${previous}).`
-      : `Duplicate captures fell ${Math.round(Math.abs(rel))}% vs the previous period (${current} vs ${previous}).`,
+      ? `Duplicate captures rose ${Math.round(rel)}% vs the previous period (${formatCount(current)} vs ${formatCount(previous)}).`
+      : `Duplicate captures fell ${Math.round(Math.abs(rel))}% vs the previous period (${formatCount(current)} vs ${formatCount(previous)}).`,
   };
 }
 

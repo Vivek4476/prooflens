@@ -50,7 +50,7 @@ export function CaptureRiskTrend({
               stroke="var(--border)"
             />
             <YAxis
-              tickFormatter={(v) => `${v}%`}
+              tickFormatter={(v) => `${Math.round(v)}%`}
               tick={{ fontSize: 12, fill: "var(--text-muted)" }}
               stroke="var(--border)"
             />
@@ -59,8 +59,9 @@ export function CaptureRiskTrend({
               stroke="var(--text-muted)"
               strokeDasharray="4 4"
               label={{
-                value: "Previous period avg",
-                position: "insideTopRight",
+                value: "Previous avg",
+                position: "insideBottomLeft",
+                dy: 10,
                 fontSize: 11,
                 fill: "var(--text-muted)",
               }}

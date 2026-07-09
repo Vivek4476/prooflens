@@ -63,6 +63,11 @@ export function useAnalytics(params: AnalyticsParams = {}, enabled: boolean = tr
     // pairs with Task 8's "skeleton only on first load" rule.
     placeholderData: (prev) => prev,
     refetchInterval: 30_000,
+    // No retry: like every other query in this file, a failed request should
+    // surface the honest error state promptly (BRAND.md "honest states
+    // only") instead of holding the loading skeleton through react-query's
+    // default multi-second retry/backoff sequence.
+    retry: false,
     enabled,
   });
 }
