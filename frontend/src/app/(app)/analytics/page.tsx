@@ -18,6 +18,7 @@ import { BandMixChart } from "@/components/analytics/BandMixChart";
 import { TopFlagReasons } from "@/components/analytics/TopFlagReasons";
 import { ByTeamPanel } from "@/components/analytics/ByTeamPanel";
 import { ExportControls } from "@/components/analytics/ExportControls";
+import { ReviewQuality } from "@/components/analytics/ReviewQuality";
 import { useAnalytics } from "@/lib/api/hooks";
 import { useAnalyticsFilters } from "@/lib/analytics/useAnalyticsFilters";
 import type { AnalyticsParams } from "@/lib/api/types";
@@ -124,6 +125,7 @@ function AnalyticsPageInner() {
             prevDuplicatesCaught={prevDuplicatesCaught}
             prevDuplicatesUnavailable={prevDuplicatesUnavailable}
           />
+          {a.flag_precision && <ReviewQuality flagPrecision={a.flag_precision} />}
           <div className="grid gap-6 lg:grid-cols-2">
             <CaptureRiskTrend buckets={a.buckets} previous={a.previous} />
             <BandMixChart buckets={a.buckets} />

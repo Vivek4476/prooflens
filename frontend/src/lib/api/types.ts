@@ -127,6 +127,19 @@ export interface AnalyticsSummary {
   period: PeriodBounds; // NEW
   previous_period: PeriodBounds; // NEW
   groups: AnalyticsGroup[]; // NEW — unused by Phase A UI, present for type completeness
+  flag_precision?: FlagPrecision; // Gate 3 — optional so older API responses still type-check
+}
+
+/**
+ * How often a Doubtful/Suspect flag was confirmed on review (Gate 3).
+ * confirmed = reject; overturned = approve + false_positive; reviewed = confirmed + overturned
+ * (escalate and pending excluded). precision_pct = confirmed/reviewed*100, null when reviewed 0.
+ */
+export interface FlagPrecision {
+  reviewed: number;
+  confirmed: number;
+  overturned: number;
+  precision_pct: number | null;
 }
 
 export type Bucket = "daily" | "weekly" | "monthly";
