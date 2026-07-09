@@ -88,6 +88,14 @@ response keeps every existing key and adds:
   `confirmed + overturned`. `"escalate"` and pending (unreviewed) flags are
   excluded entirely — they don't count toward `reviewed`. `precision_pct` =
   `round(confirmed / reviewed * 100, 1)`, or `null` when `reviewed == 0`.
+- `system_health` — `{scored_without_content_pct, median_processing_ms}` over
+  the period's results (v4 Pain 9). `scored_without_content_pct` = percentage
+  of results whose `reason_code` is `"no_content_analysis"` (short_label
+  "Scored without content check" — the fail-open signal for "vision/content
+  check did not run"), `round(no_content / total * 100, 1)`, or `null` when
+  there are no results in the period. `median_processing_ms` = the median (not
+  mean — `avg_processing_ms` remains the mean, unchanged) of `processing_ms`
+  across the same results, `round(.., 1)`, or `null` when there are no results.
 
 **`GET /v1/results`** — now also accepts `reason` (exact `reason_code`),
 `rep_id` (normalized exact), and `from`/`to` (date range). Existing filters

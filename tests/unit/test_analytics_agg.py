@@ -3,11 +3,12 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime
 
-from prooflens.api.analytics import aggregate_range, build_buckets, flag_precision
+from prooflens.api.analytics import aggregate_range, build_buckets, flag_precision, system_health
 from prooflens.service.views import ResultView
 
 
-def _r(day: date, band="Clear", score=90.0, reason=None, rep_id=None, review_status=None):
+def _r(day: date, band="Clear", score=90.0, reason=None, rep_id=None, review_status=None,
+       processing_ms=0.0):
     # reason_code defaults to band.lower() ("clear"/"doubtful"/"suspect") when
     # not given explicitly, so items built with only (day, band, score) get a
     # reason_code consistent with their band.
@@ -16,6 +17,7 @@ def _r(day: date, band="Clear", score=90.0, reason=None, rep_id=None, review_sta
         id="x", created_at=datetime(day.year, day.month, day.day, 12, tzinfo=UTC).isoformat(),
         tenant_id="t1", band=band, score=score, reason="r", reason_code=reason_code,
         rubric_version="v3", rep_id=rep_id, review_status=review_status,
+        processing_ms=processing_ms,
     )
 
 
@@ -239,4 +241,53 @@ def test_aggregate_range_includes_flag_precision_block():
                           group_by="none", today=date(2026, 6, 20))
     assert out["flag_precision"] == {
         "reviewed": 2, "confirmed": 1, "overturned": 1, "precision_pct": 50.0,
+    }
+
+
+# --- system_health (v4 Pain 9) ----------------------------------------------
+
+
+def test_system_health_scored_without_content_pct_counts_only_no_content_analysis():
+    day = date(2026, 6, 1)
+    # 2 of 10 scored without a content/vision check (fail-open); the other 8
+    # have unrelated reason codes and must NOT be counted.
+    items = (
+        [_r(day, "Doubtful", 50, reason="no_content_analysis") for _ in range(2)]
+        + [_r(day, "Clear", 90, reason="clear") for _ in range(3)]
+        + [_r(day, "Suspect", 10, reason="recycled") for _ in range(2)]
+        + [_r(day, "Doubtful", 50, reason="too_blurred") for _ in range(3)]
+    )
+    out = system_health(items)
+    assert out["scored_without_content_pct"] == 20.0
+
+
+def test_system_health_median_processing_ms_odd_count():
+    day = date(2026, 6, 1)
+    items = [_r(day, processing_ms=ms) for ms in (100.0, 300.0, 200.0)]
+    out = system_health(items)
+    assert out["median_processing_ms"] == 200.0
+
+
+def test_system_health_median_processing_ms_even_count():
+    day = date(2026, 6, 1)
+    items = [_r(day, processing_ms=ms) for ms in (100.0, 200.0, 300.0, 400.0)]
+    out = system_health(items)
+    assert out["median_processing_ms"] == 250.0
+
+
+def test_system_health_empty_items_gives_null_for_both_fields():
+    out = system_health([])
+    assert out == {"scored_without_content_pct": None, "median_processing_ms": None}
+
+
+def test_aggregate_range_includes_system_health_block():
+    start, end = _dt(date(2026, 6, 8)), _dt(date(2026, 6, 15))
+    items = [
+        _r(date(2026, 6, 10), "Doubtful", 50, reason="no_content_analysis", processing_ms=100.0),
+        _r(date(2026, 6, 11), "Clear", 90, reason="clear", processing_ms=300.0),
+    ]
+    out = aggregate_range(items, [], [], start=start, end=end, bucket="daily",
+                          group_by="none", today=date(2026, 6, 20))
+    assert out["system_health"] == {
+        "scored_without_content_pct": 50.0, "median_processing_ms": 200.0,
     }

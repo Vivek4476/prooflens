@@ -7,7 +7,9 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import date, datetime, timedelta
+from statistics import median
 
+from ..engine.verdicts import Reason
 from ..service.hierarchy import resolve_node
 from ..service.views import ResultView
 
@@ -146,6 +148,24 @@ def flag_precision(items: list[ResultView]) -> dict:
     }
 
 
+def system_health(items: list[ResultView]) -> dict:
+    """Additive system-health KPI over `items` (v4 Pain 9): what fraction of
+    results were scored without a content/vision check (fail-open degradation,
+    signalled by `reason_code == Reason.NO_CONTENT_ANALYSIS`), and the median
+    time-to-score across the period. Both are `None` when there are no items."""
+    total = len(items)
+    if total == 0:
+        return {"scored_without_content_pct": None, "median_processing_ms": None}
+    no_content = sum(
+        1 for r in items if r.reason_code == Reason.NO_CONTENT_ANALYSIS.value
+    )
+    proc = [r.processing_ms for r in items if r.processing_ms]
+    return {
+        "scored_without_content_pct": round(no_content / total * 100, 1),
+        "median_processing_ms": round(median(proc), 1) if proc else None,
+    }
+
+
 def _node_label(rows: list[dict], r: ResultView, field: str) -> str:
     node = resolve_node(rows, r.rep_id, _scored_date(r))
     if node is None:
@@ -212,4 +232,5 @@ def aggregate_range(
         "groups": groups,
         "reason_counts": reason_counts,
         "flag_precision": flag_precision(items),
+        "system_health": system_health(items),
     }
