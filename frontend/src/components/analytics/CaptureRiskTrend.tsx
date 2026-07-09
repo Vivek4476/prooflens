@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import type { DotProps } from "recharts";
 import { ChartCard } from "@/components/ui/ChartCard";
+import { ChartTooltip } from "@/components/analytics/ChartTooltip";
 import type { AnalyticsBucket, PeriodAggregate } from "@/lib/api/types";
 import { previousPeriodRate, toTrendData, type TrendPoint } from "@/lib/analytics/chartData";
 import { formatCount, formatPct } from "@/lib/format";
@@ -117,23 +118,16 @@ function TrendTooltip({
   if (!active || !payload || payload.length === 0) return null;
   const point = payload[0].payload;
   return (
-    <div className="min-w-[180px] space-y-1.5 rounded-lg border border-border bg-surface p-3 text-body-sm shadow-2">
-      <p className="font-semibold text-text">
-        {point.label}
-        {point.incomplete && <span className="ml-1.5 font-normal text-text-muted">(in progress)</span>}
-      </p>
-      <div className="flex items-center justify-between gap-4 text-caption text-text-secondary">
-        <span>Suspect rate</span>
-        <span className="font-medium tabular-nums text-text">{formatPct(point.rate)}</span>
-      </div>
-      <div className="flex items-center justify-between gap-4 text-caption text-text-secondary">
-        <span>vs previous period</span>
-        <span className="font-medium tabular-nums text-text">{formatPct(prevRate)}</span>
-      </div>
-      <div className="border-t border-border pt-1.5 text-caption text-text-muted">
-        <span className="tabular-nums">{formatCount(point.total)}</span>{" "}
-        {point.total === 1 ? "image scored" : "images scored"}
-      </div>
-    </div>
+    <ChartTooltip
+      title={point.label}
+      titleNote={point.incomplete ? "(in progress)" : undefined}
+      rows={[
+        { label: "Suspect rate", value: formatPct(point.rate) },
+        // There's no per-bucket "previous" — the backend only gives us a single
+        // previous-PERIOD aggregate, the same value the reference line plots.
+        { label: "Prev period avg", value: formatPct(prevRate) },
+      ]}
+      footer={`${formatCount(point.total)} ${point.total === 1 ? "image scored" : "images scored"}`}
+    />
   );
 }

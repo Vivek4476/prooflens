@@ -1,6 +1,7 @@
 "use client";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ChartCard } from "@/components/ui/ChartCard";
+import { ChartTooltip } from "@/components/analytics/ChartTooltip";
 import type { AnalyticsBucket } from "@/lib/api/types";
 import { bucketsWithData, MIN_BAND_MIX_BUCKETS, toBandMixData, type BandMixPoint } from "@/lib/analytics/chartData";
 import { formatCount } from "@/lib/format";
@@ -99,38 +100,18 @@ function BandMixTooltip({
   if (!active || !payload || payload.length === 0) return null;
   const point = payload[0].payload;
   return (
-    <div className="min-w-[200px] space-y-1.5 rounded-lg border border-border bg-surface p-3 text-body-sm shadow-2">
-      <p className="font-semibold text-text">
-        {label}
-        {point.incomplete && <span className="ml-1.5 font-normal text-text-muted">(in progress)</span>}
-      </p>
-      <div className="space-y-1 text-caption">
-        <div className="flex items-center justify-between gap-4">
-          <span className="flex items-center gap-1.5 text-text-secondary">
-            <span className="h-2 w-2 rounded" style={{ backgroundColor: "var(--verdict-clear)" }} />
-            Clear
-          </span>
-          <span className="font-medium tabular-nums text-text">{formatCount(point.rawClear)}</span>
-        </div>
-        <div className="flex items-center justify-between gap-4">
-          <span className="flex items-center gap-1.5 text-text-secondary">
-            <span className="h-2 w-2 rounded" style={{ backgroundColor: "var(--verdict-doubtful)" }} />
-            Doubtful
-          </span>
-          <span className="font-medium tabular-nums text-text">{formatCount(point.rawDoubtful)}</span>
-        </div>
-        <div className="flex items-center justify-between gap-4">
-          <span className="flex items-center gap-1.5 text-text-secondary">
-            <span className="h-2 w-2 rounded" style={{ backgroundColor: "var(--verdict-suspect)" }} />
-            Suspect
-          </span>
-          <span className="font-medium tabular-nums text-text">{formatCount(point.rawSuspect)}</span>
-        </div>
-      </div>
-      <div className="border-t border-border pt-1.5 flex items-center justify-between text-caption font-semibold text-text">
-        <span>Total</span>
-        <span className="tabular-nums">{formatCount(point.total)}</span>
-      </div>
-    </div>
+    <ChartTooltip
+      title={label ?? point.label}
+      titleNote={point.incomplete ? "(in progress)" : undefined}
+      rows={[
+        { label: "Clear", value: formatCount(point.rawClear), swatchColor: "var(--verdict-clear)" },
+        { label: "Doubtful", value: formatCount(point.rawDoubtful), swatchColor: "var(--verdict-doubtful)" },
+        { label: "Suspect", value: formatCount(point.rawSuspect), swatchColor: "var(--verdict-suspect)" },
+      ]}
+      // No per-bucket "previous" exists (backend's `previous` is a single period
+      // aggregate, not per-bucket) — omitted here rather than fabricated. The total
+      // row stands in as the footer instead of a dishonest comparison.
+      footer={`Total ${formatCount(point.total)}`}
+    />
   );
 }
