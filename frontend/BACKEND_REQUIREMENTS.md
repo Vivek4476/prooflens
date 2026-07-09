@@ -123,6 +123,87 @@ milestone). CSV-only upload; XLSX deferred.
   model. Scoring is fail-open: if the model errors/rate-limits, the verdict
   degrades to "scored without content analysis" — never a broken response.
 
+## Analytics v4 — Gate 4 fenced seams (documented, not built)
+
+The following are P2 doctrine/platform seams from the Analytics v4 spec
+(Pains 11, 13, 14, 15). Each is designed here so the shape is agreed, but
+**none of it is built** — no schema migration, no route, no UI. They stay
+fenced until a follow-up gate explicitly picks them up.
+
+### Pain 11 — On-page faceting
+
+Clicking a Band Mix segment or a Top Flag Reasons row would re-filter the
+*other* widgets on the page in place, surfaced as a removable chip
+("Faceted: Suspect ×"); drilling out to `/history` becomes an explicit "view
+submissions" action rather than the implicit result of a click.
+
+**Fenced because:** `/v1/analytics/summary` returns one pre-aggregated
+response per bucket/group — it has no per-bucket × per-facet breakdown (e.g.
+"Band Mix counts, filtered to reason=designed_graphic"). Client-side faceting
+needs one of:
+- **(a) A `facet` param on the summary endpoint** — e.g.
+  `GET /v1/analytics/summary?...&facet=band:Suspect` or
+  `facet=reason:designed_graphic`, returning the same `buckets[]` /
+  `groups[]` / `top_reasons[]` shape recomputed over the faceted subset, so
+  the frontend can re-render the non-clicked widgets from a second response.
+- **(b) Shipping raw rows** to the client and aggregating in the browser —
+  rejected: `/v1/results` pages are metadata-only but still per-submission,
+  and pulling enough rows to recompute every widget's aggregates client-side
+  scales badly past a few thousand records.
+
+Recommended: (a), a `facet` query param, additive to the existing summary
+endpoint. Not built.
+
+### Pain 13 — Viewer → hierarchy_node mapping seam
+
+Document an optional `user_hierarchy_node` mapping (`user_id` → `node`, same
+node vocabulary as `group_by`/hierarchy CSV: zone, srsm, rsm, sm, branch,
+city). When present, `GET /v1/analytics/summary` would default `group_by`'s
+scope to the viewer's own node — so a Zonal Head hitting `/analytics` with no
+filters lands already scoped to their zone, instead of the whole tenant.
+
+This plugs into the existing `group_by` + node-resolution machinery
+described above (`groups[]`, effective-dated hierarchy from
+`POST /v1/admin/hierarchy`) — no new aggregation logic, just a default-scope
+lookup keyed by the authenticated user before `group_by` is applied.
+
+**Fenced because:** there is no user/auth model yet (single-demo-tenant,
+no login). This seam awaits that milestone. Do not build the mapping UI now.
+
+### Pain 14 — Usage counters
+
+Privacy-safe, tenant-scoped counters for `page_view`, `filter_change`,
+`drill_down`, `export` events. Explicitly **no per-user tracking, no PII** —
+counts only, not identities.
+
+Design: an append-only `usage_events(tenant_id, event, day)` table (one row
+per tenant/event/day, incremented in place — a daily aggregate, not an event
+log) plus:
+- **`POST /v1/usage/events`** — `{ "event": "page_view" | "filter_change" |
+  "drill_down" | "export" }`, tenant resolved from the request context;
+  increments today's counter for that event.
+- **A read** — e.g. `GET /v1/usage/summary?days=7` — returning per-event
+  daily counts for "last 7 days page views" in Settings → System health.
+
+The frontend would fire the `POST` from the `/analytics` page on the
+corresponding interactions (mount, filter change, chip drill-down, export
+click). Fenced/documented — not built.
+
+### Pain 15 — Chart annotations
+
+Tenant-scoped dated markers (e.g. "Camera lock enforced · Jul 1") rendered as
+a subtle vertical rule + label on time-based charts (Capture Risk Trend, Band
+Mix over time), with simple admin CRUD in Settings.
+
+Design: a `chart_annotations(tenant_id, date, label)` table plus CRUD
+endpoints (`POST` / `GET` / `PATCH` / `DELETE` under
+`/v1/admin/annotations`, `X-Admin-Token`-gated like the other admin routes),
+and a read that `/analytics` consumes to overlay markers on the trend/Band
+Mix charts by date — most simply as an `annotations[]` array
+(`{date, label}`) added to the existing `GET /v1/analytics/summary` response
+for the requested period, so the frontend doesn't need a second round-trip.
+Fenced/documented — not built.
+
 ## STILL REQUIRED — Review Queue decision endpoints (NOT yet implemented)
 
 The Review Queue UI is built against these; until they exist the UI shows an
