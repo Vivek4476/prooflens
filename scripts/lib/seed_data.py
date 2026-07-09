@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import csv
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from random import Random
 
@@ -60,12 +60,19 @@ def sample_timestamp(day: date, rng: Random) -> datetime:
     """One timestamp on ``day``, clustered in working hours (~9am-7pm,
     triangular around midday) regardless of weekday/weekend — the caller
     (``generate_seed_plan``) is responsible for varying *how many* timestamps
-    it draws per day (the weekday/weekend volume bias), not this function."""
+    it draws per day (the weekday/weekend volume bias), not this function.
+
+    Returned as a timezone-aware UTC datetime (not naive) — ``Result.created_at``
+    is ``DateTime(timezone=True)``, and handing Postgres a naive value would let
+    it silently reinterpret the sampled hour in the session timezone, drifting
+    the intended ~9am-7pm business hours. Same convention as the rest of the
+    codebase's ``created_at`` stamping (see ``api/date_range.py``'s
+    ``.replace(tzinfo=UTC)``)."""
     hour = rng.triangular(_WORKDAY_START_HOUR, _WORKDAY_END_HOUR, _MIDDAY_HOUR)
     total_seconds = (hour - _WORKDAY_START_HOUR) * 3600.0
-    return datetime(day.year, day.month, day.day, _WORKDAY_START_HOUR) + timedelta(
-        seconds=total_seconds
-    )
+    return datetime(
+        day.year, day.month, day.day, _WORKDAY_START_HOUR, tzinfo=UTC
+    ) + timedelta(seconds=total_seconds)
 
 
 def is_weekend(day: date) -> bool:

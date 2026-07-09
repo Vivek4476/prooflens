@@ -4,7 +4,7 @@ committed scripts/sample-hierarchy.csv fixture."""
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date
 from pathlib import Path
 from random import Random
 
@@ -70,6 +70,18 @@ def test_sample_timestamp_within_working_hours_window():
         ts = sample_timestamp(day, rng)
         assert ts.date() == day
         assert 9 <= ts.hour < 19 or (ts.hour == 19 and ts.minute == 0)
+
+
+def test_sample_timestamp_is_timezone_aware_utc():
+    """Result.created_at is DateTime(timezone=True); a naive datetime here
+    would let Postgres silently reinterpret the sampled hour in the session
+    timezone, drifting the intended ~9am-7pm business hours. Must be tz-aware
+    UTC, not naive."""
+    day = date(2026, 3, 2)
+    ts = sample_timestamp(day, Random(42))
+    assert ts.tzinfo is not None
+    assert ts.utcoffset().total_seconds() == 0
+    assert ts.tzinfo == UTC
 
 
 def test_sample_timestamp_clusters_around_midday():

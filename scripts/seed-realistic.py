@@ -173,7 +173,7 @@ def _seed(args: argparse.Namespace, plan: list[SeedRecord]) -> None:
 
         total = len(plan)
         for i, record in enumerate(plan, start=1):
-            repo.record_result(
+            result_id = repo.record_result(
                 tenant.id,
                 job_id=None,
                 verdict=record.verdict,
@@ -184,10 +184,14 @@ def _seed(args: argparse.Namespace, plan: list[SeedRecord]) -> None:
             # record_result flushes but leaves created_at at its server
             # default (now()) — backdate it to the sampled historical
             # timestamp so the seeded window actually spans `--days` days
-            # instead of every row landing on "today".
+            # instead of every row landing on "today". Scoped by the just-
+            # inserted row's own primary key (NOT tenant_id+opportunity_id):
+            # opportunity_id is not unique (generate_seed_plan's counter
+            # restarts at 0 every run) and a re-run without
+            # --wipe-existing-seed would otherwise match and silently
+            # rewrite a prior run's rows too.
             session.query(Result).filter(
-                Result.tenant_id == tenant.id,
-                Result.opportunity_id == record.opportunity_id,
+                Result.id == uuid.UUID(result_id),
             ).update({Result.created_at: record.created_at}, synchronize_session=False)
 
             if i % COMMIT_BATCH_SIZE == 0:
