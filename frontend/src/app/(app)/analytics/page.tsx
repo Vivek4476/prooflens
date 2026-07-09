@@ -11,7 +11,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Skeleton, CardsSkeleton } from "@/components/ui/Skeleton";
 import { FilterBar } from "@/components/analytics/FilterBar";
-import { InsightsPanel } from "@/components/analytics/InsightsPanel";
+import { InsightsRail } from "@/components/analytics/InsightsRail";
 import { KpiRow } from "@/components/analytics/KpiRow";
 import { CaptureRiskTrend } from "@/components/analytics/CaptureRiskTrend";
 import { BandMixChart } from "@/components/analytics/BandMixChart";
@@ -44,7 +44,7 @@ function AnalyticsSkeleton() {
 
 function AnalyticsPageInner() {
   const { params, preset, bucket, from, to, setPreset, setCustomRange, setBucket } = useAnalyticsFilters();
-  const { data: a, isLoading, isError, refetch, isPlaceholderData } = useAnalytics(params);
+  const { data: a, isLoading, isError, refetch, isPlaceholderData, dataUpdatedAt } = useAnalytics(params);
 
   // Second, cheap query for the previous period's duplicates_caught (not on `previous`).
   // CRITICAL: memoized — a fresh object identity every render would reset useAnalytics's
@@ -118,22 +118,39 @@ function AnalyticsPageInner() {
           cta={{ label: "Analyze a photo", href: "/analyze" }}
         />
       ) : (
-        <div className={cn("space-y-8 transition-opacity", isPlaceholderData && "opacity-60")}>
-          <InsightsPanel analytics={a} prevDuplicatesCaught={prevDuplicatesCaught} />
-          <KpiRow
-            analytics={a}
-            prevDuplicatesCaught={prevDuplicatesCaught}
-            prevDuplicatesUnavailable={prevDuplicatesUnavailable}
-          />
-          {a.flag_precision && <ReviewQuality flagPrecision={a.flag_precision} />}
-          <div className="grid gap-6 lg:grid-cols-2">
-            <CaptureRiskTrend buckets={a.buckets} previous={a.previous} />
-            <BandMixChart buckets={a.buckets} />
+        <div
+          className={cn(
+            "transition-opacity xl:grid xl:grid-cols-[minmax(0,1fr)_300px] xl:gap-8",
+            isPlaceholderData && "opacity-60",
+          )}
+        >
+          {/* Main column: KPIs → charts → reasons/teams (Pain 7 order). */}
+          <div className="space-y-8">
+            <KpiRow
+              analytics={a}
+              prevDuplicatesCaught={prevDuplicatesCaught}
+              prevDuplicatesUnavailable={prevDuplicatesUnavailable}
+            />
+            {/* Below xl the insights rail is a full-width block directly after the KPIs. */}
+            <div className="xl:hidden">
+              <InsightsRail analytics={a} prevDuplicatesCaught={prevDuplicatesCaught} dataUpdatedAt={dataUpdatedAt} />
+            </div>
+            {a.flag_precision && <ReviewQuality flagPrecision={a.flag_precision} />}
+            <div className="grid gap-6 lg:grid-cols-2">
+              <CaptureRiskTrend buckets={a.buckets} previous={a.previous} />
+              <BandMixChart buckets={a.buckets} />
+            </div>
+            <div className="grid gap-6 lg:grid-cols-2">
+              <TopFlagReasons topReasons={a.top_reasons} />
+              <ByTeamPanel startDate={a.period.from} endDate={a.period.to} />
+            </div>
           </div>
-          <div className="grid gap-6 lg:grid-cols-2">
-            <TopFlagReasons topReasons={a.top_reasons} />
-            <ByTeamPanel startDate={a.period.from} endDate={a.period.to} />
-          </div>
+          {/* Right rail: sticky insights for skimmers (xl and up). */}
+          <aside className="hidden xl:block">
+            <div className="sticky top-6">
+              <InsightsRail analytics={a} prevDuplicatesCaught={prevDuplicatesCaught} dataUpdatedAt={dataUpdatedAt} />
+            </div>
+          </aside>
         </div>
       )}
     </div>
