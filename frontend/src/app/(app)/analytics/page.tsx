@@ -2,7 +2,8 @@
 
 import { Suspense, useMemo } from "react";
 
-import { BarChart3 } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, BarChart3 } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -65,7 +66,23 @@ function AnalyticsPageInner() {
 
   return (
     <div className="space-y-8">
-      <PageHeader title="Analytics" description="Is capture risk trending up, and where should you look?" />
+      <PageHeader
+        title="Analytics"
+        description="Is capture risk trending up, and where should you look?"
+        actions={
+          // Primary next-action for the page (BRAND: one decision, one primary action).
+          // Links to the full review queue — it isn't period-filterable, so the label
+          // doesn't promise a filter the queue can't honour. Classes mirror Button's
+          // primary (Focus Indigo); a Link can't wrap <button> as valid HTML.
+          <Link
+            href="/review"
+            className="inline-flex h-10 min-h-[44px] items-center justify-center gap-2 rounded-md bg-accent px-4 text-body-sm font-medium text-accent-fg transition-colors hover:bg-accent-hover sm:min-h-0"
+          >
+            Review flagged captures
+            <ArrowRight aria-hidden className="h-4 w-4" />
+          </Link>
+        }
+      />
       <FilterBar
         preset={preset}
         bucket={bucket}
