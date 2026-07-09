@@ -53,7 +53,7 @@ export function useResult(id: string | undefined) {
   });
 }
 
-export function useAnalytics(params: AnalyticsParams = {}) {
+export function useAnalytics(params: AnalyticsParams = {}, enabled: boolean = true) {
   const debounced = useDebouncedValue(params, 300);
   return useQuery({
     queryKey: ["analytics", debounced],
@@ -63,6 +63,7 @@ export function useAnalytics(params: AnalyticsParams = {}) {
     // pairs with Task 8's "skeleton only on first load" rule.
     placeholderData: (prev) => prev,
     refetchInterval: 30_000,
+    enabled,
   });
 }
 

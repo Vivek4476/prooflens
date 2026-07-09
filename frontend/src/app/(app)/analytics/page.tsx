@@ -55,7 +55,7 @@ function AnalyticsPageInner() {
     };
   }, [prevPeriodFrom, prevPeriodTo]);
   const hasPrevWindow = Boolean(a);
-  const { data: prevA } = useAnalytics(prevParams);
+  const { data: prevA } = useAnalytics(prevParams, Boolean(prevPeriodFrom && prevPeriodTo));
   const prevDuplicatesCaught = hasPrevWindow ? (prevA?.duplicates_caught ?? null) : null;
 
   return (
