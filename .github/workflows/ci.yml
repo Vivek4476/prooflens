@@ -25,7 +25,7 @@ jobs:
         run: ruff check src tests scripts migrations
 
       - name: Mypy
-        run: mypy src
+        run: mypy src scripts/lib
 
       - name: Pytest (unit + integration, fully offline — stub backend, Fake LSQ)
         run: pytest -m "not golden"

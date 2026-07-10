@@ -1,6 +1,6 @@
 "use client";
 
-import { History as HistoryIcon, Search } from "lucide-react";
+import { History as HistoryIcon, Search, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
 
@@ -12,27 +12,68 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { TableSkeleton } from "@/components/ui/Skeleton";
 import { useResults } from "@/lib/api/hooks";
 import type { Band } from "@/lib/api/types";
+import { reasonShortLabel } from "@/lib/analytics/topFlagReasons";
+import { formatShortDate } from "@/lib/format";
+import { useUrlState } from "@/lib/useUrlState";
 import { cn } from "@/lib/utils";
 
 const PAGE = 12;
 const BANDS: (Band | "All")[] = ["All", "Clear", "Doubtful", "Suspect"];
 const BAND_ORDER: Record<Band, number> = { Suspect: 0, Doubtful: 1, Clear: 2 };
 
+// The drill-down contract: /history reads these straight off the querystring and
+// applies them server-side via /v1/results (which honours exactly this set — see
+// api/scoring.py's list_results). Removing a chip clears just that key from the URL.
+const FILTER_DEFAULTS = {
+  band: undefined as string | undefined,
+  reason: undefined as string | undefined,
+  from: undefined as string | undefined,
+  to: undefined as string | undefined,
+};
+const FILTER_KEYS = ["band", "reason", "from", "to"] as const;
+
+interface ActiveChip {
+  key: (typeof FILTER_KEYS)[number];
+  label: string;
+}
+
 function HistoryInner() {
   const params = useSearchParams();
   const [q, setQ] = useState(params.get("q") ?? "");
-  const [band, setBand] = useState<Band | "All">("All");
+  const [filters, setFilters] = useUrlState(FILTER_DEFAULTS, [...FILTER_KEYS]);
   const [sortKey, setSortKey] = useState<SortKey>("created_at");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(0);
 
-  // Demo scale: fetch a page and do search/sort/filter/paginate client-side.
-  // For very large stores this would move server-side (see BACKEND_REQUIREMENTS).
-  const { data, isLoading, isError, refetch } = useResults({ limit: 200 });
+  const { band, reason, from, to } = filters;
+
+  // Server-side filters (band/reason/from/to) go straight to /v1/results — these are
+  // exactly the aggregate drill-down filters the backend honours. Free-text search and
+  // sort stay client-side over the returned page, same as before.
+  const { data, isLoading, isError, refetch } = useResults({
+    limit: 200,
+    band: band || undefined,
+    reason: reason || undefined,
+    from: from || undefined,
+    to: to || undefined,
+  });
+
+  const chips: ActiveChip[] = useMemo(() => {
+    const out: ActiveChip[] = [];
+    if (band) out.push({ key: "band", label: `Band: ${band}` });
+    if (reason) out.push({ key: "reason", label: `Reason: ${reasonShortLabel(reason)}` });
+    if (from) out.push({ key: "from", label: `From: ${formatShortDate(from)}` });
+    if (to) out.push({ key: "to", label: `To: ${formatShortDate(to)}` });
+    return out;
+  }, [band, reason, from, to]);
+
+  function removeChip(key: ActiveChip["key"]) {
+    setFilters({ [key]: undefined });
+    setPage(0);
+  }
 
   const rows = useMemo(() => {
     let items = data?.items ?? [];
-    if (band !== "All") items = items.filter((r) => r.band === band);
     const needle = q.trim().toLowerCase();
     if (needle) {
       items = items.filter(
@@ -50,7 +91,7 @@ function HistoryInner() {
       return (a.created_at < b.created_at ? -1 : 1) * dir;
     });
     return items;
-  }, [data, band, q, sortKey, sortDir]);
+  }, [data, q, sortKey, sortDir]);
 
   const pageRows = rows.slice(page * PAGE, page * PAGE + PAGE);
   const pageCount = Math.max(1, Math.ceil(rows.length / PAGE));
@@ -97,12 +138,12 @@ function HistoryInner() {
             <button
               key={b}
               onClick={() => {
-                setBand(b);
+                setFilters({ band: b === "All" ? undefined : b });
                 setPage(0);
               }}
               className={cn(
                 "rounded px-2.5 py-1 text-caption font-medium transition-colors",
-                band === b ? "bg-surface-2 text-text" : "text-text-muted hover:text-text-secondary",
+                (band ?? "All") === b ? "bg-surface-2 text-text" : "text-text-muted hover:text-text-secondary",
               )}
             >
               {b}
@@ -113,6 +154,27 @@ function HistoryInner() {
           {rows.length} {rows.length === 1 ? "result" : "results"}
         </span>
       </div>
+
+      {chips.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2" aria-label="Active filters">
+          {chips.map((chip) => (
+            <span
+              key={chip.key}
+              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-2 py-1 pl-3 pr-1.5 text-caption font-medium text-text"
+            >
+              {chip.label}
+              <button
+                type="button"
+                onClick={() => removeChip(chip.key)}
+                aria-label={`Remove filter: ${chip.label}`}
+                className="rounded-full p-0.5 text-text-muted hover:bg-surface hover:text-text"
+              >
+                <X size={12} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
 
       <Card>
         {isLoading || !data ? (

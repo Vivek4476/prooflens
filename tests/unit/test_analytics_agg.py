@@ -3,11 +3,12 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime
 
-from prooflens.api.analytics import aggregate_range, build_buckets
+from prooflens.api.analytics import aggregate_range, build_buckets, flag_precision, system_health
 from prooflens.service.views import ResultView
 
 
-def _r(day: date, band="Clear", score=90.0, reason=None, rep_id=None):
+def _r(day: date, band="Clear", score=90.0, reason=None, rep_id=None, review_status=None,
+       processing_ms=0.0):
     # reason_code defaults to band.lower() ("clear"/"doubtful"/"suspect") when
     # not given explicitly, so items built with only (day, band, score) get a
     # reason_code consistent with their band.
@@ -15,7 +16,8 @@ def _r(day: date, band="Clear", score=90.0, reason=None, rep_id=None):
     return ResultView(
         id="x", created_at=datetime(day.year, day.month, day.day, 12, tzinfo=UTC).isoformat(),
         tenant_id="t1", band=band, score=score, reason="r", reason_code=reason_code,
-        rubric_version="v3", rep_id=rep_id,
+        rubric_version="v3", rep_id=rep_id, review_status=review_status,
+        processing_ms=processing_ms,
     )
 
 
@@ -127,6 +129,51 @@ def test_aggregate_group_by_includes_unmapped():
     assert round(groups["North"]["share"] + groups["Unmapped"]["share"], 3) == 1.0
 
 
+def test_aggregate_group_by_agent_labels_with_name_and_falls_back_to_id():
+    start, end = _dt(date(2026, 6, 1)), _dt(date(2026, 6, 8))
+    rows = [{"agent_id": "A1", "agent_name": "Asha Verma", "sm": None, "rsm": None,
+             "srsm": None, "zonal_head": None, "branch": "North", "city": None,
+             "valid_from": date(2026, 1, 1)}]
+    items = [
+        _r(date(2026, 6, 2), "Suspect", 10, "recycled", rep_id="A1"),   # Asha Verma
+        _r(date(2026, 6, 3), "Clear", 90, "clear", rep_id="A1"),        # Asha Verma
+        _r(date(2026, 6, 4), "Suspect", 10, "recycled", rep_id="A2"),   # no hierarchy row -> id
+    ]
+    out = aggregate_range(items, [], rows, start=start, end=end, bucket="daily",
+                          group_by="agent", today=date(2026, 6, 20))
+    groups = {g["node"]: g for g in out["groups"]}
+    assert set(groups) == {"Asha Verma", "A2"}
+    assert groups["Asha Verma"]["total"] == 2 and groups["Asha Verma"]["suspect"] == 1
+    assert groups["A2"]["total"] == 1 and groups["A2"]["suspect"] == 1
+    # Each agent row carries the real agent_id (node is the display name), so the
+    # UI can link to /dse?agent=<id> — the name would 404.
+    assert groups["Asha Verma"]["agent_id"] == "A1"
+    assert groups["A2"]["agent_id"] == "A2"
+
+
+def test_group_by_agent_keeps_same_named_agents_separate():
+    # Two DSEs sharing a display name must NOT merge — grouping is by identity
+    # (rep_id), not by name.
+    start, end = _dt(date(2026, 6, 1)), _dt(date(2026, 6, 8))
+    rows = [
+        {"agent_id": "A1", "agent_name": "Sam Roy", "sm": None, "rsm": None, "srsm": None,
+         "zonal_head": None, "branch": None, "city": None, "valid_from": date(2026, 1, 1)},
+        {"agent_id": "A2", "agent_name": "Sam Roy", "sm": None, "rsm": None, "srsm": None,
+         "zonal_head": None, "branch": None, "city": None, "valid_from": date(2026, 1, 1)},
+    ]
+    items = [
+        _r(date(2026, 6, 2), "Suspect", 10, "recycled", rep_id="A1"),
+        _r(date(2026, 6, 3), "Clear", 90, "clear", rep_id="A2"),
+    ]
+    out = aggregate_range(items, [], rows, start=start, end=end, bucket="daily",
+                          group_by="agent", today=date(2026, 6, 20))
+    agent_groups = [g for g in out["groups"] if g.get("agent_id") in {"A1", "A2"}]
+    by_id = {g["agent_id"]: g for g in agent_groups}
+    assert set(by_id) == {"A1", "A2"}          # two rows, not one merged "Sam Roy"
+    assert by_id["A1"]["node"] == "Sam Roy" and by_id["A2"]["node"] == "Sam Roy"
+    assert by_id["A1"]["total"] == 1 and by_id["A2"]["total"] == 1
+
+
 def test_weekly_bucket_end_clamped_to_range_end_when_not_multiple_of_7():
     # Range Jun 1–Jun 10 (10 days): NOT a multiple of 7.
     # Without the fix, the 2nd bucket reports end=2026-06-14 (4 days past range end).
@@ -148,3 +195,144 @@ def test_weekly_bucket_end_clamped_to_range_end_when_not_multiple_of_7():
         b[1]["end"] == "2026-06-10"
     ), f"Week 2 end should be clamped to 2026-06-10, got {b[1]['end']}"
     assert b[1]["total"] == 1 and b[1]["suspect"] == 1
+
+
+# ---------------------------------------------------------------------------
+# flag_precision
+# ---------------------------------------------------------------------------
+
+
+def test_flag_precision_worked_example_from_spec():
+    day = date(2026, 6, 1)
+    items = [
+        _r(day, "Suspect", 10, review_status="reject"),
+        _r(day, "Suspect", 10, review_status="reject"),
+        _r(day, "Doubtful", 50, review_status="reject"),
+        _r(day, "Suspect", 10, review_status="approve"),
+        _r(day, "Doubtful", 50, review_status="false_positive"),
+    ]
+    out = flag_precision(items)
+    assert out == {
+        "reviewed": 5, "confirmed": 3, "overturned": 2, "precision_pct": 60.0,
+    }
+
+
+def test_flag_precision_excludes_escalate_and_pending():
+    day = date(2026, 6, 1)
+    items = [
+        _r(day, "Suspect", 10, review_status="reject"),
+        _r(day, "Suspect", 10, review_status="escalate"),
+        _r(day, "Doubtful", 50, review_status=None),
+    ]
+    out = flag_precision(items)
+    assert out == {
+        "reviewed": 1, "confirmed": 1, "overturned": 0, "precision_pct": 100.0,
+    }
+
+
+def test_flag_precision_excludes_clear_even_if_reviewed():
+    day = date(2026, 6, 1)
+    items = [
+        _r(day, "Clear", 90, review_status="reject"),
+        _r(day, "Clear", 90, review_status="approve"),
+        _r(day, "Suspect", 10, review_status="reject"),
+    ]
+    out = flag_precision(items)
+    assert out == {
+        "reviewed": 1, "confirmed": 1, "overturned": 0, "precision_pct": 100.0,
+    }
+
+
+def test_flag_precision_reviewed_zero_gives_null_precision():
+    day = date(2026, 6, 1)
+    items = [
+        _r(day, "Suspect", 10, review_status=None),
+        _r(day, "Doubtful", 50, review_status="escalate"),
+        _r(day, "Clear", 90, review_status="reject"),
+    ]
+    out = flag_precision(items)
+    assert out == {
+        "reviewed": 0, "confirmed": 0, "overturned": 0, "precision_pct": None,
+    }
+
+
+def test_flag_precision_overturned_counts_both_approve_and_false_positive():
+    day = date(2026, 6, 1)
+    items = [
+        _r(day, "Suspect", 10, review_status="approve"),
+        _r(day, "Suspect", 10, review_status="false_positive"),
+    ]
+    out = flag_precision(items)
+    assert out == {
+        "reviewed": 2, "confirmed": 0, "overturned": 2, "precision_pct": 0.0,
+    }
+
+
+def test_flag_precision_empty_items():
+    out = flag_precision([])
+    assert out == {
+        "reviewed": 0, "confirmed": 0, "overturned": 0, "precision_pct": None,
+    }
+
+
+def test_aggregate_range_includes_flag_precision_block():
+    start, end = _dt(date(2026, 6, 8)), _dt(date(2026, 6, 15))
+    items = [
+        _r(date(2026, 6, 10), "Suspect", 10, review_status="reject"),
+        _r(date(2026, 6, 11), "Suspect", 10, review_status="approve"),
+        _r(date(2026, 6, 12), "Clear", 90, review_status="reject"),
+    ]
+    out = aggregate_range(items, [], [], start=start, end=end, bucket="daily",
+                          group_by="none", today=date(2026, 6, 20))
+    assert out["flag_precision"] == {
+        "reviewed": 2, "confirmed": 1, "overturned": 1, "precision_pct": 50.0,
+    }
+
+
+# --- system_health (v4 Pain 9) ----------------------------------------------
+
+
+def test_system_health_scored_without_content_pct_counts_only_no_content_analysis():
+    day = date(2026, 6, 1)
+    # 2 of 10 scored without a content/vision check (fail-open); the other 8
+    # have unrelated reason codes and must NOT be counted.
+    items = (
+        [_r(day, "Doubtful", 50, reason="no_content_analysis") for _ in range(2)]
+        + [_r(day, "Clear", 90, reason="clear") for _ in range(3)]
+        + [_r(day, "Suspect", 10, reason="recycled") for _ in range(2)]
+        + [_r(day, "Doubtful", 50, reason="too_blurred") for _ in range(3)]
+    )
+    out = system_health(items)
+    assert out["scored_without_content_pct"] == 20.0
+
+
+def test_system_health_median_processing_ms_odd_count():
+    day = date(2026, 6, 1)
+    items = [_r(day, processing_ms=ms) for ms in (100.0, 300.0, 200.0)]
+    out = system_health(items)
+    assert out["median_processing_ms"] == 200.0
+
+
+def test_system_health_median_processing_ms_even_count():
+    day = date(2026, 6, 1)
+    items = [_r(day, processing_ms=ms) for ms in (100.0, 200.0, 300.0, 400.0)]
+    out = system_health(items)
+    assert out["median_processing_ms"] == 250.0
+
+
+def test_system_health_empty_items_gives_null_for_both_fields():
+    out = system_health([])
+    assert out == {"scored_without_content_pct": None, "median_processing_ms": None}
+
+
+def test_aggregate_range_includes_system_health_block():
+    start, end = _dt(date(2026, 6, 8)), _dt(date(2026, 6, 15))
+    items = [
+        _r(date(2026, 6, 10), "Doubtful", 50, reason="no_content_analysis", processing_ms=100.0),
+        _r(date(2026, 6, 11), "Clear", 90, reason="clear", processing_ms=300.0),
+    ]
+    out = aggregate_range(items, [], [], start=start, end=end, bucket="daily",
+                          group_by="none", today=date(2026, 6, 20))
+    assert out["system_health"] == {
+        "scored_without_content_pct": 50.0, "median_processing_ms": 200.0,
+    }

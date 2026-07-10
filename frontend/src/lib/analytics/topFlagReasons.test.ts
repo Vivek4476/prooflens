@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { excludeClear, rankTopReasons, shouldScroll } from "./topFlagReasons";
+import { excludeClear, rankTopReasons, reasonShortLabel, shouldScroll } from "./topFlagReasons";
 import type { TopReason } from "@/lib/api/types";
 
 function reason(overrides: Partial<TopReason>): TopReason {
@@ -128,5 +128,17 @@ describe("shouldScroll", () => {
   it("scrolls for top 20 and all", () => {
     expect(shouldScroll(20)).toBe(true);
     expect(shouldScroll("all")).toBe(true);
+  });
+});
+
+describe("reasonShortLabel", () => {
+  it("maps known backend reason codes to their short label (mirrors REASON_SHORT_LABEL)", () => {
+    expect(reasonShortLabel("recycled")).toBe("Recycled image");
+    expect(reasonShortLabel("screen_recapture")).toBe("Photo of a screen");
+    expect(reasonShortLabel("too_blurred")).toBe("Too blurred");
+  });
+
+  it("falls back to the raw code for an unrecognized reason_code (never fabricates a label)", () => {
+    expect(reasonShortLabel("some_future_code")).toBe("some_future_code");
   });
 });

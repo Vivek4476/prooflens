@@ -56,7 +56,9 @@ export function FilterBar({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-3">
+      {/* Interactive range/bucket controls — hidden in print; the caption below keeps the
+          printed report's window unambiguous. */}
+      <div className="no-print flex flex-wrap items-center gap-3">
         <div className="flex flex-wrap items-center gap-1 rounded-md border border-border bg-surface p-1">
           {RANGE_PRESETS.map((p) => (
             <button

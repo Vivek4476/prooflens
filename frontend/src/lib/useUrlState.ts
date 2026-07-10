@@ -19,6 +19,27 @@ export function serializeState<T extends Record<string, string | undefined>>(
   return out;
 }
 
+/** Pure: apply this hook's OWNED keys onto a copy of the current querystring, preserving
+ *  any foreign params. This is what lets several independent `useUrlState` instances share
+ *  one URL (e.g. the global filters + two per-card aggregation overrides) without wiping
+ *  each other's params. Owned keys equal to their default (or empty) are removed. */
+export function mergeState<T extends Record<string, string | undefined>>(
+  current: URLSearchParams,
+  next: T,
+  defaults: Partial<T>,
+  allowedKeys: (keyof T)[],
+): URLSearchParams {
+  const params = new URLSearchParams(current.toString());
+  for (const key of allowedKeys) {
+    const k = String(key);
+    const v = next[key];
+    const isDefault = defaults[key] !== undefined && v === defaults[key];
+    if (v === undefined || v === "" || isDefault) params.delete(k);
+    else params.set(k, v as string);
+  }
+  return params;
+}
+
 /** Pure: parse a URLSearchParams into a typed state object, falling back to defaults
  *  and dropping keys not in `allowedKeys` (ignores unrelated query params). */
 export function parseState<T extends Record<string, string | undefined>>(
@@ -54,11 +75,13 @@ export function useUrlState<T extends Record<string, string | undefined>>(
   const setState = useCallback(
     (patch: Partial<T>) => {
       const next = { ...state, ...patch };
-      const serialized = serializeState(next, defaults);
-      const qs = new URLSearchParams(serialized).toString();
+      // Merge onto the FULL current querystring — only this hook's owned keys change; any
+      // params owned by other useUrlState instances (per-card overrides, etc.) are kept.
+      const params = mergeState(new URLSearchParams(searchParams.toString()), next, defaults, allowedKeys);
+      const qs = params.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
-    [state, defaults, pathname, router],
+    [state, defaults, allowedKeys, pathname, router, searchParams],
   );
 
   return [state, setState] as const;

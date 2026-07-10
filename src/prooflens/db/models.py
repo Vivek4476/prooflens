@@ -65,6 +65,23 @@ class Tenant(Base):
     jobs: Mapped[list[Job]] = relationship(back_populates="tenant")
 
 
+class ApiKey(Base):
+    __tablename__ = "api_keys"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id"), index=True
+    )
+    # sha256(raw key), hex (64 chars). The raw key is shown once at mint, never stored.
+    key_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    # First chars of the raw key, for display/debugging only (never reconstructable).
+    prefix: Mapped[str] = mapped_column(String(16))
+    label: Mapped[str] = mapped_column(String(120), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Non-null => inactive. Revocation sets this instead of deleting the row.
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class Job(Base):
     __tablename__ = "jobs"
     __table_args__ = (
@@ -141,6 +158,9 @@ class Result(Base):
     rubric_version: Mapped[str] = mapped_column(String(16))
     checks: Mapped[list] = mapped_column(JSONB, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Provenance: "direct" (/v1/score) | "webhook" (LSQ job) | "seed" (demo data).
+    # Stored (not derived) so the realistic-seed script can mark rows honestly.
+    source: Mapped[str] = mapped_column(String(16), default="direct")
 
     review_status: Mapped[str | None] = mapped_column(String(24), nullable=True)
     review_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
@@ -161,6 +181,7 @@ class Hierarchy(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"))
     agent_id: Mapped[str] = mapped_column(String(200))
+    agent_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     sm: Mapped[str | None] = mapped_column(String(200), nullable=True)
     rsm: Mapped[str | None] = mapped_column(String(200), nullable=True)
     srsm: Mapped[str | None] = mapped_column(String(200), nullable=True)

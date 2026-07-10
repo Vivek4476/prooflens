@@ -48,13 +48,13 @@ export function KpiRow({
         label="Total scored"
         value={formatCount(a.total)}
         sub={deltaSub(totalDelta)}
-        subTone={totalDelta.sentiment}
+        subDirection={totalDelta.direction}
       />
       <MetricCard
         label="Suspect rate"
         value={formatPct(a.suspect_pct)}
         sub={deltaSub(suspectRateDelta)}
-        subTone={suspectRateDelta.sentiment}
+        subDirection={suspectRateDelta.direction}
         accent
       />
       <MetricCard
@@ -62,7 +62,7 @@ export function KpiRow({
         value={formatScore(a.avg_score)}
         suffix="/ 100"
         sub={deltaSub(avgScoreDelta)}
-        subTone={avgScoreDelta.sentiment}
+        subDirection={avgScoreDelta.direction}
       />
       <MetricCard
         label="Duplicates caught"
@@ -74,7 +74,7 @@ export function KpiRow({
               ? "Comparison unavailable"
               : "Loading previous period…"
         }
-        subTone={dupDelta ? dupDelta.sentiment : "neutral"}
+        subDirection={dupDelta ? dupDelta.direction : undefined}
       />
     </div>
   );

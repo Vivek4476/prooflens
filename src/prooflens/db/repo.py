@@ -10,12 +10,15 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
+from sqlalchemy import func, or_
+from sqlalchemy.orm import aliased
+
 from ..engine.types import Verdict
 from ..queue import queue as q
 from ..service.views import JobView, ResultView, TenantView
 from ..tenants.service import resolve_scoring
 from .hashstore import PostgresHashStore
-from .models import AuditLog, Hierarchy, Job, Result, Tenant
+from .models import ApiKey, AuditLog, Hierarchy, Job, Result, Tenant
 
 
 def _tenant_view(t: Tenant) -> TenantView:
@@ -57,6 +60,42 @@ class PostgresRepo:
         t = self._session.get(Tenant, uuid.UUID(tenant_id))
         return _tenant_view(t) if t else None
 
+    def record_api_key(self, tenant_id: str, key_hash: str, prefix: str, label: str) -> str:
+        import uuid as _uuid
+        row = ApiKey(
+            tenant_id=_uuid.UUID(tenant_id), key_hash=key_hash, prefix=prefix, label=label
+        )
+        self._session.add(row)
+        self._session.flush()
+        return str(row.id)
+
+    def tenant_for_api_key(self, key_hash: str) -> TenantView | None:
+        row = (
+            self._session.query(ApiKey)
+            .filter(ApiKey.key_hash == key_hash, ApiKey.revoked_at.is_(None))
+            .one_or_none()
+        )
+        if row is None:
+            return None
+        t = (
+            self._session.query(Tenant)
+            .filter(Tenant.id == row.tenant_id, Tenant.active.is_(True))
+            .one_or_none()
+        )
+        return _tenant_view(t) if t else None
+
+    def revoke_api_key(self, key_id: str) -> None:
+        import uuid as _uuid
+
+        from sqlalchemy import func as _func
+        row = (
+            self._session.query(ApiKey)
+            .filter(ApiKey.id == _uuid.UUID(key_id))
+            .one_or_none()
+        )
+        if row is not None:
+            row.revoked_at = _func.now()
+
     def enqueue(self, tenant_id: str, event_id: str, payload: dict) -> tuple[str, bool]:
         tid = uuid.UUID(tenant_id)
         existing = (
@@ -88,6 +127,7 @@ class PostgresRepo:
         *,
         opportunity_id: str | None = None,
         rep_id: str | None = None,
+        source: str | None = None,
     ) -> str:
         from ..service.ids import normalize_id
 
@@ -102,19 +142,20 @@ class PostgresRepo:
             reason_code=verdict.reason_code,
             rubric_version=verdict.rubric_version,
             checks=[c.to_dict() for c in verdict.checks],
+            source=source or ("webhook" if job_id else "direct"),
         )
         self._session.add(row)
         self._session.flush()
         return str(row.id)
 
     def list_results(
-        self, *, limit: int = 50, offset: int = 0, band: str | None = None,
+        self, *, tenant_id: str, limit: int = 50, offset: int = 0, band: str | None = None,
         review: str | None = None, reason: str | None = None, rep_id: str | None = None,
         start: datetime | None = None, end: datetime | None = None,
     ) -> tuple[list[ResultView], int]:
         from ..service.ids import normalize_id
 
-        query = self._session.query(Result)
+        query = self._session.query(Result).filter(Result.tenant_id == uuid.UUID(tenant_id))
         if band:
             query = query.filter(Result.band == band)
         if reason is not None:
@@ -143,25 +184,36 @@ class PostgresRepo:
         views = [self._to_view(r, jobs.get(r.job_id) if r.job_id else None) for r in rows]
         return views, total
 
-    def get_result(self, result_id: str) -> ResultView | None:
+    def get_result(self, result_id: str, *, tenant_id: str) -> ResultView | None:
         try:
             rid = uuid.UUID(result_id)
+            tid = uuid.UUID(tenant_id)
         except (ValueError, AttributeError):
             return None  # not a valid id => treat as not found, not a 500
-        row = self._session.get(Result, rid)
+        row = (
+            self._session.query(Result)
+            .filter(Result.id == rid, Result.tenant_id == tid)
+            .one_or_none()
+        )
         if row is None:
             return None
         job = self._session.get(Job, row.job_id) if row.job_id else None
         return self._to_view(row, job)
 
     def record_review(
-        self, result_id: str, decision: str, note: str | None, reviewer: str
+        self, result_id: str, decision: str, note: str | None, reviewer: str,
+        *, tenant_id: str,
     ) -> ResultView | None:
         try:
             rid = uuid.UUID(result_id)
+            tid = uuid.UUID(tenant_id)
         except (ValueError, AttributeError):
             return None
-        row = self._session.get(Result, rid)
+        row = (
+            self._session.query(Result)
+            .filter(Result.id == rid, Result.tenant_id == tid)
+            .one_or_none()
+        )
         if row is None:
             return None
         row.review_status = decision
@@ -190,6 +242,7 @@ class PostgresRepo:
             self._session.add(Hierarchy(
                 tenant_id=tid,
                 agent_id=normalize_id(r.get("agent_id")),
+                agent_name=r.get("agent_name") or None,
                 sm=r.get("sm"), rsm=r.get("rsm"), srsm=r.get("srsm"),
                 zonal_head=r.get("zonal_head"), branch=r.get("branch"), city=r.get("city"),
                 valid_from=r["valid_from"], upload_id=upload_id,
@@ -200,10 +253,60 @@ class PostgresRepo:
         tid = uuid.UUID(tenant_id)
         rows = self._session.query(Hierarchy).filter(Hierarchy.tenant_id == tid).all()
         return [{
-            "agent_id": h.agent_id, "sm": h.sm, "rsm": h.rsm, "srsm": h.srsm,
+            "agent_id": h.agent_id, "agent_name": h.agent_name,
+            "sm": h.sm, "rsm": h.rsm, "srsm": h.srsm,
             "zonal_head": h.zonal_head, "branch": h.branch, "city": h.city,
             "valid_from": h.valid_from, "upload_id": h.upload_id,
         } for h in rows]
+
+    def search_hierarchy(self, tenant_id: str, q: str, limit: int) -> list[dict]:
+        tid = uuid.UUID(tenant_id)
+        # Latest row per agent via DISTINCT ON (Postgres), then match + cap in SQL.
+        latest_sq = (
+            self._session.query(Hierarchy)
+            .filter(Hierarchy.tenant_id == tid)
+            .distinct(Hierarchy.agent_id)
+            .order_by(Hierarchy.agent_id, Hierarchy.valid_from.desc())
+            .subquery()
+        )
+        H = aliased(Hierarchy, latest_sq)
+        needle = q.strip().lower()
+        # Escape LIKE metacharacters so they match literally.
+        esc = needle.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pat = f"%{esc}%"
+        rows = (
+            self._session.query(H)
+            .filter(
+                or_(
+                    func.lower(H.agent_id).like(pat, escape="\\"),
+                    func.lower(func.coalesce(H.agent_name, "")).like(pat, escape="\\"),
+                )
+            )
+            .order_by(H.agent_id)
+            .limit(limit)
+            .all()
+        )
+        return [{
+            "agent_id": h.agent_id, "agent_name": h.agent_name,
+            "sm": h.sm, "rsm": h.rsm, "srsm": h.srsm,
+            "zonal_head": h.zonal_head, "branch": h.branch, "city": h.city,
+            "valid_from": h.valid_from, "upload_id": h.upload_id,
+        } for h in rows]
+
+    def result_counts_by_rep(
+        self, tenant_id: str, start: datetime | None, end: datetime | None
+    ) -> dict[str, int]:
+        tid = uuid.UUID(tenant_id)
+        query = (
+            self._session.query(Result.rep_id, func.count().label("n"))
+            .filter(Result.tenant_id == tid, Result.rep_id.isnot(None))
+        )
+        if start is not None:
+            query = query.filter(Result.created_at >= start)
+        if end is not None:
+            query = query.filter(Result.created_at < end)
+        query = query.group_by(Result.rep_id)
+        return {rep_id: n for rep_id, n in query.all()}
 
     def hierarchy_status(self, tenant_id: str) -> dict:
         from ..service.ids import normalize_id
@@ -259,7 +362,10 @@ class PostgresRepo:
             processing_ms=round(
                 sum(float(c.get("latency_ms") or 0.0) for c in (r.checks or [])), 1
             ),
-            source="webhook" if r.job_id else "direct",
+            # Prefer the stored column (set by the migration backfill / this
+            # repo going forward); fall back to the job_id derivation only for
+            # legacy rows the backfill somehow missed.
+            source=r.source if r.source else ("webhook" if r.job_id else "direct"),
             opportunity_id=opportunity_id,
             rep_id=rep_id,
             review_status=r.review_status,

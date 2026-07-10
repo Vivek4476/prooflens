@@ -34,6 +34,22 @@ The CLI and API follow this exact hierarchy; the dashboard must too.
   Suspect) and are **always paired with the word**. Colour never carries meaning
   on its own — colour-blind and greyscale readers get the same information.
 
+## Component budget
+
+- **The `/analytics` page carries at most 7 top-level components.** It
+  currently runs ~6 (KPI row, Capture Risk Trend, Band Mix, Top Flag Reasons,
+  By Team, insights rail) plus a compact system-health line. That line is the
+  7th slot.
+- **Any new widget must replace or relocate an existing one — never stack.**
+  Adding a component without removing or merging another is a budget
+  violation, not a feature. If a widget earns its place, name what it
+  replaces in the PR/SUMMARY.
+- **Not adopted from Salesforce dashboard doctrine:** splitting the page into
+  tabs or sub-pages (it breaks the single-page What → Why → Where → What-next
+  narrative the page is built to answer in order) and their higher visual
+  density (more chrome per widget than ProofLens's decision-first bar
+  allows). Both were considered and rejected for this page, not overlooked.
+
 ## Accessibility
 
 - **AA contrast** minimum for all text.

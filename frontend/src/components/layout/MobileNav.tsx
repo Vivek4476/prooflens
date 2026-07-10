@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Menu, Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { SidebarInner } from "./Sidebar";
 
@@ -20,6 +21,14 @@ export function MobileNav() {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+
+  // The overlay is portaled to <body> so its fixed positioning is viewport-
+  // relative. Rendered inline it would be trapped by the Topbar's backdrop-blur
+  // (a backdrop-filter ancestor establishes a containing block for fixed
+  // descendants), clipping the drawer + scrim to the 64px header. portalReady
+  // gates the portal until after mount so SSR never touches document.body.
+  const [portalReady, setPortalReady] = useState(false);
+  useEffect(() => setPortalReady(true), []);
 
   // Lock body scroll while the drawer is open.
   useEffect(() => {
@@ -86,8 +95,10 @@ export function MobileNav() {
         <Menu size={18} />
       </button>
 
-      <AnimatePresence>
-        {open && (
+      {portalReady &&
+        createPortal(
+          <AnimatePresence>
+            {open && (
           <>
             <motion.button
               initial={{ opacity: 0 }}
@@ -151,8 +162,10 @@ export function MobileNav() {
               </div>
             </motion.div>
           </>
+            )}
+          </AnimatePresence>,
+          document.body,
         )}
-      </AnimatePresence>
     </div>
   );
 }

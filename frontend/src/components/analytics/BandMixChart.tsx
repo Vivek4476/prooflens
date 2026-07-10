@@ -1,23 +1,85 @@
 "use client";
+import { useMemo } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ChartCard } from "@/components/ui/ChartCard";
-import type { AnalyticsBucket } from "@/lib/api/types";
+import { ChartTooltip } from "@/components/analytics/ChartTooltip";
+import { CardAggChip, CardAggSelect } from "@/components/analytics/CardAggControl";
+import { useAnalytics } from "@/lib/api/hooks";
+import type { AnalyticsBucket, AnalyticsParams, Bucket } from "@/lib/api/types";
 import { bucketsWithData, MIN_BAND_MIX_BUCKETS, toBandMixData, type BandMixPoint } from "@/lib/analytics/chartData";
+import { effectiveBucket, isOverridden } from "@/lib/analytics/cardOverride";
+import { BANDMIX_AGG_PARAM, useCardAggOverride } from "@/lib/analytics/useCardAggOverride";
 import { formatCount } from "@/lib/format";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 
 /** ≤400ms per BRAND.md §11's chart draw-in ceiling. */
 const ANIMATION_DURATION_MS = 350;
 
-export function BandMixChart({ buckets }: { buckets: AnalyticsBucket[] }) {
+export function BandMixChart({
+  buckets,
+  bucket: globalBucket,
+  from,
+  to,
+}: {
+  buckets: AnalyticsBucket[];
+  /** The page's global bucket + resolved range — needed so this card can gate
+   *  its own override options and, when overridden, run its own query. */
+  bucket: Bucket;
+  from?: string;
+  to?: string;
+}) {
   const reducedMotion = usePrefersReducedMotion();
-  const withData = bucketsWithData(buckets);
+  const [choice, setChoice] = useCardAggOverride(BANDMIX_AGG_PARAM);
+  const overridden = isOverridden(choice, globalBucket);
+  const cardBucket = effectiveBucket(choice, globalBucket);
+
+  // Only fetch a second, card-owned query when genuinely overridden — see
+  // CaptureRiskTrend for the same pattern (mirrors ByTeamPanel's own-query model).
+  const ownParams: AnalyticsParams = useMemo(
+    () => ({ start_date: from, end_date: to, bucket: cardBucket, group_by: "none" }),
+    [from, to, cardBucket],
+  );
+  const ownEnabled = overridden && Boolean(from && to);
+  const { data: ownData, isError: ownIsError, isPlaceholderData: ownIsPlaceholder } = useAnalytics(
+    ownParams,
+    ownEnabled,
+  );
+
+  const action = (
+    <div className="flex flex-col items-end gap-1.5">
+      <CardAggSelect choice={choice} onChange={setChoice} from={from} to={to} label="Band mix aggregation" />
+      {overridden && <CardAggChip bucket={cardBucket} onResync={() => setChoice("page")} />}
+    </div>
+  );
+
+  if (overridden && ownEnabled && ownIsError) {
+    return (
+      <ChartCard
+        title="Band mix"
+        subtitle="Clear / Doubtful / Suspect share per period."
+        height={280}
+        action={action}
+      >
+        <p className="grid h-full place-items-center text-center text-body-sm text-text-muted">
+          Couldn&apos;t load this card&apos;s {cardBucket} view — try resyncing to the page aggregation.
+        </p>
+      </ChartCard>
+    );
+  }
+
+  const effectiveBuckets = overridden ? (ownData?.buckets ?? []) : buckets;
+  const withData = bucketsWithData(effectiveBuckets);
 
   // Zero data-bearing buckets: nothing to plot, no X-domain — replace the chart body
   // with a caption entirely (matches the ChartCard body-slot pattern used elsewhere).
   if (withData.length === 0) {
     return (
-      <ChartCard title="Band mix" subtitle="Clear / Doubtful / Suspect share per period." height={280}>
+      <ChartCard
+        title="Band mix"
+        subtitle="Clear / Doubtful / Suspect share per period."
+        height={280}
+        action={action}
+      >
         <p className="grid h-full place-items-center text-center text-body-sm text-text-muted">
           Not enough scored volume yet to show a band mix — check back once more periods have data.
         </p>
@@ -28,29 +90,47 @@ export function BandMixChart({ buckets }: { buckets: AnalyticsBucket[] }) {
   // 1-2 data-bearing buckets: still render what exists (X-domain = only buckets with
   // data, per the brief) but caption it so a two-point "trend" isn't over-read.
   const thin = withData.length < MIN_BAND_MIX_BUCKETS;
-  const data = toBandMixData(buckets);
+  const data = toBandMixData(effectiveBuckets);
 
   return (
-    <ChartCard title="Band mix" subtitle="Clear / Doubtful / Suspect share per period." height={280}>
+    <ChartCard title="Band mix" subtitle="Clear / Doubtful / Suspect share per period." height={280} action={action}>
       <div className="flex h-full flex-col">
         <div className="min-h-0 flex-1">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 12, fill: "var(--text-muted)" }} stroke="var(--border)" />
+          <ResponsiveContainer
+            width="100%"
+            height="100%"
+            className={overridden && ownIsPlaceholder ? "opacity-60 transition-opacity" : "transition-opacity"}
+          >
+            <BarChart
+              data={data}
+              margin={{ top: 12, right: 8, left: 0, bottom: 0 }}
+              barCategoryGap={data.length > 20 ? "8%" : "24%"}
+              maxBarSize={40}
+            >
+              <CartesianGrid strokeDasharray="2 4" stroke="var(--border)" vertical={false} />
+              <XAxis
+                dataKey="label"
+                tickLine={false}
+                axisLine={{ stroke: "var(--border)" }}
+                tick={{ fontSize: 11, fill: "var(--text-muted)" }}
+                minTickGap={24}
+              />
               <YAxis
                 tickFormatter={(v) => `${Math.round(v)}%`}
                 domain={[0, 100]}
                 ticks={[0, 25, 50, 75, 100]}
-                tick={{ fontSize: 12, fill: "var(--text-muted)" }}
-                stroke="var(--border)"
+                tickLine={false}
+                axisLine={false}
+                width={42}
+                tick={{ fontSize: 11, fill: "var(--text-muted)" }}
               />
-              <Tooltip content={<BandMixTooltip />} />
+              <Tooltip content={<BandMixTooltip />} cursor={{ fill: "var(--text-muted)", opacity: 0.08 }} />
               <Legend
-                iconType="square"
-                iconSize={10}
+                iconType="circle"
+                iconSize={8}
                 verticalAlign="bottom"
-                wrapperStyle={{ fontSize: 12, color: "var(--text-muted)" }}
+                height={28}
+                wrapperStyle={{ fontSize: 11, color: "var(--text-muted)", paddingTop: 4 }}
               />
               <Bar
                 dataKey="Clear"
@@ -99,38 +179,18 @@ function BandMixTooltip({
   if (!active || !payload || payload.length === 0) return null;
   const point = payload[0].payload;
   return (
-    <div className="min-w-[200px] space-y-1.5 rounded-lg border border-border bg-surface p-3 text-body-sm shadow-2">
-      <p className="font-semibold text-text">
-        {label}
-        {point.incomplete && <span className="ml-1.5 font-normal text-text-muted">(in progress)</span>}
-      </p>
-      <div className="space-y-1 text-caption">
-        <div className="flex items-center justify-between gap-4">
-          <span className="flex items-center gap-1.5 text-text-secondary">
-            <span className="h-2 w-2 rounded" style={{ backgroundColor: "var(--verdict-clear)" }} />
-            Clear
-          </span>
-          <span className="font-medium tabular-nums text-text">{formatCount(point.rawClear)}</span>
-        </div>
-        <div className="flex items-center justify-between gap-4">
-          <span className="flex items-center gap-1.5 text-text-secondary">
-            <span className="h-2 w-2 rounded" style={{ backgroundColor: "var(--verdict-doubtful)" }} />
-            Doubtful
-          </span>
-          <span className="font-medium tabular-nums text-text">{formatCount(point.rawDoubtful)}</span>
-        </div>
-        <div className="flex items-center justify-between gap-4">
-          <span className="flex items-center gap-1.5 text-text-secondary">
-            <span className="h-2 w-2 rounded" style={{ backgroundColor: "var(--verdict-suspect)" }} />
-            Suspect
-          </span>
-          <span className="font-medium tabular-nums text-text">{formatCount(point.rawSuspect)}</span>
-        </div>
-      </div>
-      <div className="border-t border-border pt-1.5 flex items-center justify-between text-caption font-semibold text-text">
-        <span>Total</span>
-        <span className="tabular-nums">{formatCount(point.total)}</span>
-      </div>
-    </div>
+    <ChartTooltip
+      title={label ?? point.label}
+      titleNote={point.incomplete ? "(in progress)" : undefined}
+      rows={[
+        { label: "Clear", value: formatCount(point.rawClear), swatchColor: "var(--verdict-clear)" },
+        { label: "Doubtful", value: formatCount(point.rawDoubtful), swatchColor: "var(--verdict-doubtful)" },
+        { label: "Suspect", value: formatCount(point.rawSuspect), swatchColor: "var(--verdict-suspect)" },
+      ]}
+      // No per-bucket "previous" exists (backend's `previous` is a single period
+      // aggregate, not per-bucket) — omitted here rather than fabricated. The total
+      // row stands in as the footer instead of a dishonest comparison.
+      footer={`Total ${formatCount(point.total)}`}
+    />
   );
 }

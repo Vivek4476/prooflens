@@ -2,7 +2,8 @@
 
 import { Suspense, useMemo } from "react";
 
-import { BarChart3 } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, BarChart3 } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -10,11 +11,15 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Skeleton, CardsSkeleton } from "@/components/ui/Skeleton";
 import { FilterBar } from "@/components/analytics/FilterBar";
-import { InsightsPanel } from "@/components/analytics/InsightsPanel";
+import { InsightsRail } from "@/components/analytics/InsightsRail";
 import { KpiRow } from "@/components/analytics/KpiRow";
 import { CaptureRiskTrend } from "@/components/analytics/CaptureRiskTrend";
 import { BandMixChart } from "@/components/analytics/BandMixChart";
 import { TopFlagReasons } from "@/components/analytics/TopFlagReasons";
+import { ByTeamPanel } from "@/components/analytics/ByTeamPanel";
+import { ExportControls } from "@/components/analytics/ExportControls";
+import { ReviewQuality } from "@/components/analytics/ReviewQuality";
+import { SystemHealthLine } from "@/components/analytics/SystemHealthLine";
 import { useAnalytics } from "@/lib/api/hooks";
 import { useAnalyticsFilters } from "@/lib/analytics/useAnalyticsFilters";
 import type { AnalyticsParams } from "@/lib/api/types";
@@ -40,7 +45,7 @@ function AnalyticsSkeleton() {
 
 function AnalyticsPageInner() {
   const { params, preset, bucket, from, to, setPreset, setCustomRange, setBucket } = useAnalyticsFilters();
-  const { data: a, isLoading, isError, refetch, isPlaceholderData } = useAnalytics(params);
+  const { data: a, isLoading, isError, refetch, isPlaceholderData, dataUpdatedAt } = useAnalytics(params);
 
   // Second, cheap query for the previous period's duplicates_caught (not on `previous`).
   // CRITICAL: memoized — a fresh object identity every render would reset useAnalytics's
@@ -64,7 +69,27 @@ function AnalyticsPageInner() {
 
   return (
     <div className="space-y-8">
-      <PageHeader title="Analytics" description="Is capture risk trending up, and where should you look?" />
+      <PageHeader
+        title="Analytics"
+        description="Is capture risk trending up, and where should you look?"
+        actions={
+          <>
+            {/* Export the current view (CSV + print/PDF) — only once data has loaded. */}
+            {a && <ExportControls analytics={a} />}
+            {/* Primary next-action for the page (BRAND: one decision, one primary action).
+                Links to the full review queue — it isn't period-filterable, so the label
+                doesn't promise a filter the queue can't honour. Classes mirror Button's
+                primary (Focus Indigo); a Link can't wrap <button> as valid HTML. */}
+            <Link
+              href="/review"
+              className="no-print inline-flex h-10 min-h-[44px] items-center justify-center gap-2 rounded-md bg-accent px-4 text-body-sm font-medium text-accent-fg transition-colors hover:bg-accent-hover sm:min-h-0"
+            >
+              Review flagged captures
+              <ArrowRight aria-hidden className="h-4 w-4" />
+            </Link>
+          </>
+        }
+      />
       <FilterBar
         preset={preset}
         bucket={bucket}
@@ -94,18 +119,47 @@ function AnalyticsPageInner() {
           cta={{ label: "Analyze a photo", href: "/analyze" }}
         />
       ) : (
-        <div className={cn("space-y-8 transition-opacity", isPlaceholderData && "opacity-60")}>
-          <InsightsPanel analytics={a} prevDuplicatesCaught={prevDuplicatesCaught} />
-          <KpiRow
-            analytics={a}
-            prevDuplicatesCaught={prevDuplicatesCaught}
-            prevDuplicatesUnavailable={prevDuplicatesUnavailable}
-          />
-          <div className="grid gap-6 lg:grid-cols-2">
-            <CaptureRiskTrend buckets={a.buckets} previous={a.previous} />
-            <BandMixChart buckets={a.buckets} />
+        <div
+          className={cn(
+            "transition-opacity xl:grid xl:grid-cols-[minmax(0,1fr)_300px] xl:gap-8",
+            isPlaceholderData && "opacity-60",
+          )}
+        >
+          {/* Main column: KPIs → charts → reasons/teams (Pain 7 order). */}
+          <div className="space-y-8">
+            <KpiRow
+              analytics={a}
+              prevDuplicatesCaught={prevDuplicatesCaught}
+              prevDuplicatesUnavailable={prevDuplicatesUnavailable}
+            />
+            {/* Two quiet system-health signals under the KPIs (Pain 9). */}
+            {a.system_health && <SystemHealthLine health={a.system_health} />}
+            {/* Below xl the insights rail is a full-width block directly after the KPIs. */}
+            <div className="xl:hidden">
+              <InsightsRail analytics={a} prevDuplicatesCaught={prevDuplicatesCaught} dataUpdatedAt={dataUpdatedAt} />
+            </div>
+            {a.flag_precision && <ReviewQuality flagPrecision={a.flag_precision} />}
+            <div className="grid gap-6 lg:grid-cols-2">
+              <CaptureRiskTrend
+                buckets={a.buckets}
+                previous={a.previous}
+                bucket={bucket}
+                from={a.period.from}
+                to={a.period.to}
+              />
+              <BandMixChart buckets={a.buckets} bucket={bucket} from={a.period.from} to={a.period.to} />
+            </div>
+            <div className="grid gap-6 lg:grid-cols-2">
+              <TopFlagReasons topReasons={a.top_reasons} from={a.period.from} to={a.period.to} />
+              <ByTeamPanel startDate={a.period.from} endDate={a.period.to} />
+            </div>
           </div>
-          <TopFlagReasons topReasons={a.top_reasons} />
+          {/* Right rail: sticky insights for skimmers (xl and up). */}
+          <aside className="hidden xl:block">
+            <div className="sticky top-6">
+              <InsightsRail analytics={a} prevDuplicatesCaught={prevDuplicatesCaught} dataUpdatedAt={dataUpdatedAt} />
+            </div>
+          </aside>
         </div>
       )}
     </div>

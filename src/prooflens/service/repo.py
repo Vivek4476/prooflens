@@ -29,6 +29,18 @@ class Repo(Protocol):
     def get_tenant_by_slug(self, slug: str) -> TenantView | None: ...
     def get_tenant(self, tenant_id: str) -> TenantView | None: ...
 
+    def record_api_key(self, tenant_id: str, key_hash: str, prefix: str, label: str) -> str:
+        """Store a hashed API key for a tenant; return the new key's id."""
+        ...
+
+    def tenant_for_api_key(self, key_hash: str) -> TenantView | None:
+        """The active tenant owning a non-revoked key with this hash, else None."""
+        ...
+
+    def revoke_api_key(self, key_id: str) -> None:
+        """Mark a key inactive (idempotent; unknown id is a no-op)."""
+        ...
+
     def enqueue(self, tenant_id: str, event_id: str, payload: dict) -> tuple[str, bool]:
         """Return (job_id, created). created=False for a duplicate event id."""
         ...
@@ -45,39 +57,57 @@ class Repo(Protocol):
         *,
         opportunity_id: str | None = None,
         rep_id: str | None = None,
+        source: str | None = None,
     ) -> str:
-        """Persist a result and return its id. job_id None => a direct /v1/score."""
+        """Persist a result and return its id. job_id None => a direct /v1/score.
+        source defaults from job_id ("webhook" if set else "direct") unless a
+        caller (e.g. the seed script) explicitly overrides it (e.g. "seed")."""
         ...
 
     def list_results(
-        self, *, limit: int = 50, offset: int = 0, band: str | None = None,
+        self, *, tenant_id: str, limit: int = 50, offset: int = 0, band: str | None = None,
         review: str | None = None, reason: str | None = None, rep_id: str | None = None,
         start: datetime | None = None, end: datetime | None = None,
     ) -> tuple[list[ResultView], int]:
-        """Newest-first page of results + total matching count.
+        """Newest-first page of results + total matching count, scoped to tenant_id.
         review="pending" => undecided only; other value => exact review_status match.
         reason filters exact reason_code; rep_id filters normalized-exact rep_id.
         start/end are a half-open range: created_at >= start AND created_at < end."""
         ...
 
-    def get_result(self, result_id: str) -> ResultView | None:
-        """A single stored result by id, or None if it doesn't exist."""
+    def get_result(self, result_id: str, *, tenant_id: str) -> ResultView | None:
+        """A single stored result by id, scoped to tenant_id. None if it doesn't
+        exist or belongs to a different tenant."""
         ...
 
     def record_review(
-        self, result_id: str, decision: str, note: str | None, reviewer: str
+        self, result_id: str, decision: str, note: str | None, reviewer: str,
+        *, tenant_id: str,
     ) -> ResultView | None:
-        """Record a moderator decision on a result; write an audit event.
-        Returns the updated view, or None if result_id is unknown."""
+        """Record a moderator decision on a result scoped to tenant_id; write an
+        audit event. Returns the updated view, or None if result_id is unknown
+        or belongs to a different tenant (no mutation, no audit row)."""
         ...
 
     def replace_hierarchy(self, tenant_id: str, rows: list[dict], upload_id: str) -> None:
         """Atomically replace this tenant's hierarchy with rows.
-        Each row: {agent_id, sm, rsm, srsm, zonal_head, branch, city, valid_from(date)}."""
+        Each row: {agent_id, agent_name(optional), sm, rsm, srsm, zonal_head,
+        branch, city, valid_from(date)}."""
         ...
 
     def get_hierarchy_rows(self, tenant_id: str) -> list[dict]:
         """Current hierarchy rows for the tenant (dicts incl. upload_id)."""
+        ...
+
+    def search_hierarchy(self, tenant_id: str, q: str, limit: int) -> list[dict]:
+        """Latest hierarchy row per agent whose agent_id/agent_name contains q
+        (case-insensitive, % and _ literal), capped to limit, sorted by agent_id."""
+        ...
+
+    def result_counts_by_rep(
+        self, tenant_id: str, start: datetime | None, end: datetime | None
+    ) -> dict[str, int]:
+        """rep_id -> result count for this tenant in [start, end) (None = unbounded)."""
         ...
 
     def hierarchy_status(self, tenant_id: str) -> dict:
@@ -103,6 +133,8 @@ class InMemoryRepo:
         self.audit_log: list[dict] = []
         self._hierarchy: dict[str, list[dict]] = {}
         self._ids = itertools.count(1)
+        # key_hash -> {"id": str, "tenant_id": str, "revoked": bool}
+        self._api_keys: dict[str, dict] = {}
 
     def add_tenant(self, tenant: TenantView) -> None:
         self._tenants[tenant.id] = tenant
@@ -113,6 +145,22 @@ class InMemoryRepo:
 
     def get_tenant(self, tenant_id: str) -> TenantView | None:
         return self._tenants.get(tenant_id)
+
+    def record_api_key(self, tenant_id: str, key_hash: str, prefix: str, label: str) -> str:
+        key_id = str(next(self._ids))
+        self._api_keys[key_hash] = {"id": key_id, "tenant_id": tenant_id, "revoked": False}
+        return key_id
+
+    def tenant_for_api_key(self, key_hash: str) -> TenantView | None:
+        rec = self._api_keys.get(key_hash)
+        if rec is None or rec["revoked"]:
+            return None
+        return self._tenants.get(rec["tenant_id"])
+
+    def revoke_api_key(self, key_id: str) -> None:
+        for rec in self._api_keys.values():
+            if rec["id"] == key_id:
+                rec["revoked"] = True
 
     def enqueue(self, tenant_id: str, event_id: str, payload: dict) -> tuple[str, bool]:
         key = (tenant_id, event_id)
@@ -156,6 +204,7 @@ class InMemoryRepo:
         *,
         opportunity_id: str | None = None,
         rep_id: str | None = None,
+        source: str | None = None,
     ) -> str:
         rid = str(next(self._ids))
         self.results.append(
@@ -170,7 +219,7 @@ class InMemoryRepo:
                 rubric_version=verdict.rubric_version,
                 checks=[c.to_dict() for c in verdict.checks],
                 processing_ms=processing_ms(verdict),
-                source="webhook" if job_id else "direct",
+                source=source or ("webhook" if job_id else "direct"),
                 opportunity_id=opportunity_id,
                 rep_id=normalize_id(rep_id),
             )
@@ -178,11 +227,12 @@ class InMemoryRepo:
         return rid
 
     def list_results(
-        self, *, limit: int = 50, offset: int = 0, band: str | None = None,
+        self, *, tenant_id: str, limit: int = 50, offset: int = 0, band: str | None = None,
         review: str | None = None, reason: str | None = None, rep_id: str | None = None,
         start: datetime | None = None, end: datetime | None = None,
     ) -> tuple[list[ResultView], int]:
-        rows = [r for r in self.results if band is None or r.band == band]
+        rows = [r for r in self.results if r.tenant_id == tenant_id]
+        rows = [r for r in rows if band is None or r.band == band]
         if reason is not None:
             rows = [r for r in rows if r.reason_code == reason]
         if rep_id is not None:
@@ -205,13 +255,18 @@ class InMemoryRepo:
         rows = list(reversed(rows))  # newest first
         return rows[offset : offset + limit], len(rows)
 
-    def get_result(self, result_id: str) -> ResultView | None:
-        return next((r for r in self.results if r.id == result_id), None)
+    def get_result(self, result_id: str, *, tenant_id: str) -> ResultView | None:
+        return next(
+            (r for r in self.results if r.id == result_id and r.tenant_id == tenant_id), None
+        )
 
     def record_review(
-        self, result_id: str, decision: str, note: str | None, reviewer: str
+        self, result_id: str, decision: str, note: str | None, reviewer: str,
+        *, tenant_id: str,
     ) -> ResultView | None:
-        view = next((r for r in self.results if r.id == result_id), None)
+        view = next(
+            (r for r in self.results if r.id == result_id and r.tenant_id == tenant_id), None
+        )
         if view is None:
             return None
         view.review_status = decision
@@ -234,6 +289,7 @@ class InMemoryRepo:
         for r in rows:
             stored.append({
                 "agent_id": normalize_id(r.get("agent_id")),
+                "agent_name": r.get("agent_name") or None,
                 "sm": r.get("sm"),
                 "rsm": r.get("rsm"),
                 "srsm": r.get("srsm"),
@@ -247,6 +303,40 @@ class InMemoryRepo:
 
     def get_hierarchy_rows(self, tenant_id: str) -> list[dict]:
         return [dict(r) for r in self._hierarchy.get(tenant_id, [])]
+
+    def search_hierarchy(self, tenant_id: str, q: str, limit: int) -> list[dict]:
+        rows = self._hierarchy.get(tenant_id, [])
+        latest: dict[str, dict] = {}
+        for r in rows:
+            aid = r.get("agent_id")
+            if aid is None:
+                continue
+            cur = latest.get(aid)
+            if cur is None or r["valid_from"] > cur["valid_from"]:
+                latest[aid] = r
+        needle = q.strip().lower()
+        matches = [
+            r for r in latest.values()
+            if needle in (r["agent_id"] or "").lower()
+            or needle in (r.get("agent_name") or "").lower()
+        ]
+        matches.sort(key=lambda r: r["agent_id"])
+        return [dict(r) for r in matches[:limit]]
+
+    def result_counts_by_rep(
+        self, tenant_id: str, start: datetime | None, end: datetime | None
+    ) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for r in self.results:
+            if r.tenant_id != tenant_id or not r.rep_id or not r.created_at:
+                continue
+            ts = datetime.fromisoformat(r.created_at)
+            if start is not None and ts < start:
+                continue
+            if end is not None and ts >= end:
+                continue
+            counts[r.rep_id] = counts.get(r.rep_id, 0) + 1
+        return counts
 
     def hierarchy_status(self, tenant_id: str) -> dict:
         rows = self._hierarchy.get(tenant_id, [])

@@ -66,15 +66,37 @@ describe("computeInsights — suspectRateShift rule", () => {
     expect(insights.find((i) => i.id === "suspect-rate-shift")).toBeUndefined();
   });
 
-  it("fires when previous is 0 and current is 10 (Infinity relative change treated as a real shift)", () => {
+  it("does NOT fire a percentage/Infinity insight when previous.total is a large sample but prior suspect count is 0 (honest-states guard)", () => {
+    // previous.total (100) is well above MIN_PREV_N, so this isn't a small-sample
+    // case — it's a genuine "no prior Suspect captures" case. Percent-of-zero is
+    // still undefined, so no relative-% bullet may be emitted for it.
     const a = makeSummary({
       band_distribution: { Clear: 90, Doubtful: 0, Suspect: 10 },
       previous: { clear: 100, doubtful: 0, suspect: 0, total: 100, avg_score: 75 },
     });
     const insights = computeInsights(a, null);
     const hit = insights.find((i) => i.id === "suspect-rate-shift");
-    expect(hit).toBeDefined();
-    expect(hit?.severity).toBe("high");
+    if (hit) {
+      expect(hit.text).not.toMatch(/Infinity/i);
+      expect(hit.text).not.toMatch(/NaN/i);
+      expect(hit.text).not.toMatch(/%/);
+    }
+  });
+
+  it("never emits Infinity/NaN/% text when previous.total is below MIN_PREV_N, even with a huge current suspect count", () => {
+    const a = makeSummary({
+      band_distribution: { Clear: 0, Doubtful: 0, Suspect: 133 },
+      previous: { clear: 0, doubtful: 0, suspect: 0, total: 0, avg_score: 0 },
+    });
+    const insights = computeInsights(a, null);
+    for (const i of insights) {
+      expect(i.text).not.toMatch(/Infinity/i);
+      expect(i.text).not.toMatch(/NaN/i);
+    }
+    const hit = insights.find((i) => i.id === "suspect-rate-shift");
+    if (hit) {
+      expect(hit.text).not.toMatch(/%/);
+    }
   });
 
   it("fires with info severity and 'fell' wording when suspect volume falls", () => {
@@ -207,6 +229,31 @@ describe("computeInsights — duplicatesShift rule", () => {
     expect(insights.find((i) => i.id === "duplicates-shift")).toBeUndefined();
   });
 
+  it("does not emit Infinity/NaN/% text when previous.total is below MIN_PREV_N, even though prevDuplicatesCaught=0 and current=34 (honest-states guard, reproduces reported bug)", () => {
+    const a = makeSummary({
+      duplicates_caught: 34,
+      previous: { clear: 0, doubtful: 0, suspect: 0, total: 0, avg_score: 0 },
+    });
+    const insights = computeInsights(a, 0);
+    const hit = insights.find((i) => i.id === "duplicates-shift");
+    if (hit) {
+      expect(hit.text).not.toMatch(/Infinity/i);
+      expect(hit.text).not.toMatch(/NaN/i);
+      expect(hit.text).not.toMatch(/%/);
+    }
+  });
+
+  it("still fires a normal relative-% duplicates insight when previous.total is sufficient (regression guard)", () => {
+    const a = makeSummary({
+      duplicates_caught: 5,
+      previous: { clear: 80, doubtful: 12, suspect: 8, total: 100, avg_score: 75 },
+    });
+    const insights = computeInsights(a, 4);
+    const hit = insights.find((i) => i.id === "duplicates-shift");
+    expect(hit).toBeDefined();
+    expect(hit?.text).toContain("25%");
+  });
+
   it("fires with info severity and 'fell' wording when duplicates fall", () => {
     const a = makeSummary({ duplicates_caught: 4 });
     // previous=8: rel change (4-8)/8 = -50%
@@ -282,6 +329,49 @@ describe("computeInsights — fallback, ordering, and cap", () => {
     });
     const insights = computeInsights(a, 4);
     expect(insights.length).toBeLessThanOrEqual(5);
+  });
+});
+
+describe("computeInsights — drill-down href", () => {
+  it("suspect-rate-shift links to /history?band=Suspect with the current period", () => {
+    const a = makeSummary({
+      band_distribution: { Clear: 80, Doubtful: 10, Suspect: 10 },
+      previous: { clear: 80, doubtful: 12, suspect: 8, total: 100, avg_score: 75 },
+      period: { from: "2026-06-09", to: "2026-07-08" },
+    });
+    const hit = computeInsights(a, null).find((i) => i.id === "suspect-rate-shift");
+    expect(hit?.href).toBe("/history?band=Suspect&from=2026-06-09&to=2026-07-08");
+  });
+
+  it("dominant-reason links to /history?reason=<code> with the current period", () => {
+    const a = makeSummary({
+      top_reasons: [
+        reason({ reason_code: "screen_recapture", short_label: "Photo of a screen", count: 30 }),
+        reason({ reason_code: "blur", short_label: "Blurry", count: 70 }),
+      ],
+      period: { from: "2026-06-09", to: "2026-07-08" },
+    });
+    const hit = computeInsights(a, null).find((i) => i.id === "dominant-reason");
+    expect(hit?.href).toBe("/history?reason=screen_recapture&from=2026-06-09&to=2026-07-08");
+  });
+
+  it("duplicates-shift links to /history?reason=recycled (the real reason_code) with the current period", () => {
+    const a = makeSummary({
+      duplicates_caught: 5,
+      period: { from: "2026-06-09", to: "2026-07-08" },
+    });
+    const hit = computeInsights(a, 4).find((i) => i.id === "duplicates-shift");
+    expect(hit?.href).toBe("/history?reason=recycled&from=2026-06-09&to=2026-07-08");
+  });
+
+  it("avg-score-shift has no href — /v1/results has no avg-score filter to honour", () => {
+    const a = makeSummary({
+      avg_score: 65,
+      previous: { clear: 20, doubtful: 5, suspect: 5, total: 30, avg_score: 75 },
+    });
+    const hit = computeInsights(a, null).find((i) => i.id === "avg-score-shift");
+    expect(hit).toBeDefined();
+    expect(hit?.href).toBeUndefined();
   });
 });
 

@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { AbsliMasthead } from "@/components/brand/AbsliMasthead";
-import { PoweredByProofLens } from "@/components/brand/PoweredByProofLens";
+import { ProofLensMasthead } from "@/components/brand/ProofLensMasthead";
+import { TenantChip } from "@/components/brand/TenantChip";
 import { NAV } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
@@ -17,9 +17,10 @@ export function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <div className="flex h-full flex-col">
-      {/* ABSLI-first masthead: the tenant is the primary brand. */}
+      {/* ProofLens hosts the workspace (BRAND.md §9: product mark at top); the tenant's
+          own brand lives only in the bottom chip. */}
       <div className="border-b border-border px-4 py-4">
-        <AbsliMasthead />
+        <ProofLensMasthead />
       </div>
 
       <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
@@ -46,9 +47,8 @@ export function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
         })}
       </nav>
 
-      <div className="space-y-2.5 border-t border-border p-4">
-        <PoweredByProofLens />
-        <p className="text-caption text-text-muted">Scores &amp; flags — never blocks. Images are never stored.</p>
+      <div className="border-t border-border p-4">
+        <TenantChip />
       </div>
     </div>
   );

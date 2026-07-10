@@ -55,7 +55,7 @@ export default function DashboardPage() {
               <MetricCard label="Suspect %" value={a.suspect_pct} suffix="%" accent sub="of all verdicts" />
               <MetricCard label="Avg score" value={a.avg_score} suffix="/100" />
               <MetricCard label="Avg processing" value={formatMs(a.avg_processing_ms)} />
-              <MetricCard label="Duplicates caught" value={a.duplicates_caught} />
+              <MetricCard label="Duplicates caught" value={a.duplicates_caught} className="col-span-2 md:col-span-1" />
             </div>
           )}
 
