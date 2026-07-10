@@ -60,3 +60,25 @@ def test_compute_tier_is_stricter():
     assert client.post("/v1/bulk-score", json=payload).status_code in (200, 429)
     r = client.post("/v1/bulk-score", json=payload)
     assert r.status_code == 429
+
+
+def test_webhook_is_never_rate_limited():
+    # general=1: a non-exempt path would 429 on the 2nd call. The webhook
+    # must bypass the limiter entirely, so none of several calls return 429
+    # (they may 401/404/422 on signature/payload — that's fine).
+    client = _client(general=1, compute=0)
+    for _ in range(5):
+        r = client.post("/v1/webhooks/lsq/dev", json={"anything": "here"})
+        assert r.status_code != 429
+
+
+def test_compute_rejection_does_not_burn_general_budget():
+    # general=5, compute=1: 2nd bulk-score call rejects on compute, but must
+    # NOT have consumed the shared general counter — a subsequent /v1/results
+    # call should still succeed.
+    client = _client(general=5, compute=1)
+    payload = {"rows": [{"image_url": "https://x/p.jpg"}]}
+    assert client.post("/v1/bulk-score", json=payload).status_code in (200, 429)
+    r = client.post("/v1/bulk-score", json=payload)
+    assert r.status_code == 429
+    assert client.get("/v1/results").status_code == 200

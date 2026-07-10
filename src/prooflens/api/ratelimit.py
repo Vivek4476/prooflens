@@ -16,6 +16,15 @@ from fastapi import Request, Response
 # Paths under /v1/ that get the stricter "compute" tier.
 _COMPUTE_PATHS = ("/v1/score", "/v1/bulk-score")
 
+# Prefix bypassed entirely: HMAC-authed, machine-driven, fail-open ingestion.
+# Webhook senders share egress IPs, so gating this would collapse all webhook
+# traffic into one bucket and drop events. Docs promise this path is
+# unaffected by rate limiting.
+_EXEMPT_PREFIXES = ("/v1/webhooks/",)
+
+# Cap on distinct (bucket_key, tier) entries before an opportunistic prune.
+_PRUNE_THRESHOLD = 10_000
+
 
 class RateLimiter:
     """Fixed 60s window per (bucket_key, tier). check() returns
@@ -33,6 +42,8 @@ class RateLimiter:
         if limit <= 0:
             return True, 0  # 0/absent => unlimited
         t = time.time() if now is None else now
+        if len(self._buckets) > _PRUNE_THRESHOLD:
+            self.prune(now=t)
         key = (bucket_key, tier)
         start, count = self._buckets.get(key, (t, 0))
         if t - start >= self._window:
@@ -74,11 +85,13 @@ def make_rate_limit_middleware(limiter: RateLimiter):
         path = request.url.path
         if not path.startswith("/v1/"):
             return await call_next(request)
+        if path.startswith(_EXEMPT_PREFIXES):
+            return await call_next(request)
         bkey = _bucket_key(request)
-        # A compute request counts against BOTH tiers; the stricter one wins.
-        tiers = ["general"]
-        if path in _COMPUTE_PATHS:
-            tiers.append("compute")
+        # A compute request counts against BOTH tiers; check the stricter
+        # (compute) tier first so an over-limit compute call rejects without
+        # having already consumed the shared general budget.
+        tiers = (["compute"] if path in _COMPUTE_PATHS else []) + ["general"]
         for tier in tiers:
             allowed, retry = limiter.check(bkey, tier)
             if not allowed:
