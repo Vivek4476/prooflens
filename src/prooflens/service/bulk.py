@@ -91,6 +91,12 @@ class BulkJob:
         }
 
 
+# Keep at most this many jobs in the in-memory registry. A long-lived process
+# would otherwise retain every job (rows + per-row results) forever; evict the
+# oldest once over the cap. Phase 3's durable queue removes this ceiling.
+MAX_RETAINED_JOBS = 200
+
+
 class BulkJobRegistry:
     """In-memory job store keyed by job_id. Not persisted — Phase 1 scope
     (see the module docstring + BACKEND_REQUIREMENTS.md Phase 3 seam)."""
@@ -102,6 +108,9 @@ class BulkJobRegistry:
         job_id = str(uuid.uuid4())
         job = BulkJob(id=job_id, total=total, label=label)
         self._jobs[job_id] = job
+        # dict preserves insertion order, so the first key is the oldest job.
+        while len(self._jobs) > MAX_RETAINED_JOBS:
+            del self._jobs[next(iter(self._jobs))]
         return job
 
     def get(self, job_id: str) -> BulkJob | None:
@@ -146,7 +155,14 @@ async def run_bulk_job(
                 data = await anyio.to_thread.run_sync(lsq.fetch_image, row.image_url)
                 repo, close = repo_factory()
                 try:
-                    from ..api.scoring import score_bytes
+                    # Imported here to avoid a circular import at module load.
+                    # _score_limiter is the SAME process-wide CapacityLimiter
+                    # /v1/score uses: bulk scorings must share it so their memory
+                    # spikes queue behind (not stack on top of) live scoring —
+                    # BULK_CONCURRENCY only bounds rows within one job, not bulk
+                    # jobs against each other or against live traffic (the exact
+                    # unbounded-concurrency OOM scoring.py guards against).
+                    from ..api.scoring import _score_limiter, score_bytes
 
                     tenant_view = repo.get_tenant_by_slug(tenant_slug)
                     if tenant_view is None:
@@ -160,7 +176,8 @@ async def run_bulk_job(
                             rep_id=row.rep_id,
                             opportunity_id=row.opportunity_id,
                             source="bulk",
-                        )
+                        ),
+                        limiter=_score_limiter,
                     )
                     repo.commit()
                     # data (image bytes) is discarded here — never stored, only

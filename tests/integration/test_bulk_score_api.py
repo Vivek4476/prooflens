@@ -118,6 +118,35 @@ def test_get_unknown_bulk_job_404(client):
     assert r.status_code == 404
 
 
+def test_bulk_score_rejects_oversized_batch(client):
+    # A raw caller can't ingest an unbounded row list (OOM guard) — over the
+    # hard cap is a 422, not an accepted (and memory-resident) job.
+    from prooflens.api.bulk import MAX_BULK_ROWS
+
+    rows = [{"image_url": f"https://lsq.example/p{i}.jpg"} for i in range(MAX_BULK_ROWS + 1)]
+    r = client.post("/v1/bulk-score", json={"rows": rows})
+    assert r.status_code == 422
+
+
+def test_bulk_score_rejects_empty_batch(client):
+    r = client.post("/v1/bulk-score", json={"rows": []})
+    assert r.status_code == 422
+
+
+def test_bulk_registry_evicts_oldest_over_cap():
+    # The in-memory registry can't grow without bound: once over the retention
+    # cap, the oldest job is evicted (returns 404), newest stay resolvable.
+    from prooflens.service.bulk import MAX_RETAINED_JOBS, BulkJobRegistry
+
+    reg = BulkJobRegistry()
+    first = reg.create(total=1)
+    for _ in range(MAX_RETAINED_JOBS):
+        reg.create(total=1)
+    assert reg.get(first.id) is None  # oldest evicted
+    # The cap holds: never more than MAX_RETAINED_JOBS retained.
+    assert len(reg._jobs) == MAX_RETAINED_JOBS
+
+
 def test_bulk_score_unknown_tenant_row_field_shape(client):
     # Response shape sanity: exact keys per row, even for a null rep/opportunity.
     rows = [{"image_url": "https://lsq.example/p.jpg"}]

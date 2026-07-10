@@ -157,6 +157,24 @@ export default function BulkUploadPage() {
     }
   }, [valid, fileName]);
 
+  // Fetch the job once and reflect it into state (job, error, done->results).
+  // Shared by the automatic poll and the manual "Retry" button so the button
+  // actually updates the UI instead of firing a throwaway request.
+  const pollOnce = useCallback(async () => {
+    if (!jobId) return;
+    try {
+      const data = await api.bulkJob(jobId);
+      setJob(data);
+      setRunError(null);
+      if (data.status === "done") {
+        if (pollRef.current) clearInterval(pollRef.current);
+        setStage("results");
+      }
+    } catch (err) {
+      setRunError(errorDetail(err) ?? "Lost contact with the bulk job.");
+    }
+  }, [jobId]);
+
   // Poll the job until done. Errors here are surfaced but don't stop polling
   // (a transient network blip shouldn't abandon an in-progress job).
   useEffect(() => {
@@ -237,7 +255,7 @@ export default function BulkUploadPage() {
       )}
 
       {stage === "running" && (
-        <RunningStep job={job} runError={runError} onRetryJob={() => jobId && api.bulkJob(jobId)} />
+        <RunningStep job={job} runError={runError} onRetryJob={pollOnce} />
       )}
 
       {stage === "results" && job && (

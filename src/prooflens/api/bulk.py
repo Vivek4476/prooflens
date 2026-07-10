@@ -12,7 +12,7 @@ frontend/BACKEND_REQUIREMENTS.md.
 from __future__ import annotations
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..lsq.base import LSQClient
 from ..lsq.fake import FakeLSQClient
@@ -24,6 +24,13 @@ router = APIRouter(tags=["bulk"])
 
 DEFAULT_TENANT = "dev"
 
+# Hard cap on rows per bulk request. Every row's {url, ids, result} is held in
+# memory for the job's lifetime; an uncapped `rows` list lets a single POST
+# (bypassing the frontend) allocate arbitrary memory on an instance already
+# prone to OOM. Larger exports are split client-side. Phase 3's durable queue
+# streams rows and lifts this ceiling.
+MAX_BULK_ROWS = 1000
+
 
 class BulkRowIn(BaseModel):
     image_url: str
@@ -32,7 +39,7 @@ class BulkRowIn(BaseModel):
 
 
 class BulkScoreRequest(BaseModel):
-    rows: list[BulkRowIn]
+    rows: list[BulkRowIn] = Field(min_length=1, max_length=MAX_BULK_ROWS)
     label: str | None = None
 
 
