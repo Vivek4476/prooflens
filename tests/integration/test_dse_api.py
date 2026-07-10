@@ -251,6 +251,17 @@ def test_scorecard_truncated_flag_false_for_small(client, repo):
     assert r.json()["truncated"] is False
 
 
+def test_scorecard_truncated_flag_true_when_over_cap(client, repo, monkeypatch):
+    from prooflens.api import dse as dse_mod
+    monkeypatch.setattr(dse_mod, "_SCORECARD_LIMIT", 2)
+    _seed_results(repo, "A1", [
+        (date(2026, 6, 1), "Clear"), (date(2026, 6, 2), "Clear"), (date(2026, 6, 3), "Clear"),
+    ])  # 3 results > cap of 2
+    r = client.get("/v1/dse/A1", params={"from": "2026-06-01", "to": "2026-06-05"})
+    assert r.status_code == 200
+    assert r.json()["truncated"] is True
+
+
 def test_search_uses_repo_and_still_finds_by_name(client):
     # Regression: the reworked search still returns the seeded agents by name.
     body = client.get("/v1/dse", params={"q": "asha"}).json()

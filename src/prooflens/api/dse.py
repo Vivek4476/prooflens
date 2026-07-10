@@ -61,13 +61,13 @@ def search_dse(
     tenant: TenantView = Depends(require_tenant),
 ) -> dict:
     """Search the hierarchy by name (case-insensitive substring) or agent_id
-    (case-insensitive substring). Empty q -> the most-active DSEs (by result
-    count in the last 90 days), else the first N by agent_id. Capped at 25,
+    (case-insensitive substring). Empty q -> the most-active DSEs (by total
+    result count, all time), else the first N by agent_id. Capped at 25,
     tenant-scoped."""
     tenant_id = tenant.id
     needle = q.strip()
     if needle:
-        matches = repo.search_hierarchy(tenant_id, needle, _SEARCH_LIMIT)
+        matches = repo.search_hierarchy(tenant_id, needle, _SEARCH_LIMIT) if tenant_id else []
     else:
         rows = repo.get_hierarchy_rows(tenant_id) if tenant_id else []
         latest = _latest_rows_by_agent(rows)
