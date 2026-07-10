@@ -13,16 +13,25 @@
   --brand-crimson-hover: #a80d26;
   --brand-gold: #f4a623;
 
+  /* Accent — Focus Indigo (interaction: buttons, links, focus rings, selection) */
+  --accent: #4c5fd5;
+  --accent-hover: #3d4ec2;
+  /* Text placed ON a bg-accent fill (e.g. primary buttons). White passes AA on
+     the light-mode --accent; dark-mode --accent is a deliberately light
+     indigo (correct for accent-as-text on dark surfaces), so on-accent text
+     must flip dark to keep >=4.5:1 contrast. */
+  --accent-fg: #ffffff;
+
   /* Verdict semantics (always paired with the word) */
   --verdict-clear: #1f9d57;
   --verdict-doubtful: #e08a00;
-  --verdict-suspect: #c8102e;
+  --verdict-suspect: #dc2f45; /* was #c8102e — no longer collides with tenant crimson */
   --verdict-clear-bg: #e7f4ec;
   --verdict-doubtful-bg: #fbefdb;
-  --verdict-suspect-bg: #fbe7ea;
+  --verdict-suspect-bg: #fbe9ea; /* re-derived soft tint of #dc2f45 */
   --verdict-clear-fg: #14713e;
   --verdict-doubtful-fg: #8a5300;
-  --verdict-suspect-fg: #9c0c23;
+  --verdict-suspect-fg: #a3132a;
 
   /* Neutral canvas — warm grays on near-white (light mode) */
   --canvas: #fafaf8;
@@ -53,6 +62,10 @@
   --brand-crimson: #e64157; /* lifted for contrast on dark, brand-scoped only */
   --brand-crimson-hover: #f05467;
   --brand-gold: #f4a623;
+
+  --accent: #7b8cff;
+  --accent-hover: #93a1ff;
+  --accent-fg: #101012; /* dark text on light-indigo fill: ~7:1 contrast */
 
   --verdict-clear: #35c47e;
   --verdict-doubtful: #f0a83c;

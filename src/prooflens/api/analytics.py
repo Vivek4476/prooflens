@@ -7,11 +7,17 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import date, datetime, timedelta
+from statistics import median
 
-from ..service.hierarchy import resolve_node
+from ..engine.verdicts import Reason
+from ..service.hierarchy import agent_display_name, resolve_node
+from ..service.ids import normalize_id
 from ..service.views import ResultView
 
 # API group_by value -> hierarchy node field. "zone" is the friendly alias.
+# "agent" is special-cased: it groups by the result's own rep_id (not a
+# hierarchy node field) and labels with agent_display_name (name, falls back
+# to id) rather than a hierarchy lookup — see _groups below.
 GROUP_BY_FIELD: dict[str, str] = {
     "zone": "zonal_head",
     "srsm": "srsm",
@@ -19,6 +25,7 @@ GROUP_BY_FIELD: dict[str, str] = {
     "sm": "sm",
     "branch": "branch",
     "city": "city",
+    "agent": "agent",
 }
 
 
@@ -116,6 +123,54 @@ def build_buckets(
     return out
 
 
+# review_status values that count as a completed decision on a flagged result.
+# "escalate" and pending (None) are deliberately excluded from `reviewed`.
+_CONFIRMED_STATUSES = {"reject"}
+_OVERTURNED_STATUSES = {"approve", "false_positive"}
+
+
+def flag_precision(items: list[ResultView]) -> dict:
+    """Flag-precision KPI over `items`: a "flag" is any non-"Clear" band
+    (Doubtful or Suspect) — reuses the same band check `_tally` uses. Among
+    flagged results, only "reject"/"approve"/"false_positive" reviews count
+    toward `reviewed`; "escalate" and pending (None) are excluded entirely."""
+    confirmed = 0
+    overturned = 0
+    for r in items:
+        if r.band == "Clear":
+            continue
+        if r.review_status in _CONFIRMED_STATUSES:
+            confirmed += 1
+        elif r.review_status in _OVERTURNED_STATUSES:
+            overturned += 1
+    reviewed = confirmed + overturned
+    precision_pct = round(confirmed / reviewed * 100, 1) if reviewed > 0 else None
+    return {
+        "reviewed": reviewed,
+        "confirmed": confirmed,
+        "overturned": overturned,
+        "precision_pct": precision_pct,
+    }
+
+
+def system_health(items: list[ResultView]) -> dict:
+    """Additive system-health KPI over `items` (v4 Pain 9): what fraction of
+    results were scored without a content/vision check (fail-open degradation,
+    signalled by `reason_code == Reason.NO_CONTENT_ANALYSIS`), and the median
+    time-to-score across the period. Both are `None` when there are no items."""
+    total = len(items)
+    if total == 0:
+        return {"scored_without_content_pct": None, "median_processing_ms": None}
+    no_content = sum(
+        1 for r in items if r.reason_code == Reason.NO_CONTENT_ANALYSIS.value
+    )
+    proc = [r.processing_ms for r in items if r.processing_ms is not None]
+    return {
+        "scored_without_content_pct": round(no_content / total * 100, 1),
+        "median_processing_ms": round(median(proc), 1) if proc else None,
+    }
+
+
 def _node_label(rows: list[dict], r: ResultView, field: str) -> str:
     node = resolve_node(rows, r.rep_id, _scored_date(r))
     if node is None:
@@ -125,16 +180,44 @@ def _node_label(rows: list[dict], r: ResultView, field: str) -> str:
 
 
 def _groups(items: list[ResultView], rows: list[dict], field: str) -> list[dict]:
-    buckets: dict[str, list[ResultView]] = {}
+    # For the agent dimension, group by the agent's IDENTITY (normalised rep_id),
+    # not the display name: two DSEs who share a name must stay separate, and each
+    # row must carry the real agent_id so the UI can link to /dse?agent=<id>
+    # (the name won't resolve). For every other dimension the group key IS the
+    # node label. agent_display_name does a linear hierarchy scan, so memoise it
+    # per unique id rather than per result item.
+    is_agent = field == "agent"
+    entries: dict[str, dict] = {}  # key -> {label, agent_id, items}
+    name_cache: dict[str, str] = {}
     for r in items:
-        label = _node_label(rows, r, field)
-        buckets.setdefault(label, []).append(r)
+        agent_id: str | None = None
+        if is_agent:
+            rep = normalize_id(r.rep_id) if r.rep_id else None
+            if not rep:
+                key = label = "Unmapped"
+            else:
+                key = rep
+                agent_id = rep
+                cached = name_cache.get(rep)
+                if cached is None:
+                    cached = agent_display_name(rows, rep)
+                    name_cache[rep] = cached
+                label = cached
+        else:
+            key = label = _node_label(rows, r, field)
+        entry = entries.get(key)
+        if entry is None:
+            entry = {"label": label, "agent_id": agent_id, "items": []}
+            entries[key] = entry
+        entry["items"].append(r)
     total_all = len(items)
     out: list[dict] = []
-    for label, group in sorted(buckets.items()):
-        t = _tally(group)
-        out.append({
-            "node": label,
+    # Sort by display label, then key, so equal-named agents stay deterministic.
+    for key in sorted(entries, key=lambda k: (entries[k]["label"], k)):
+        entry = entries[key]
+        t = _tally(entry["items"])
+        row = {
+            "node": entry["label"],
             "total": t["total"],
             "clear": t["clear"],
             "doubtful": t["doubtful"],
@@ -142,7 +225,10 @@ def _groups(items: list[ResultView], rows: list[dict], field: str) -> list[dict]
             "avg_score": t["avg_score"],
             "suspect_rate": round(t["suspect"] / t["total"], 3) if t["total"] else 0.0,
             "share": round(t["total"] / total_all, 3) if total_all else 0.0,
-        })
+        }
+        if entry["agent_id"] is not None:
+            row["agent_id"] = entry["agent_id"]
+        out.append(row)
     return out
 
 
@@ -181,4 +267,6 @@ def aggregate_range(
         },
         "groups": groups,
         "reason_counts": reason_counts,
+        "flag_precision": flag_precision(items),
+        "system_health": system_health(items),
     }

@@ -11,6 +11,11 @@ const config: Config = {
           "crimson-hover": "var(--brand-crimson-hover)",
           gold: "var(--brand-gold)",
         },
+        accent: {
+          DEFAULT: "var(--accent)",
+          hover: "var(--accent-hover)",
+          fg: "var(--accent-fg)",
+        },
         verdict: {
           clear: "var(--verdict-clear)",
           doubtful: "var(--verdict-doubtful)",
@@ -66,11 +71,16 @@ const config: Config = {
           from: { opacity: "0", transform: "translateY(6px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
+        "tooltip-in": {
+          from: { opacity: "0", transform: "translateY(2px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
         shimmer: { "100%": { transform: "translateX(100%)" } },
       },
       animation: {
         "fade-in": "fade-in 180ms ease-out",
         "slide-up": "slide-up 200ms ease-out",
+        "tooltip-in": "tooltip-in 120ms ease-out",
       },
     },
   },

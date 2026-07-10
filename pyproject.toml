@@ -68,7 +68,7 @@ ignore = ["B008"]  # FastAPI Depends() in defaults
 [tool.mypy]
 python_version = "3.12"
 mypy_path = "src"
-packages = ["prooflens"]
+packages = ["prooflens", "scripts.lib"]
 ignore_missing_imports = true
 warn_unused_ignores = false
 no_implicit_optional = true

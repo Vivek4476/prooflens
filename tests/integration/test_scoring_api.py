@@ -32,6 +32,8 @@ def repo() -> InMemoryRepo:
 def client(repo) -> TestClient:
     app = create_app()
     app.dependency_overrides[get_repo] = lambda: repo
+    from prooflens.api.auth import require_tenant
+    app.dependency_overrides[require_tenant] = lambda: repo.get_tenant_by_slug("dev")
     return TestClient(app, raise_server_exceptions=False)
 
 
@@ -148,13 +150,6 @@ def test_explicit_override_to_misconfigured_live_backend_503s(client, monkeypatc
         )
     assert r.status_code == 503
     config.get_settings.cache_clear()
-
-
-def test_score_unknown_tenant_404(client):
-    with open(IMAGES_DIR / "meeting.jpg", "rb") as fh:
-        r = client.post("/v1/score", files={"image": ("m.jpg", fh.read(), "image/jpeg")},
-                        data={"tenant": "nope"})
-    assert r.status_code == 404
 
 
 def test_results_and_analytics_populate(client):
@@ -279,6 +274,21 @@ def test_analytics_additive_keys_present(client):
         assert k in body
     assert body["groups"] == []                       # group_by defaults to none
     assert "short_label" in body["top_reasons"][0]
+    assert set(body["flag_precision"]) == {
+        "reviewed", "confirmed", "overturned", "precision_pct",
+    }
+
+
+def test_analytics_flag_precision_reflects_reviewed_flags(client, repo):
+    _backdate(repo, "A1", "Suspect", 10, "recycled", 2)
+    _backdate(repo, "A2", "Suspect", 10, "recycled", 2)
+    flagged = [r for r in repo.results if r.band == "Suspect"]
+    flagged[0].review_status = "reject"       # confirmed
+    flagged[1].review_status = "approve"      # overturned
+    body = client.get("/v1/analytics/summary").json()
+    assert body["flag_precision"] == {
+        "reviewed": 2, "confirmed": 1, "overturned": 1, "precision_pct": 50.0,
+    }
 
 
 def test_analytics_from_to_aliases(client):

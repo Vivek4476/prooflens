@@ -19,7 +19,7 @@
   }
   /* Visible, accessible focus rings everywhere */
   :focus-visible {
-    outline: 2px solid var(--ring);
+    outline: 2px solid var(--accent);
     outline-offset: 2px;
     border-radius: 4px;
   }
@@ -60,5 +60,41 @@
       transparent
     );
     animation: shimmer 1.4s infinite;
+  }
+}
+
+/* Print / Save-as-PDF: strip the app chrome and interactive controls, keep the data and let
+   it flow across as many pages as needed. (Print in light mode for a clean report.) */
+@media print {
+  @page {
+    margin: 14mm;
+  }
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  /* App chrome + interactive controls never print. */
+  aside,
+  header,
+  .no-print,
+  select,
+  label:has(select) {
+    display: none !important;
+  }
+  main {
+    height: auto !important;
+    overflow: visible !important;
+  }
+  /* Cards and charts stay whole on a page rather than splitting mid-figure. */
+  .card {
+    box-shadow: none !important;
+    border-color: #e5e5e5 !important;
+    break-inside: avoid;
+  }
+  .recharts-responsive-container,
+  figure {
+    break-inside: avoid;
   }
 }

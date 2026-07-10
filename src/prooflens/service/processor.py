@@ -71,6 +71,8 @@ def process_job(job: JobView, *, repo: Repo, lsq: LSQClient, settings: Settings)
     if opportunity_id:
         lsq.update_custom_fields(opportunity_id, _ordered_updates(tenant, verdict))
 
+    # source defaults from job_id ("webhook" since job.id is set here); no
+    # override needed — only the seed script passes source explicitly.
     repo.record_result(
         tenant.id,
         job.id,

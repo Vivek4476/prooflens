@@ -62,6 +62,7 @@ export interface ResultsPage {
 export interface TopReason {
   reason_code: string;
   reason: string;
+  short_label: string; // NEW — always present now
   count: number;
 }
 
@@ -74,6 +75,45 @@ export interface DaySeries {
   avg_score: number;
 }
 
+export interface AnalyticsBucket {
+  bucket_label: string;
+  start: string; // YYYY-MM-DD
+  end: string; // YYYY-MM-DD
+  clear: number;
+  doubtful: number;
+  suspect: number;
+  total: number;
+  avg_score: number;
+  incomplete: boolean;
+}
+
+export interface PeriodAggregate {
+  clear: number;
+  doubtful: number;
+  suspect: number;
+  total: number;
+  avg_score: number;
+}
+
+export interface PeriodBounds {
+  from: string; // YYYY-MM-DD
+  to: string; // YYYY-MM-DD
+}
+
+export interface AnalyticsGroup {
+  node: string;
+  total: number;
+  clear: number;
+  doubtful: number;
+  suspect: number;
+  avg_score: number;
+  suspect_rate: number;
+  share: number;
+  // Present only for group_by=agent: the real agent_id (node is the display
+  // name). Used to link a DSE row to /dse?agent=<id> — the name won't resolve.
+  agent_id?: string;
+}
+
 export interface AnalyticsSummary {
   total: number;
   images_today: number;
@@ -83,7 +123,47 @@ export interface AnalyticsSummary {
   avg_processing_ms: number;
   duplicates_caught: number;
   top_reasons: TopReason[];
-  series: DaySeries[];
+  series: DaySeries[]; // legacy, unchanged — still used by Dashboard if applicable
+  buckets: AnalyticsBucket[]; // NEW
+  incomplete: boolean; // NEW
+  previous: PeriodAggregate; // NEW
+  period: PeriodBounds; // NEW
+  previous_period: PeriodBounds; // NEW
+  groups: AnalyticsGroup[]; // NEW — unused by Phase A UI, present for type completeness
+  flag_precision?: FlagPrecision; // Gate 3 — optional so older API responses still type-check
+  system_health?: SystemHealth; // Pain 9 — optional for backward-compat
+}
+
+/**
+ * System-health signals (Pain 9), so a vision-backend outage can't masquerade as a fraud
+ * trend. scored_without_content_pct = fail-open degradation rate; median_processing_ms =
+ * time-to-score. Both null when the period has no results.
+ */
+export interface SystemHealth {
+  scored_without_content_pct: number | null;
+  median_processing_ms: number | null;
+}
+
+/**
+ * How often a Doubtful/Suspect flag was confirmed on review (Gate 3).
+ * confirmed = reject; overturned = approve + false_positive; reviewed = confirmed + overturned
+ * (escalate and pending excluded). precision_pct = confirmed/reviewed*100, null when reviewed 0.
+ */
+export interface FlagPrecision {
+  reviewed: number;
+  confirmed: number;
+  overturned: number;
+  precision_pct: number | null;
+}
+
+export type Bucket = "daily" | "weekly" | "monthly";
+export type GroupBy = "none" | "zone" | "srsm" | "rsm" | "sm" | "branch" | "city" | "agent";
+
+export interface AnalyticsParams {
+  start_date?: string; // YYYY-MM-DD
+  end_date?: string; // YYYY-MM-DD
+  bucket?: Bucket;
+  group_by?: GroupBy;
 }
 
 export interface ScoringConfig {
@@ -121,3 +201,92 @@ export interface ReviewBlock {
 }
 
 export type HealthState = "ok" | "degraded" | "down" | "loading";
+
+// --- Bulk upload (Phase 1) ---------------------------------------------
+
+/** One row of the POST /v1/bulk-score request body — a mapped CSV row. */
+export interface BulkScoreRow {
+  image_url: string;
+  rep_id: string | null;
+  opportunity_id: string | null;
+}
+
+export interface BulkScoreResponse {
+  job_id: string;
+  total: number;
+}
+
+export type BulkJobStatus = "queued" | "running" | "done";
+
+/** Per-photo outcome inside a bulk job. `band`/`score`/`reason_code`/`result_id`
+ *  are null until scored; `error` is set (and the rest stay null) on a
+ *  fail-open per-row failure — the batch continues regardless. */
+export interface BulkResultItem {
+  image_url: string;
+  rep_id: string | null;
+  opportunity_id: string | null;
+  band: Band | null;
+  score: number | null;
+  reason_code: string | null;
+  result_id: string | null;
+  error: string | null;
+}
+
+export interface BulkJob {
+  status: BulkJobStatus;
+  processed: number;
+  total: number;
+  results: BulkResultItem[];
+}
+
+// --- DSE (agent) scorecard + search ---
+
+export interface DseSearchResult {
+  agent_id: string;
+  name: string;
+  branch: string | null;
+  sm: string | null;
+}
+
+export interface DseSearchResponse {
+  results: DseSearchResult[];
+}
+
+export interface DseChain {
+  sm: string | null;
+  rsm: string | null;
+  srsm: string | null;
+  zone: string | null;
+  branch: string | null;
+  city: string | null;
+}
+
+export interface DseTrendPoint {
+  bucket_label: string;
+  start: string; // YYYY-MM-DD
+  end: string; // YYYY-MM-DD
+  suspect: number;
+  total: number;
+  suspect_rate: number;
+  incomplete: boolean;
+}
+
+export interface DseTopReason {
+  reason_code: string;
+  short_label: string;
+  count: number;
+}
+
+export interface DseScorecard {
+  agent_id: string;
+  name: string;
+  chain: DseChain;
+  total: number;
+  band_distribution: Record<Band, number>;
+  suspect_rate: number;
+  avg_score: number;
+  top_reasons: DseTopReason[];
+  trend: DseTrendPoint[];
+  recent: ResultItem[];
+  truncated: boolean; // true when total exceeded the scorecard's 5000 cap
+}

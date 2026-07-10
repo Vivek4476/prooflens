@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Menu, Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { SidebarInner } from "./Sidebar";
 
@@ -21,6 +22,14 @@ export function MobileNav() {
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 
+  // The overlay is portaled to <body> so its fixed positioning is viewport-
+  // relative. Rendered inline it would be trapped by the Topbar's backdrop-blur
+  // (a backdrop-filter ancestor establishes a containing block for fixed
+  // descendants), clipping the drawer + scrim to the 64px header. portalReady
+  // gates the portal until after mount so SSR never touches document.body.
+  const [portalReady, setPortalReady] = useState(false);
+  useEffect(() => setPortalReady(true), []);
+
   // Lock body scroll while the drawer is open.
   useEffect(() => {
     if (!open) return;
@@ -32,7 +41,16 @@ export function MobileNav() {
   }, [open]);
 
   // Move focus into the drawer on open; restore it to the trigger on close.
+  // Skip on mount — only run this in response to an actual open/close
+  // transition, never on first render (otherwise the hamburger trigger
+  // steals focus from the page on every load, before the user has done
+  // anything).
+  const mounted = useRef(false);
   useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
     if (open) {
       closeRef.current?.focus();
       return;
@@ -77,8 +95,10 @@ export function MobileNav() {
         <Menu size={18} />
       </button>
 
-      <AnimatePresence>
-        {open && (
+      {portalReady &&
+        createPortal(
+          <AnimatePresence>
+            {open && (
           <>
             <motion.button
               initial={{ opacity: 0 }}
@@ -142,8 +162,10 @@ export function MobileNav() {
               </div>
             </motion.div>
           </>
+            )}
+          </AnimatePresence>,
+          document.body,
         )}
-      </AnimatePresence>
     </div>
   );
 }
