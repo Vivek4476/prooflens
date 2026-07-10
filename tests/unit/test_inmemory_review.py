@@ -42,8 +42,8 @@ def test_list_results_review_filter():
     a = repo.record_result("t1", None, _verdict())
     repo.record_result("t1", None, _verdict())  # left pending
     repo.record_review(a, "reject", None, "Demo Operator")
-    pending, _ = repo.list_results(review="pending")
-    rejected, _ = repo.list_results(review="reject")
+    pending, _ = repo.list_results(tenant_id="t1", review="pending")
+    rejected, _ = repo.list_results(tenant_id="t1", review="reject")
     assert len(pending) == 1 and pending[0].review_status is None
     assert len(rejected) == 1 and rejected[0].id == a
 
@@ -58,11 +58,11 @@ def test_list_results_filters_by_date_range():
     repo.results[1].created_at = "2026-07-08T09:00:00+00:00"
 
     start = datetime(2026, 7, 5, tzinfo=UTC)
-    rows, total = repo.list_results(start=start)
+    rows, total = repo.list_results(tenant_id="t1", start=start)
     assert total == 1
     assert rows[0].created_at.startswith("2026-07-08")
 
     end = datetime(2026, 7, 5, tzinfo=UTC)
-    rows, total = repo.list_results(end=end)
+    rows, total = repo.list_results(tenant_id="t1", end=end)
     assert total == 1
     assert rows[0].created_at.startswith("2026-07-01")
