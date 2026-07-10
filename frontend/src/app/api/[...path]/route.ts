@@ -26,8 +26,10 @@ async function proxy(req: NextRequest, path: string[]): Promise<Response> {
 
   const upstream = await fetch(url, { method, headers, body, redirect: "manual" });
   const respHeaders = new Headers();
-  const ct = upstream.headers.get("content-type");
-  if (ct) respHeaders.set("content-type", ct);
+  for (const h of ["content-type", "location", "content-disposition", "cache-control"]) {
+    const v = upstream.headers.get(h);
+    if (v) respHeaders.set(h, v);
+  }
   return new Response(upstream.body, { status: upstream.status, headers: respHeaders });
 }
 

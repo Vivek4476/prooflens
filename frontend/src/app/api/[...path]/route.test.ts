@@ -54,4 +54,18 @@ describe("BFF proxy", () => {
     expect(res.status).toBe(202);
     expect(fetchMock.mock.calls[0][1]!.method).toBe("POST");
   });
+
+  it("forwards the location header on a 3xx upstream redirect", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, {
+        status: 302,
+        headers: { location: "https://example.com/elsewhere" },
+      }),
+    );
+    const res = await GET(req("http://localhost:3000/api/v1/results"), {
+      params: Promise.resolve({ path: ["v1", "results"] }),
+    });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("https://example.com/elsewhere");
+  });
 });
