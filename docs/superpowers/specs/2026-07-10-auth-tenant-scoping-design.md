@@ -82,9 +82,10 @@ api_keys(
   tenant-scoped.
 - **Untouched:** webhook (`/v1/webhooks/lsq/{slug}`, HMAC), admin routes (`X-Admin-Token`),
   `/healthz`, `/readyz`, `/metrics`, `/openapi.json`, `/docs`.
-- **Config:** `AUTH_ENABLED: bool = True` (`config.py`). When `False` (local dev convenience only),
-  `require_tenant` falls back to the `dev` tenant so a bare `curl` still works locally. Production
-  sets it `True`. The setting is the single switch; enforcement code lives in one dependency.
+- **Always enforced — no bypass switch.** There is deliberately no `AUTH_ENABLED=False` fallback (a
+  footgun if it ever shipped disabled). Local dev uses a real minted `dev` key held by the local BFF
+  env, exactly like production; tests use the `require_tenant` dependency override (below). One code
+  path, no "off" mode.
 
 ### ③ Next.js BFF proxy
 - **Catch-all route handler** `frontend/src/app/api/[...path]/route.ts` exporting `GET/POST/PUT/PATCH/DELETE`.
@@ -107,7 +108,7 @@ api_keys(
 ### ④ Rollout (production held)
 1. Migration `0007_api_keys` (additive; nullable/independent — no backfill).
 2. `scripts/mint_api_key.py --tenant dev` → set `PROOFLENS_TENANT_KEY` in Vercel (server) + wherever
-   server-to-server callers need it. `AUTH_ENABLED=True` on Render.
+   server-to-server callers need it. (Auth is always on — no enable flag to set.)
 3. Move `PROOFLENS_ADMIN_TOKEN` / `PROOFLENS_API_URL` to Vercel server env; remove
    `NEXT_PUBLIC_ADMIN_TOKEN`.
 4. Land backend + proxy together on this branch so preview always has a consistent pair. No data
@@ -117,8 +118,7 @@ api_keys(
 
 ### ⑤ Testing
 - **Backend unit** (`tests/unit/test_auth.py`): `require_tenant` — valid key → correct `TenantView`;
-  missing/blank header → 401; unknown key → 401; revoked key → 401; inactive tenant → 401;
-  `AUTH_ENABLED=False` → dev fallback.
+  missing/blank header → 401; unknown key → 401; revoked key → 401; inactive tenant → 401.
 - **Cross-tenant isolation** (`tests/integration/test_tenant_scoping.py`): seed tenant A + B each with
   results; A's key on `/v1/results` and `/v1/analytics/summary` and `/v1/dse` returns only A's data,
   never B's. `list_results` unit test: `tenant_id` filter excludes other tenants.
