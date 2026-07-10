@@ -25,7 +25,7 @@ def _verdict() -> Verdict:
 def test_record_review_updates_and_audits():
     repo = _repo()
     rid = repo.record_result("t1", None, _verdict())
-    view = repo.record_review(rid, "approve", "ok", "Demo Operator")
+    view = repo.record_review(rid, "approve", "ok", "Demo Operator", tenant_id="t1")
     assert view is not None
     assert view.review_status == "approve" and view.reviewer == "Demo Operator"
     assert view.reviewed_at is not None
@@ -34,14 +34,20 @@ def test_record_review_updates_and_audits():
 
 
 def test_record_review_unknown_id_returns_none():
-    assert _repo().record_review("nope", "approve", None, "Demo Operator") is None
+    assert _repo().record_review("nope", "approve", None, "Demo Operator", tenant_id="t1") is None
+
+
+def test_record_review_wrong_tenant_returns_none():
+    repo = _repo()
+    rid = repo.record_result("t1", None, _verdict())
+    assert repo.record_review(rid, "approve", None, "Demo Operator", tenant_id="other") is None
 
 
 def test_list_results_review_filter():
     repo = _repo()
     a = repo.record_result("t1", None, _verdict())
     repo.record_result("t1", None, _verdict())  # left pending
-    repo.record_review(a, "reject", None, "Demo Operator")
+    repo.record_review(a, "reject", None, "Demo Operator", tenant_id="t1")
     pending, _ = repo.list_results(tenant_id="t1", review="pending")
     rejected, _ = repo.list_results(tenant_id="t1", review="reject")
     assert len(pending) == 1 and pending[0].review_status is None

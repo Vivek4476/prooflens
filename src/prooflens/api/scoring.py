@@ -204,9 +204,13 @@ def list_results(
 
 
 @router.get("/v1/results/{result_id}")
-def get_result(result_id: str, repo: Repo = Depends(get_repo)) -> dict:
+def get_result(
+    result_id: str,
+    repo: Repo = Depends(get_repo),
+    tenant: TenantView = Depends(require_tenant),
+) -> dict:
     """A single stored verdict with its full evidence — the Verdict Detail view."""
-    result = repo.get_result(result_id)
+    result = repo.get_result(result_id, tenant_id=tenant.id)
     if result is None:
         raise HTTPException(status_code=404, detail=f"no result {result_id!r}")
     return result.to_dict()
@@ -214,10 +218,13 @@ def get_result(result_id: str, repo: Repo = Depends(get_repo)) -> dict:
 
 @router.post("/v1/results/{result_id}/review")
 def review_result(
-    result_id: str, body: ReviewBody, repo: Repo = Depends(get_repo)
+    result_id: str,
+    body: ReviewBody,
+    repo: Repo = Depends(get_repo),
+    tenant: TenantView = Depends(require_tenant),
 ) -> dict:
     """Record a moderator decision on a stored verdict (writes an audit event)."""
-    view = repo.record_review(result_id, body.decision, body.note, REVIEWER)
+    view = repo.record_review(result_id, body.decision, body.note, REVIEWER, tenant_id=tenant.id)
     if view is None:
         raise HTTPException(status_code=404, detail=f"no result {result_id!r}")
     return view.to_dict()

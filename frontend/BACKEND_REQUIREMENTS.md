@@ -334,9 +334,13 @@ small-sample values (never fabricated). Analytics `group_by=agent` added
 
 ## Auth (per-tenant API key) — implemented (#18)
 
-All `/v1/*` data routes require `Authorization: Bearer <key>`; missing/invalid/revoked → `401`.
-The key resolves the tenant and every query is filtered to it. Webhook (HMAC), admin
-(`X-Admin-Token`), and `/healthz`/`/readyz`/`/metrics` are unaffected.
+All `/v1/*` **tenant data** routes require `Authorization: Bearer <key>`;
+missing/invalid/revoked → `401`. The key resolves the tenant and every query is
+filtered to it — a valid key for the wrong tenant gets an honest `404` on a
+single-result lookup (e.g. `GET /v1/results/{id}`), never a leak of another
+tenant's data. The `/v1/admin/*` admin routes (e.g. `POST /v1/admin/hierarchy`)
+use `X-Admin-Token` instead, exactly like the legacy `/admin/*` routes. Webhook
+(HMAC) and `/healthz`/`/readyz`/`/metrics` are unaffected.
 
 **Keys:** minted via `python scripts/mint_api_key.py --tenant <slug> --label <note>` (prints the raw
 key once; only its sha256 is stored; revocable). **Never** shipped to the browser.

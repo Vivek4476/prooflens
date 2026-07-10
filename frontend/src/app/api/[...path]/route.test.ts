@@ -39,6 +39,19 @@ describe("BFF proxy", () => {
     expect(headers.get("authorization")).toBeNull();
   });
 
+  it("injects the admin token on v1/admin/* and not the bearer key", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("{}", { status: 200, headers: { "content-type": "application/json" } }),
+    );
+    await GET(req("http://localhost:3000/api/v1/admin/hierarchy"), {
+      params: Promise.resolve({ path: ["v1", "admin", "hierarchy"] }),
+    });
+    const init = fetchMock.mock.calls[0][1]!;
+    const headers = init.headers as Headers;
+    expect(headers.get("x-admin-token")).toBeTruthy();
+    expect(headers.get("authorization")).toBeNull();
+  });
+
   it("forwards a POST body", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response("{}", { status: 202, headers: { "content-type": "application/json" } }),

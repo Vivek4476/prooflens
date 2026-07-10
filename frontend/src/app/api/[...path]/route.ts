@@ -18,8 +18,11 @@ async function proxy(req: NextRequest, path: string[]): Promise<Response> {
   const headers = new Headers();
   const contentType = req.headers.get("content-type");
   if (contentType) headers.set("content-type", contentType);
-  if (suffix.startsWith("v1/") && TENANT_KEY) headers.set("authorization", `Bearer ${TENANT_KEY}`);
-  if (suffix.startsWith("admin/") && ADMIN_TOKEN) headers.set("x-admin-token", ADMIN_TOKEN);
+  // Admin routes live at both /admin/* and /v1/admin/* (e.g. hierarchy_admin);
+  // both use X-Admin-Token, never the tenant Bearer, so check admin FIRST.
+  const isAdmin = suffix.startsWith("admin/") || suffix.startsWith("v1/admin/");
+  if (isAdmin && ADMIN_TOKEN) headers.set("x-admin-token", ADMIN_TOKEN);
+  else if (suffix.startsWith("v1/") && TENANT_KEY) headers.set("authorization", `Bearer ${TENANT_KEY}`);
 
   const method = req.method.toUpperCase();
   const body = method === "GET" || method === "HEAD" ? undefined : await req.arrayBuffer();

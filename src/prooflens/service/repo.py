@@ -75,15 +75,18 @@ class Repo(Protocol):
         start/end are a half-open range: created_at >= start AND created_at < end."""
         ...
 
-    def get_result(self, result_id: str) -> ResultView | None:
-        """A single stored result by id, or None if it doesn't exist."""
+    def get_result(self, result_id: str, *, tenant_id: str) -> ResultView | None:
+        """A single stored result by id, scoped to tenant_id. None if it doesn't
+        exist or belongs to a different tenant."""
         ...
 
     def record_review(
-        self, result_id: str, decision: str, note: str | None, reviewer: str
+        self, result_id: str, decision: str, note: str | None, reviewer: str,
+        *, tenant_id: str,
     ) -> ResultView | None:
-        """Record a moderator decision on a result; write an audit event.
-        Returns the updated view, or None if result_id is unknown."""
+        """Record a moderator decision on a result scoped to tenant_id; write an
+        audit event. Returns the updated view, or None if result_id is unknown
+        or belongs to a different tenant (no mutation, no audit row)."""
         ...
 
     def replace_hierarchy(self, tenant_id: str, rows: list[dict], upload_id: str) -> None:
@@ -241,13 +244,18 @@ class InMemoryRepo:
         rows = list(reversed(rows))  # newest first
         return rows[offset : offset + limit], len(rows)
 
-    def get_result(self, result_id: str) -> ResultView | None:
-        return next((r for r in self.results if r.id == result_id), None)
+    def get_result(self, result_id: str, *, tenant_id: str) -> ResultView | None:
+        return next(
+            (r for r in self.results if r.id == result_id and r.tenant_id == tenant_id), None
+        )
 
     def record_review(
-        self, result_id: str, decision: str, note: str | None, reviewer: str
+        self, result_id: str, decision: str, note: str | None, reviewer: str,
+        *, tenant_id: str,
     ) -> ResultView | None:
-        view = next((r for r in self.results if r.id == result_id), None)
+        view = next(
+            (r for r in self.results if r.id == result_id and r.tenant_id == tenant_id), None
+        )
         if view is None:
             return None
         view.review_status = decision

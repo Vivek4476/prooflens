@@ -181,25 +181,36 @@ class PostgresRepo:
         views = [self._to_view(r, jobs.get(r.job_id) if r.job_id else None) for r in rows]
         return views, total
 
-    def get_result(self, result_id: str) -> ResultView | None:
+    def get_result(self, result_id: str, *, tenant_id: str) -> ResultView | None:
         try:
             rid = uuid.UUID(result_id)
+            tid = uuid.UUID(tenant_id)
         except (ValueError, AttributeError):
             return None  # not a valid id => treat as not found, not a 500
-        row = self._session.get(Result, rid)
+        row = (
+            self._session.query(Result)
+            .filter(Result.id == rid, Result.tenant_id == tid)
+            .one_or_none()
+        )
         if row is None:
             return None
         job = self._session.get(Job, row.job_id) if row.job_id else None
         return self._to_view(row, job)
 
     def record_review(
-        self, result_id: str, decision: str, note: str | None, reviewer: str
+        self, result_id: str, decision: str, note: str | None, reviewer: str,
+        *, tenant_id: str,
     ) -> ResultView | None:
         try:
             rid = uuid.UUID(result_id)
+            tid = uuid.UUID(tenant_id)
         except (ValueError, AttributeError):
             return None
-        row = self._session.get(Result, rid)
+        row = (
+            self._session.query(Result)
+            .filter(Result.id == rid, Result.tenant_id == tid)
+            .one_or_none()
+        )
         if row is None:
             return None
         row.review_status = decision
