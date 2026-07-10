@@ -22,7 +22,6 @@ restart loses in-flight job progress, not the scored data).
 
 from __future__ import annotations
 
-import asyncio
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -31,13 +30,22 @@ from typing import Any, Literal
 import anyio
 
 from ..lsq.base import LSQClient
+from ..service.views import TenantView
 from .repo import Repo
 
 RepoFactory = Callable[[], tuple[Repo, Callable[[], None]]]
 
-# Small fixed concurrency cap: never load/fetch the whole folder into memory
-# at once (Render has OOM'd before on unbounded concurrency — see scoring.py).
+# Per-job cap on rows processed concurrently — never fan out the whole batch at
+# once (Render has OOM'd before on unbounded concurrency — see scoring.py).
 BULK_CONCURRENCY = 4
+
+# Process-wide cap on concurrent image FETCHES across ALL bulk jobs. Each fetch
+# holds a full image's bytes in memory; the per-job BULK_CONCURRENCY bounds rows
+# within one job but not jobs against each other, so without this up to
+# MAX_INFLIGHT_JOBS × BULK_CONCURRENCY fetches could stack. Mirrors the
+# _score_limiter pattern that bounds decodes (scoring is capped by that limiter).
+BULK_FETCH_CONCURRENCY = 6
+_fetch_limiter = anyio.CapacityLimiter(BULK_FETCH_CONCURRENCY)
 
 JobStatus = Literal["queued", "running", "done"]
 
@@ -114,9 +122,17 @@ class BulkJobRegistry:
         job_id = str(uuid.uuid4())
         job = BulkJob(id=job_id, total=total, label=label)
         self._jobs[job_id] = job
-        # dict preserves insertion order, so the first key is the oldest job.
-        while len(self._jobs) > MAX_RETAINED_JOBS:
-            del self._jobs[next(iter(self._jobs))]
+        if len(self._jobs) > MAX_RETAINED_JOBS:
+            # Evict oldest DONE jobs only — never drop a queued/running job a
+            # client is still polling (that would 404 a live job). In-flight
+            # jobs are bounded by MAX_INFLIGHT_JOBS, so there are always enough
+            # done jobs to fall back under the cap. dict preserves insertion
+            # order, so iterating yields oldest-first.
+            for jid in list(self._jobs):
+                if len(self._jobs) <= MAX_RETAINED_JOBS:
+                    break
+                if jid != job_id and self._jobs[jid].status == "done":
+                    del self._jobs[jid]
         return job
 
     def get(self, job_id: str) -> BulkJob | None:
@@ -132,6 +148,43 @@ class BulkJobRegistry:
 registry = BulkJobRegistry()
 
 
+def _score_and_record_row(
+    data: bytes,
+    row: BulkRow,
+    tenant_view: TenantView,
+    backend: str | None,
+    repo_factory: RepoFactory,
+) -> dict[str, Any]:
+    """Synchronous score + persist for one row, run inside a worker thread.
+
+    Everything blocking (a fresh repo/session, the vision call, the DB write,
+    commit/close) stays OFF the event loop — running these on the loop would
+    stall health-check probes and concurrent scoring, the exact Render
+    502/OOM-kill scenario /v1/score offloads to avoid. ``score_bytes`` is the
+    SAME core /v1/score uses; the image bytes are discarded on return (only the
+    hash + verdict persist)."""
+    from ..api.scoring import score_bytes
+
+    repo, close = repo_factory()
+    try:
+        payload = score_bytes(
+            data,
+            tenant_view=tenant_view,
+            backend=backend,
+            repo=repo,
+            rep_id=row.rep_id,
+            opportunity_id=row.opportunity_id,
+            source="bulk",
+        )
+        repo.commit()
+        return payload
+    except Exception:
+        repo.rollback()
+        raise
+    finally:
+        close()
+
+
 async def run_bulk_job(
     job: BulkJob,
     rows: list[BulkRow],
@@ -141,66 +194,67 @@ async def run_bulk_job(
     repo_factory: RepoFactory,
     backend: str | None = None,
 ) -> None:
-    """Fetch -> score -> record_result for every row, bounded by a small
-    concurrency cap. Fail-open per row; never raises (a row's exception is
-    caught and recorded as that row's error, and the batch continues).
+    """Fetch -> score -> record_result for every row, bounded by concurrency
+    limiters. Fail-open per row; never raises (a row's exception is caught and
+    recorded as that row's error, and the batch continues).
 
-    ``repo_factory()`` must return a fresh ``(Repo, close)`` pair for the
-    caller's storage backend (e.g. a new PostgresRepo/session in production,
-    or the same InMemoryRepo instance with a no-op close in tests) — one call
-    per row, so concurrent rows never share a single mutable session.
+    Fetches share a process-wide ``_fetch_limiter``; scoring shares the
+    process-wide ``_score_limiter`` /v1/score uses — so neither stacks memory
+    spikes across bulk jobs or against live traffic. ``repo_factory()`` returns
+    a fresh ``(Repo, close)`` pair per row, off the event loop, so concurrent
+    rows never share a mutable session.
     """
+    # _score_limiter is the SAME process-wide CapacityLimiter /v1/score uses.
+    # Imported inside the function (not at module load) to keep the import graph
+    # acyclic and lazy. Once per job, not per row.
+    from ..api.scoring import _score_limiter
+
     job.status = "running"
-    semaphore = asyncio.Semaphore(BULK_CONCURRENCY)
     # Preallocate slots so results stay in row order regardless of completion order.
     job.results = [
         BulkRowResult(image_url=r.image_url, rep_id=r.rep_id, opportunity_id=r.opportunity_id)
         for r in rows
     ]
 
+    # Resolve the tenant ONCE for the whole batch, off the event loop. TenantView
+    # is a detached snapshot, safe to reuse across each row's own repo/session.
+    def _resolve_tenant() -> TenantView | None:
+        repo, close = repo_factory()
+        try:
+            return repo.get_tenant_by_slug(tenant_slug)
+        finally:
+            close()
+
+    tenant_view = await anyio.to_thread.run_sync(_resolve_tenant)
+    if tenant_view is None:
+        for out in job.results:
+            out.error = f"unknown tenant {tenant_slug!r}"
+        job.processed = len(job.results)
+        job.status = "done"
+        return
+
+    semaphore = anyio.Semaphore(BULK_CONCURRENCY)
+
     async def _process(index: int, row: BulkRow) -> None:
         async with semaphore:
             out = job.results[index]
             try:
-                data = await anyio.to_thread.run_sync(lsq.fetch_image, row.image_url)
-                repo, close = repo_factory()
-                try:
-                    # Imported here to avoid a circular import at module load.
-                    # _score_limiter is the SAME process-wide CapacityLimiter
-                    # /v1/score uses: bulk scorings must share it so their memory
-                    # spikes queue behind (not stack on top of) live scoring —
-                    # BULK_CONCURRENCY only bounds rows within one job, not bulk
-                    # jobs against each other or against live traffic (the exact
-                    # unbounded-concurrency OOM scoring.py guards against).
-                    from ..api.scoring import _score_limiter, score_bytes
-
-                    tenant_view = repo.get_tenant_by_slug(tenant_slug)
-                    if tenant_view is None:
-                        raise RuntimeError(f"unknown tenant {tenant_slug!r}")
-                    payload = await anyio.to_thread.run_sync(
-                        lambda: score_bytes(
-                            data,
-                            tenant_view=tenant_view,
-                            backend=backend,
-                            repo=repo,
-                            rep_id=row.rep_id,
-                            opportunity_id=row.opportunity_id,
-                            source="bulk",
-                        ),
-                        limiter=_score_limiter,
-                    )
-                    repo.commit()
-                    # data (image bytes) is discarded here — never stored, only
-                    # the hash + verdict persisted (inside score_bytes/record_result).
-                    out.band = payload["band"]
-                    out.score = int(round(payload["score"]))
-                    out.reason_code = payload["reason_code"]
-                    out.result_id = payload["result_id"]
-                except Exception:
-                    repo.rollback()
-                    raise
-                finally:
-                    close()
+                data = await anyio.to_thread.run_sync(
+                    lsq.fetch_image, row.image_url, limiter=_fetch_limiter
+                )
+                payload = await anyio.to_thread.run_sync(
+                    _score_and_record_row,
+                    data,
+                    row,
+                    tenant_view,
+                    backend,
+                    repo_factory,
+                    limiter=_score_limiter,
+                )
+                out.band = payload["band"]
+                out.score = int(round(payload["score"]))
+                out.reason_code = payload["reason_code"]
+                out.result_id = payload["result_id"]
             except Exception as exc:  # noqa: BLE001 — fail-open: record, keep going
                 out.error = str(exc)[:500]
             finally:

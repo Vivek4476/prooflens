@@ -35,6 +35,17 @@ def lsq() -> FakeLSQClient:
     return FakeLSQClient()
 
 
+@pytest.fixture(autouse=True)
+def _reset_registry():
+    # The bulk registry is a process-wide singleton; reset it around every test
+    # so jobs from one test can't pollute another's active_count/eviction state.
+    from prooflens.service import bulk as bulk_mod
+
+    bulk_mod.registry._jobs.clear()
+    yield
+    bulk_mod.registry._jobs.clear()
+
+
 @pytest.fixture
 def client(repo, lsq) -> TestClient:
     app = create_app()
@@ -149,6 +160,22 @@ def test_bulk_score_rejects_when_too_many_inflight(client):
             registry._jobs.pop(j.id, None)
 
 
+def test_bulk_registry_eviction_never_drops_in_flight_job():
+    # A still-running job must survive eviction — dropping it would 404 a live
+    # job the operator is polling. Only done jobs are evicted.
+    from prooflens.service.bulk import MAX_RETAINED_JOBS, BulkJobRegistry
+
+    reg = BulkJobRegistry()
+    running = reg.create(total=1)
+    running.status = "running"  # oldest, but in-flight
+    for _ in range(MAX_RETAINED_JOBS + 5):
+        done = reg.create(total=1)
+        done.status = "done"
+    # The running job (oldest) is retained; done jobs were evicted instead.
+    assert reg.get(running.id) is not None
+    assert len(reg._jobs) <= MAX_RETAINED_JOBS
+
+
 def test_bulk_registry_active_count_ignores_done():
     from prooflens.service.bulk import BulkJobRegistry
 
@@ -167,9 +194,11 @@ def test_bulk_registry_evicts_oldest_over_cap():
 
     reg = BulkJobRegistry()
     first = reg.create(total=1)
+    first.status = "done"
     for _ in range(MAX_RETAINED_JOBS):
-        reg.create(total=1)
-    assert reg.get(first.id) is None  # oldest evicted
+        j = reg.create(total=1)
+        j.status = "done"  # only done jobs are eligible for eviction
+    assert reg.get(first.id) is None  # oldest done job evicted
     # The cap holds: never more than MAX_RETAINED_JOBS retained.
     assert len(reg._jobs) == MAX_RETAINED_JOBS
 

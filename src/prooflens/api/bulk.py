@@ -39,9 +39,12 @@ MAX_BULK_ROWS = 1000
 
 
 class BulkRowIn(BaseModel):
-    image_url: str
-    rep_id: str | None = None
-    opportunity_id: str | None = None
+    # Cap the URL length: without it, a 1000-row batch of multi-KB junk strings
+    # (still a valid, in-cap request) can balloon the in-memory body. A real
+    # LSQ/S3 URL is well under this. (Belt-and-braces with the body-size limit.)
+    image_url: str = Field(max_length=2048)
+    rep_id: str | None = Field(default=None, max_length=128)
+    opportunity_id: str | None = Field(default=None, max_length=128)
 
 
 class BulkScoreRequest(BaseModel):

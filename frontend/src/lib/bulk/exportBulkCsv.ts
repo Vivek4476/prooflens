@@ -1,10 +1,15 @@
 import type { BulkResultItem } from "@/lib/api/types";
 
-/** RFC-4180 cell quoting: wrap in quotes and double internal quotes when needed.
- *  (Same pattern as src/lib/analytics/exportCsv.ts — kept file-local by design.) */
+/** RFC-4180 cell quoting + spreadsheet formula-injection guard.
+ *  (Same pattern as src/lib/analytics/exportCsv.ts — kept file-local by design.)
+ *  image_url / rep_id / error here come from an uploaded CSV, so a cell like
+ *  "=cmd|..." could execute if opened in Excel/Sheets; prefix a quote. Only
+ *  string cells can carry a payload — numbers/booleans are left untouched so
+ *  legitimate negative values aren't mangled. */
 function csvCell(value: string | number | boolean | null): string {
   const s = value === null ? "" : String(value);
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  const guarded = typeof value === "string" && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+  return /[",\n\r]/.test(guarded) ? `"${guarded.replace(/"/g, '""')}"` : guarded;
 }
 
 function csvRow(cells: Array<string | number | boolean | null>): string {
