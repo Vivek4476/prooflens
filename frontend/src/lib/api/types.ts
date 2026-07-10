@@ -288,4 +288,5 @@ export interface DseScorecard {
   top_reasons: DseTopReason[];
   trend: DseTrendPoint[];
   recent: ResultItem[];
+  truncated: boolean; // true when total exceeded the scorecard's 5000 cap
 }

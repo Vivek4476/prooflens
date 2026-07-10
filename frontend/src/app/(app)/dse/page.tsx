@@ -5,6 +5,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, UserSearch } from "lucide-react";
 
+import { FilterBar } from "@/components/analytics/FilterBar";
 import { ChainBreadcrumb } from "@/components/dse/ChainBreadcrumb";
 import { DseBandMix } from "@/components/dse/DseBandMix";
 import { DseKpiRow } from "@/components/dse/DseKpiRow";
@@ -17,7 +18,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { CardsSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { useDseScorecard } from "@/lib/api/hooks";
+import { useDseScorecard, useDseScorecardFilters } from "@/lib/api/hooks";
 import { isSparseDse } from "@/lib/dse/scorecard";
 
 function ScorecardSkeleton() {
@@ -39,7 +40,9 @@ function DsePageInner() {
   const searchParams = useSearchParams();
   const agentId = searchParams.get("agent") ?? undefined;
 
-  const { data, isLoading, isError, refetch, isPlaceholderData } = useDseScorecard(agentId);
+  const { preset, bucket, from, to, params, setPreset, setCustomRange, setBucket } =
+    useDseScorecardFilters();
+  const { data, isLoading, isError, refetch, isPlaceholderData } = useDseScorecard(agentId, params);
 
   function selectAgent(id: string) {
     router.push(`/dse?agent=${encodeURIComponent(id)}`);
@@ -78,6 +81,16 @@ function DsePageInner() {
         <ScorecardSkeleton />
       ) : (
         <div className="space-y-8">
+          <FilterBar
+            preset={preset}
+            bucket={bucket}
+            from={from}
+            to={to}
+            onPresetChange={setPreset}
+            onCustomRangeChange={setCustomRange}
+            onBucketChange={setBucket}
+          />
+
           <Card className="p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
@@ -94,6 +107,12 @@ function DsePageInner() {
             <p className="text-caption text-text-muted">
               This DSE has {data.total} scored {data.total === 1 ? "capture" : "captures"} in range — limited data;
               treat the rate and score below as directional, not conclusive.
+            </p>
+          )}
+
+          {data.truncated && (
+            <p className="text-caption text-text-muted">
+              Showing the most recent 5,000 captures in range — totals above are capped.
             </p>
           )}
 
