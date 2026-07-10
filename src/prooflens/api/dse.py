@@ -36,6 +36,7 @@ router = APIRouter(prefix="/v1/dse", tags=["dse"])
 
 _SEARCH_LIMIT = 25
 _RECENT_LIMIT = 20
+_SCORECARD_LIMIT = 5000
 
 
 def _latest_rows_by_agent(rows: list[dict]) -> dict[str, dict]:
@@ -60,42 +61,33 @@ def search_dse(
     tenant: TenantView = Depends(require_tenant),
 ) -> dict:
     """Search the hierarchy by name (case-insensitive substring) or agent_id
-    (case-insensitive substring). Empty q -> the most-active DSEs (by result
-    count in the last 90 days), else the first N by agent_id. Capped at 25,
+    (case-insensitive substring). Empty q -> the most-active DSEs (by total
+    result count, all time), else the first N by agent_id. Capped at 25,
     tenant-scoped."""
     tenant_id = tenant.id
-    rows = repo.get_hierarchy_rows(tenant_id) if tenant_id else []
-    latest = _latest_rows_by_agent(rows)
-
-    needle = q.strip().lower()
+    needle = q.strip()
     if needle:
-        matches = [
-            row for row in latest.values()
-            if needle in row["agent_id"].lower()
-            or needle in (row.get("agent_name") or "").lower()
-        ]
-        matches.sort(key=lambda r: r["agent_id"])
+        matches = repo.search_hierarchy(tenant_id, needle, _SEARCH_LIMIT) if tenant_id else []
     else:
-        # Empty query -> most-active first. Cheap at demo scale (mirrors
-        # /v1/analytics/summary's limit=5000 in-Python aggregation).
-        items, _ = repo.list_results(tenant_id=tenant_id, limit=5000, offset=0)
-        counts: dict[str, int] = {}
-        for r in items:
-            if r.rep_id:
-                counts[r.rep_id] = counts.get(r.rep_id, 0) + 1
+        rows = repo.get_hierarchy_rows(tenant_id) if tenant_id else []
+        latest = _latest_rows_by_agent(rows)
+        # most-active, all time (as before)
+        counts = repo.result_counts_by_rep(tenant_id, None, None)
         matches = sorted(
             latest.values(),
             key=lambda r: (-counts.get(r["agent_id"], 0), r["agent_id"]),
-        )
+        )[:_SEARCH_LIMIT]
 
     results = [
         {
             "agent_id": row["agent_id"],
-            "name": agent_display_name(rows, row["agent_id"]),
+            # search_hierarchy / _latest_rows_by_agent return the LATEST row per
+            # agent, so its agent_name IS the display name (falls back to id).
+            "name": row.get("agent_name") or row["agent_id"],
             "branch": row.get("branch"),
             "sm": row.get("sm"),
         }
-        for row in matches[:_SEARCH_LIMIT]
+        for row in matches
     ]
     return {"results": results}
 
@@ -123,7 +115,7 @@ def dse_scorecard(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     items, total = repo.list_results(
-        tenant_id=tenant_id, limit=5000, offset=0, rep_id=agent_id, start=start, end=end
+        tenant_id=tenant_id, limit=_SCORECARD_LIMIT, offset=0, rep_id=agent_id, start=start, end=end
     )
 
     latest = _latest_rows_by_agent(rows)
@@ -203,5 +195,6 @@ def dse_scorecard(
         "top_reasons": top_reasons,
         "trend": trend,
         "recent": recent,
+        "truncated": total > _SCORECARD_LIMIT,
     }
 

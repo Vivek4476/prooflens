@@ -10,6 +10,9 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
+from sqlalchemy import func, or_
+from sqlalchemy.orm import aliased
+
 from ..engine.types import Verdict
 from ..queue import queue as q
 from ..service.views import JobView, ResultView, TenantView
@@ -255,6 +258,55 @@ class PostgresRepo:
             "zonal_head": h.zonal_head, "branch": h.branch, "city": h.city,
             "valid_from": h.valid_from, "upload_id": h.upload_id,
         } for h in rows]
+
+    def search_hierarchy(self, tenant_id: str, q: str, limit: int) -> list[dict]:
+        tid = uuid.UUID(tenant_id)
+        # Latest row per agent via DISTINCT ON (Postgres), then match + cap in SQL.
+        latest_sq = (
+            self._session.query(Hierarchy)
+            .filter(Hierarchy.tenant_id == tid)
+            .distinct(Hierarchy.agent_id)
+            .order_by(Hierarchy.agent_id, Hierarchy.valid_from.desc())
+            .subquery()
+        )
+        H = aliased(Hierarchy, latest_sq)
+        needle = q.strip().lower()
+        # Escape LIKE metacharacters so they match literally.
+        esc = needle.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pat = f"%{esc}%"
+        rows = (
+            self._session.query(H)
+            .filter(
+                or_(
+                    func.lower(H.agent_id).like(pat, escape="\\"),
+                    func.lower(func.coalesce(H.agent_name, "")).like(pat, escape="\\"),
+                )
+            )
+            .order_by(H.agent_id)
+            .limit(limit)
+            .all()
+        )
+        return [{
+            "agent_id": h.agent_id, "agent_name": h.agent_name,
+            "sm": h.sm, "rsm": h.rsm, "srsm": h.srsm,
+            "zonal_head": h.zonal_head, "branch": h.branch, "city": h.city,
+            "valid_from": h.valid_from, "upload_id": h.upload_id,
+        } for h in rows]
+
+    def result_counts_by_rep(
+        self, tenant_id: str, start: datetime | None, end: datetime | None
+    ) -> dict[str, int]:
+        tid = uuid.UUID(tenant_id)
+        query = (
+            self._session.query(Result.rep_id, func.count().label("n"))
+            .filter(Result.tenant_id == tid, Result.rep_id.isnot(None))
+        )
+        if start is not None:
+            query = query.filter(Result.created_at >= start)
+        if end is not None:
+            query = query.filter(Result.created_at < end)
+        query = query.group_by(Result.rep_id)
+        return {rep_id: n for rep_id, n in query.all()}
 
     def hierarchy_status(self, tenant_id: str) -> dict:
         from ..service.ids import normalize_id

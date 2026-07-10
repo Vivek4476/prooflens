@@ -24,6 +24,7 @@ from .bulk import router as bulk_router
 from .deps import get_repo
 from .dse import router as dse_router
 from .hierarchy_admin import router as hierarchy_admin_router
+from .ratelimit import RateLimiter, make_rate_limit_middleware
 from .schemas import WebhookAck, WebhookPayload
 from .scoring import router as scoring_router
 from .security import SIGNATURE_HEADER, verify
@@ -52,6 +53,15 @@ def create_app() -> FastAPI:
             if too_big:
                 return Response(status_code=413, content="request body too large")
         return await call_next(request)
+
+    _rate_limiter = RateLimiter(
+        limits={
+            "general": settings.ratelimit_general_per_min,
+            "compute": settings.ratelimit_compute_per_min,
+        },
+        window_seconds=60,
+    )
+    app.middleware("http")(make_rate_limit_middleware(_rate_limiter))
 
     app.add_middleware(
         CORSMiddleware,
