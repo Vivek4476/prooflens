@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { api } from "./client";
-import type { AnalyticsParams, HealthState } from "./types";
+import type { AnalyticsParams, Bucket, HealthState } from "./types";
 import { useDebouncedValue } from "./useDebouncedValue";
 
 export function useHealth() {
@@ -78,4 +78,31 @@ export function useAnalytics(params: AnalyticsParams = {}, enabled: boolean = tr
 
 export function useTenants() {
   return useQuery({ queryKey: ["tenants"], queryFn: () => api.tenants(), retry: false });
+}
+
+/** Debounced DSE search-as-you-type. Disabled while the query is empty and shorter
+ *  than MIN_QUERY_LEN — an empty q still hits the backend (recent/most-active), but we
+ *  don't want to fire a request on every single keystroke of a 1-character query. */
+export function useDseSearch(q: string, enabled: boolean = true) {
+  const debounced = useDebouncedValue(q, 300);
+  return useQuery({
+    queryKey: ["dse-search", debounced],
+    queryFn: () => api.dseSearch(debounced.trim()),
+    enabled,
+    retry: false,
+  });
+}
+
+export function useDseScorecard(
+  agentId: string | undefined,
+  params?: { from?: string; to?: string; bucket?: Bucket },
+) {
+  const debounced = useDebouncedValue(params, 300);
+  return useQuery({
+    queryKey: ["dse-scorecard", agentId, debounced],
+    queryFn: () => api.dseScorecard(agentId as string, debounced),
+    enabled: !!agentId,
+    placeholderData: (prev) => prev,
+    retry: false,
+  });
 }

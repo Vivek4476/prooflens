@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { ChartCard } from "@/components/ui/ChartCard";
 import { useAnalytics } from "@/lib/api/hooks";
@@ -26,22 +27,28 @@ const DIMENSIONS: { value: GroupBy; label: string }[] = [
   { value: "rsm", label: "Regional manager" },
   { value: "srsm", label: "Senior RSM" },
   { value: "zone", label: "Zone" },
+  { value: "agent", label: "DSE" },
 ];
 
-/**
- * Row click would ideally drill down into filtered history (e.g. `/history?branch=…`),
- * but /v1/results has no team/branch/node filter — only band, reason, rep_id, from, to
- * (see api/scoring.py's list_results). Unlike TopFlagReasons and the suspect-rate/
- * dominant-reason/duplicates insights (which now navigate to /history?band=…&reason=…,
- * filters the backend genuinely honours), a team drill-down here would build a URL
- * /history can't apply — deferred no-op until /v1/results grows a node filter.
- */
-function onRowSelect(_node: string) {
-  // Intentionally deferred — /v1/results has no node/branch filter to honour yet.
-}
-
 export function ByTeamPanel({ startDate, endDate }: { startDate?: string; endDate?: string }) {
+  const router = useRouter();
   const [dimension, setDimension] = useState<GroupBy>("branch");
+
+  /**
+   * Row click would ideally drill down into filtered history (e.g. `/history?branch=…`),
+   * but /v1/results has no team/branch/node filter — only band, reason, rep_id, from, to
+   * (see api/scoring.py's list_results). Unlike TopFlagReasons and the suspect-rate/
+   * dominant-reason/duplicates insights (which now navigate to /history?band=…&reason=…,
+   * filters the backend genuinely honours), a team drill-down here would build a URL
+   * /history can't apply — deferred no-op until /v1/results grows a node filter.
+   *
+   * The "DSE" dimension is the one exception: group_by=agent's rows ARE individual
+   * DSEs (node = agent_id), so a row genuinely identifies a single scorecard — it
+   * navigates to /dse?agent=<id> rather than deferring.
+   */
+  function onRowSelect(node: string) {
+    if (dimension === "agent") router.push(`/dse?agent=${encodeURIComponent(node)}`);
+  }
 
   // Own query, keyed on its own dimension — changing "By branch → By city" refetches only
   // this panel, not the whole page. Memoized so useAnalytics's 300ms debounce can settle.
