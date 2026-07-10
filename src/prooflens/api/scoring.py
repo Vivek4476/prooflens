@@ -24,6 +24,7 @@ from ..engine import EngineContext, score
 from ..engine.types import Verdict
 from ..engine.verdicts import REASON_SHORT_LABEL, REASON_TEXT, Reason
 from ..service.repo import Repo, processing_ms
+from ..service.views import TenantView
 from ..vision.unavailable import UnavailableVision
 from .analytics import aggregate_range
 from .date_range import fill_series, resolve_range
@@ -83,13 +84,32 @@ def _score_direct(data: bytes, tenant: str, backend: str | None, repo: Repo) -> 
         raise HTTPException(
             status_code=404, detail=f"unknown tenant {tenant!r} (seed a tenant first)"
         )
+    return score_bytes(data, tenant_view=tenant_view, backend=backend, repo=repo)
 
+
+def score_bytes(
+    data: bytes,
+    *,
+    tenant_view: TenantView,
+    backend: str | None,
+    repo: Repo,
+    rep_id: str | None = None,
+    opportunity_id: str | None = None,
+    source: str | None = None,
+) -> dict:
+    """The scoring core shared by /v1/score (direct, tenant resolved from the
+    request) and the bulk-scoring service (tenant resolved once per batch).
+    Builds the vision backend, runs the SAME pure engine, records the result
+    (with optional rep/opportunity attribution + source), and returns the
+    Verdict payload. Raises HTTPException only when a backend was EXPLICITLY
+    requested and is misconfigured/failed — same fail-open contract as before.
+    """
     settings = get_settings()
-    # Direct scoring is operator-driven: the request override wins, else the env
-    # VISION_BACKEND. "Demo Model" (stub) always works; anything else is Live AI.
-    explicit = backend is not None            # operator named a backend on THIS request
+    # The request override wins, else the env VISION_BACKEND. "Demo Model"
+    # (stub) always works; anything else is Live AI.
+    explicit = backend is not None            # caller named a backend explicitly
     requested = (backend or settings.vision_backend or "groq").strip().lower()
-    # "live_ai" now means the operator EXPLICITLY asked for a non-stub backend, so
+    # "live_ai" now means the caller EXPLICITLY asked for a non-stub backend, so
     # a misconfiguration should surface loudly (503). The configured default degrades
     # quietly to Doubtful instead (fail-open: score & flag, never block).
     live_ai = explicit and requested != "stub"
@@ -114,6 +134,8 @@ def _score_direct(data: bytes, tenant: str, backend: str | None, repo: Repo) -> 
         vision=vision,
         hash_store=repo.hash_store,
         scoring=tenant_view.scoring,
+        rep_id=rep_id,
+        opportunity_id=opportunity_id,
         remember_hash=False,
     )
     verdict = score(data, ctx)
@@ -131,9 +153,10 @@ def _score_direct(data: bytes, tenant: str, backend: str | None, repo: Repo) -> 
 
     # Keeper verdict — remember the hash now, then persist.
     _remember_hash(ctx, verdict)
-    # source defaults from job_id ("direct" since job_id is None here); no
-    # override needed — only the seed script passes source explicitly.
-    result_id = repo.record_result(tenant_view.id, None, verdict)
+    result_id = repo.record_result(
+        tenant_view.id, None, verdict,
+        opportunity_id=opportunity_id, rep_id=rep_id, source=source,
+    )
 
     payload = verdict.to_dict()
     payload["result_id"] = result_id

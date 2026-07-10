@@ -1,0 +1,132 @@
+"""POST /v1/bulk-score + GET /v1/bulk-score/{job_id} — bulk photo scoring
+(Phase 1). Fully offline: InMemoryRepo + FakeLSQClient + stub vision backend.
+"""
+
+from __future__ import annotations
+
+import time
+
+import pytest
+from fastapi.testclient import TestClient
+
+from prooflens.api.app import create_app
+from prooflens.api.bulk import get_lsq_client
+from prooflens.api.deps import get_repo, get_repo_factory
+from prooflens.engine.scoring_config import ScoringConfig
+from prooflens.lsq.fake import BAD_FETCH_MARKER, FakeLSQClient
+from prooflens.service.repo import InMemoryRepo
+from prooflens.service.views import TenantView
+
+
+def _tenant() -> TenantView:
+    return TenantView(
+        id="t1", slug="dev", webhook_secret="s", field_map={}, scoring=ScoringConfig(),
+        vision_backend="stub",
+    )
+
+
+@pytest.fixture
+def repo() -> InMemoryRepo:
+    return InMemoryRepo([_tenant()])
+
+
+@pytest.fixture
+def lsq() -> FakeLSQClient:
+    return FakeLSQClient()
+
+
+@pytest.fixture
+def client(repo, lsq) -> TestClient:
+    app = create_app()
+    app.dependency_overrides[get_repo] = lambda: repo
+    # Background rows each call repo_factory(); reuse the same InMemoryRepo
+    # (safe — it has no per-call session state) with a no-op close.
+    app.dependency_overrides[get_repo_factory] = lambda: (lambda: (repo, lambda: None))
+    app.dependency_overrides[get_lsq_client] = lambda: lsq
+    return TestClient(app, raise_server_exceptions=False)
+
+
+def _poll_until_done(client, job_id, timeout=5.0):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        body = client.get(f"/v1/bulk-score/{job_id}").json()
+        if body["status"] == "done":
+            return body
+        time.sleep(0.02)
+    raise AssertionError("bulk job did not complete in time")
+
+
+def test_bulk_batch_scores_attributes_and_fails_open_on_bad_row(client, repo):
+    rows = [
+        {"image_url": "https://lsq.example/photo1.jpg", "rep_id": "A1", "opportunity_id": "OPP1"},
+        {"image_url": "https://lsq.example/photo2.jpg", "rep_id": "A2", "opportunity_id": "OPP2"},
+        {"image_url": f"https://lsq.example/{BAD_FETCH_MARKER}.jpg", "rep_id": "A3",
+         "opportunity_id": "OPP3"},
+    ]
+    r = client.post("/v1/bulk-score", json={"rows": rows, "label": "test batch"})
+    assert r.status_code == 200
+    body = r.json()
+    job_id = body["job_id"]
+    assert body["total"] == 3
+
+    final = _poll_until_done(client, job_id)
+    assert final["status"] == "done"
+    assert final["processed"] == 3
+    assert final["total"] == 3
+    assert len(final["results"]) == 3
+
+    ok_rows = [row for row in final["results"] if row["error"] is None]
+    err_rows = [row for row in final["results"] if row["error"] is not None]
+    assert len(ok_rows) == 2
+    assert len(err_rows) == 1
+    assert err_rows[0]["image_url"].endswith(f"{BAD_FETCH_MARKER}.jpg")
+    assert err_rows[0]["band"] is None and err_rows[0]["score"] is None
+
+    for row in ok_rows:
+        assert row["band"] is not None
+        assert row["score"] is not None
+        assert row["reason_code"] is not None
+        assert row["result_id"] is not None
+
+    # Persisted as normal Result rows with source="bulk" + attribution.
+    persisted = {r.rep_id: r for r in repo.results}
+    assert persisted["A1"].source == "bulk"
+    assert persisted["A1"].opportunity_id == "OPP1"
+    assert persisted["A2"].source == "bulk"
+    assert persisted["A2"].opportunity_id == "OPP2"
+    assert "A3" not in persisted  # the bad-fetch row never reached record_result
+    assert len(repo.results) == 2
+
+
+def test_get_bulk_score_reflects_progress_before_done(client):
+    rows = [{"image_url": "https://lsq.example/p.jpg", "rep_id": None, "opportunity_id": None}]
+    r = client.post("/v1/bulk-score", json={"rows": rows})
+    job_id = r.json()["job_id"]
+
+    first = client.get(f"/v1/bulk-score/{job_id}").json()
+    assert first["status"] in ("queued", "running", "done")
+    assert first["total"] == 1
+    assert 0 <= first["processed"] <= 1
+
+    final = _poll_until_done(client, job_id)
+    assert final["processed"] == 1
+    assert final["results"][0]["error"] is None
+
+
+def test_get_unknown_bulk_job_404(client):
+    r = client.get("/v1/bulk-score/does-not-exist")
+    assert r.status_code == 404
+
+
+def test_bulk_score_unknown_tenant_row_field_shape(client):
+    # Response shape sanity: exact keys per row, even for a null rep/opportunity.
+    rows = [{"image_url": "https://lsq.example/p.jpg"}]
+    r = client.post("/v1/bulk-score", json={"rows": rows})
+    job_id = r.json()["job_id"]
+    final = _poll_until_done(client, job_id)
+    row = final["results"][0]
+    assert set(row.keys()) == {
+        "image_url", "rep_id", "opportunity_id", "band", "score",
+        "reason_code", "result_id", "error",
+    }
+    assert row["rep_id"] is None and row["opportunity_id"] is None

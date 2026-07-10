@@ -20,6 +20,7 @@ from ..service.repo import Repo
 from ..telemetry import configure_logging
 from ..telemetry import metrics as m
 from .admin import router as admin_router
+from .bulk import router as bulk_router
 from .deps import get_repo
 from .hierarchy_admin import router as hierarchy_admin_router
 from .schemas import WebhookAck, WebhookPayload
@@ -41,6 +42,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_router)
     app.include_router(scoring_router)
     app.include_router(hierarchy_admin_router)
+    app.include_router(bulk_router)
 
     @app.get("/healthz")
     def healthz() -> dict:
