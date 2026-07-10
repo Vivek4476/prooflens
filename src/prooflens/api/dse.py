@@ -26,23 +26,16 @@ from ..engine.verdicts import REASON_SHORT_LABEL, Reason
 from ..service.hierarchy import agent_display_name
 from ..service.ids import normalize_id
 from ..service.repo import Repo
+from ..service.views import TenantView
 from .analytics import _tally, build_buckets
+from .auth import require_tenant
 from .date_range import resolve_range
 from .deps import get_repo
-from .scoring import DEFAULT_TENANT
 
 router = APIRouter(prefix="/v1/dse", tags=["dse"])
 
 _SEARCH_LIMIT = 25
 _RECENT_LIMIT = 20
-
-
-def _tenant_id(repo: Repo) -> str:
-    # Mirrors scoring._analytics_tenant_id: single-demo-tenant read path.
-    # Empty string (no tenant / no hierarchy loaded) yields no hierarchy rows,
-    # so search returns no matches and the scorecard falls back to id-only.
-    t = repo.get_tenant_by_slug(DEFAULT_TENANT)
-    return t.id if t else ""
 
 
 def _latest_rows_by_agent(rows: list[dict]) -> dict[str, dict]:
@@ -64,12 +57,13 @@ def _latest_rows_by_agent(rows: list[dict]) -> dict[str, dict]:
 def search_dse(
     q: str = Query(default=""),
     repo: Repo = Depends(get_repo),
+    tenant: TenantView = Depends(require_tenant),
 ) -> dict:
     """Search the hierarchy by name (case-insensitive substring) or agent_id
     (case-insensitive substring). Empty q -> the most-active DSEs (by result
     count in the last 90 days), else the first N by agent_id. Capped at 25,
     tenant-scoped."""
-    tenant_id = _tenant_id(repo)
+    tenant_id = tenant.id
     rows = repo.get_hierarchy_rows(tenant_id) if tenant_id else []
     latest = _latest_rows_by_agent(rows)
 
@@ -84,7 +78,7 @@ def search_dse(
     else:
         # Empty query -> most-active first. Cheap at demo scale (mirrors
         # /v1/analytics/summary's limit=5000 in-Python aggregation).
-        items, _ = repo.list_results(limit=5000, offset=0)
+        items, _ = repo.list_results(tenant_id=tenant_id, limit=5000, offset=0)
         counts: dict[str, int] = {}
         for r in items:
             if r.rep_id:
@@ -113,13 +107,14 @@ def dse_scorecard(
     to: str | None = Query(default=None, alias="to"),
     bucket: Literal["daily", "weekly", "monthly"] = Query(default="daily"),
     repo: Repo = Depends(get_repo),
+    tenant: TenantView = Depends(require_tenant),
 ) -> dict:
     """The DSE scorecard: manager chain, KPIs, suspect-rate trend, top flag
     reasons, and the DSE's recent flagged captures — all computed over THIS
     rep_id's results in [from, to). Honest small-sample: a sparse DSE shows
     real (possibly tiny) numbers, never fabricated; 404 when the agent_id has
     neither a hierarchy row nor any results (unknown agent)."""
-    tenant_id = _tenant_id(repo)
+    tenant_id = tenant.id
     rows = repo.get_hierarchy_rows(tenant_id) if tenant_id else []
 
     try:
@@ -128,7 +123,7 @@ def dse_scorecard(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     items, total = repo.list_results(
-        limit=5000, offset=0, rep_id=agent_id, start=start, end=end
+        tenant_id=tenant_id, limit=5000, offset=0, rep_id=agent_id, start=start, end=end
     )
 
     latest = _latest_rows_by_agent(rows)
@@ -141,7 +136,9 @@ def dse_scorecard(
         # Also check for ANY result ever (outside the range) before declaring
         # the agent unknown — a real DSE with no activity in this window is
         # not "unknown", just quiet.
-        _any_items, any_total = repo.list_results(limit=1, offset=0, rep_id=agent_id)
+        _any_items, any_total = repo.list_results(
+            tenant_id=tenant_id, limit=1, offset=0, rep_id=agent_id
+        )
         if any_total == 0:
             raise HTTPException(status_code=404, detail=f"no such DSE {agent_id!r}")
 
