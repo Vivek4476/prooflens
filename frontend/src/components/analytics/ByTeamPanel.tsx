@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { ChartCard } from "@/components/ui/ChartCard";
 import { useAnalytics } from "@/lib/api/hooks";
-import type { AnalyticsParams, GroupBy } from "@/lib/api/types";
+import type { AnalyticsGroup, AnalyticsParams, GroupBy } from "@/lib/api/types";
 import { rankHotspots } from "@/lib/analytics/hotspots";
 import { formatCount, formatPct } from "@/lib/format";
 
@@ -26,22 +27,31 @@ const DIMENSIONS: { value: GroupBy; label: string }[] = [
   { value: "rsm", label: "Regional manager" },
   { value: "srsm", label: "Senior RSM" },
   { value: "zone", label: "Zone" },
+  { value: "agent", label: "DSE" },
 ];
 
-/**
- * Row click would ideally drill down into filtered history (e.g. `/history?branch=…`),
- * but /v1/results has no team/branch/node filter — only band, reason, rep_id, from, to
- * (see api/scoring.py's list_results). Unlike TopFlagReasons and the suspect-rate/
- * dominant-reason/duplicates insights (which now navigate to /history?band=…&reason=…,
- * filters the backend genuinely honours), a team drill-down here would build a URL
- * /history can't apply — deferred no-op until /v1/results grows a node filter.
- */
-function onRowSelect(_node: string) {
-  // Intentionally deferred — /v1/results has no node/branch filter to honour yet.
-}
-
 export function ByTeamPanel({ startDate, endDate }: { startDate?: string; endDate?: string }) {
+  const router = useRouter();
   const [dimension, setDimension] = useState<GroupBy>("branch");
+
+  /**
+   * Row click would ideally drill down into filtered history (e.g. `/history?branch=…`),
+   * but /v1/results has no team/branch/node filter — only band, reason, rep_id, from, to
+   * (see api/scoring.py's list_results). Unlike TopFlagReasons and the suspect-rate/
+   * dominant-reason/duplicates insights (which now navigate to /history?band=…&reason=…,
+   * filters the backend genuinely honours), a team drill-down here would build a URL
+   * /history can't apply — deferred no-op until /v1/results grows a node filter.
+   *
+   * The "DSE" dimension is the one exception: group_by=agent's rows ARE individual
+   * DSEs, so a row genuinely identifies a single scorecard — it navigates to
+   * /dse?agent=<agent_id>. The link MUST use g.agent_id (the real id), not g.node
+   * (the display name) — /v1/dse/{agent_id} resolves by id only, so a name 404s.
+   */
+  function onRowSelect(g: AnalyticsGroup) {
+    if (dimension === "agent" && g.agent_id) {
+      router.push(`/dse?agent=${encodeURIComponent(g.agent_id)}`);
+    }
+  }
 
   // Own query, keyed on its own dimension — changing "By branch → By city" refetches only
   // this panel, not the whole page. Memoized so useAnalytics's 300ms debounce can settle.
@@ -107,11 +117,11 @@ export function ByTeamPanel({ startDate, endDate }: { startDate?: string; endDat
         <div className={`flex h-full flex-col transition-opacity ${isPlaceholderData ? "opacity-60" : ""}`}>
           <ol className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pr-1">
             {ranked.map((g, i) => (
-              <li key={g.node} className="shrink-0">
+              <li key={g.agent_id ?? g.node} className="shrink-0">
                 <button
                   type="button"
                   title={`${g.node} — ${formatCount(g.suspect)} of ${formatCount(g.total)} scored are Suspect`}
-                  onClick={() => onRowSelect(g.node)}
+                  onClick={() => onRowSelect(g)}
                   className="group relative flex w-full items-center gap-3 overflow-hidden rounded-md px-2.5 py-2 text-left transition-colors hover:bg-surface-2"
                 >
                   {/* Magnitude bar — width relative to the worst node's suspect rate. This IS

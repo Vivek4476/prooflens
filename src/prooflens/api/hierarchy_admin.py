@@ -26,7 +26,7 @@ from .scoring import DEFAULT_TENANT
 
 router = APIRouter(prefix="/v1/admin/hierarchy", tags=["admin", "hierarchy"])
 
-_HEADER = ("agent_id", *NODE_FIELDS, "valid_from")  # canonical column set
+_HEADER = ("agent_id", "agent_name", *NODE_FIELDS, "valid_from")  # canonical column set
 
 
 def _tenant_id(repo: Repo) -> str:
@@ -76,6 +76,7 @@ def _parse_csv(data: bytes) -> list[dict]:
         seen.add(key)
         rows.append({
             "agent_id": agent,
+            "agent_name": norm.get("agent_name") or None,
             "sm": norm.get("sm") or None,
             "rsm": norm.get("rsm") or None,
             "srsm": norm.get("srsm") or None,
@@ -120,7 +121,7 @@ def hierarchy_template() -> Response:
     writer = csv.writer(output, lineterminator="\n")
     writer.writerow(_HEADER)
     writer.writerow([
-        "REP-1", "Sam", "Ravi", "Sr1", "ZoneN", "North", "Delhi", "2026-01-01"
+        "REP-1", "Asha Verma", "Sam", "Ravi", "Sr1", "ZoneN", "North", "Delhi", "2026-01-01"
     ])
     return Response(
         content=output.getvalue(),

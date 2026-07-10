@@ -76,7 +76,8 @@ class Repo(Protocol):
 
     def replace_hierarchy(self, tenant_id: str, rows: list[dict], upload_id: str) -> None:
         """Atomically replace this tenant's hierarchy with rows.
-        Each row: {agent_id, sm, rsm, srsm, zonal_head, branch, city, valid_from(date)}."""
+        Each row: {agent_id, agent_name(optional), sm, rsm, srsm, zonal_head,
+        branch, city, valid_from(date)}."""
         ...
 
     def get_hierarchy_rows(self, tenant_id: str) -> list[dict]:
@@ -238,6 +239,7 @@ class InMemoryRepo:
         for r in rows:
             stored.append({
                 "agent_id": normalize_id(r.get("agent_id")),
+                "agent_name": r.get("agent_name") or None,
                 "sm": r.get("sm"),
                 "rsm": r.get("rsm"),
                 "srsm": r.get("srsm"),

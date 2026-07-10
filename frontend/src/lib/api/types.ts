@@ -109,6 +109,9 @@ export interface AnalyticsGroup {
   avg_score: number;
   suspect_rate: number;
   share: number;
+  // Present only for group_by=agent: the real agent_id (node is the display
+  // name). Used to link a DSE row to /dse?agent=<id> — the name won't resolve.
+  agent_id?: string;
 }
 
 export interface AnalyticsSummary {
@@ -154,7 +157,7 @@ export interface FlagPrecision {
 }
 
 export type Bucket = "daily" | "weekly" | "monthly";
-export type GroupBy = "none" | "zone" | "srsm" | "rsm" | "sm" | "branch" | "city";
+export type GroupBy = "none" | "zone" | "srsm" | "rsm" | "sm" | "branch" | "city" | "agent";
 
 export interface AnalyticsParams {
   start_date?: string; // YYYY-MM-DD
@@ -198,3 +201,54 @@ export interface ReviewBlock {
 }
 
 export type HealthState = "ok" | "degraded" | "down" | "loading";
+
+// --- DSE (agent) scorecard + search ---
+
+export interface DseSearchResult {
+  agent_id: string;
+  name: string;
+  branch: string | null;
+  sm: string | null;
+}
+
+export interface DseSearchResponse {
+  results: DseSearchResult[];
+}
+
+export interface DseChain {
+  sm: string | null;
+  rsm: string | null;
+  srsm: string | null;
+  zone: string | null;
+  branch: string | null;
+  city: string | null;
+}
+
+export interface DseTrendPoint {
+  bucket_label: string;
+  start: string; // YYYY-MM-DD
+  end: string; // YYYY-MM-DD
+  suspect: number;
+  total: number;
+  suspect_rate: number;
+  incomplete: boolean;
+}
+
+export interface DseTopReason {
+  reason_code: string;
+  short_label: string;
+  count: number;
+}
+
+export interface DseScorecard {
+  agent_id: string;
+  name: string;
+  chain: DseChain;
+  total: number;
+  band_distribution: Record<Band, number>;
+  suspect_rate: number;
+  avg_score: number;
+  top_reasons: DseTopReason[];
+  trend: DseTrendPoint[];
+  recent: ResultItem[];
+}
