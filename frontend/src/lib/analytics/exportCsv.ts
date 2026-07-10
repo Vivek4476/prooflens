@@ -1,9 +1,13 @@
 import type { AnalyticsBucket, AnalyticsSummary, PeriodBounds } from "@/lib/api/types";
 
-/** RFC-4180 cell quoting: wrap in quotes and double internal quotes when needed. */
+/** RFC-4180 cell quoting + spreadsheet formula-injection guard: a string cell
+ *  with a leading =/+/-/@ (or control char) can execute in Excel/Sheets, so
+ *  prefix a quote. Numbers/booleans are left untouched (no payload possible,
+ *  and legitimate negatives stay intact). */
 function csvCell(value: string | number | boolean): string {
   const s = String(value);
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  const guarded = typeof value === "string" && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+  return /[",\n\r]/.test(guarded) ? `"${guarded.replace(/"/g, '""')}"` : guarded;
 }
 
 function csvRow(cells: Array<string | number | boolean>): string {

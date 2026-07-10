@@ -5,6 +5,9 @@ import type {
   AnalyticsParams,
   AnalyticsSummary,
   Bucket,
+  BulkJob,
+  BulkScoreResponse,
+  BulkScoreRow,
   DseScorecard,
   DseSearchResponse,
   ResultItem,
@@ -81,6 +84,20 @@ export const api = {
       decision,
       note,
     });
+    return data;
+  },
+
+  // Kick off a bulk-scoring job for a mapped CSV of photo rows. Returns the
+  // job id + total immediately; the backend scores in the background.
+  async bulkScore(rows: BulkScoreRow[], label?: string | null): Promise<BulkScoreResponse> {
+    const { data } = await http.post("/v1/bulk-score", { rows, label: label ?? null });
+    return data;
+  },
+
+  // Poll a bulk job's progress/results. Callers poll this on an interval
+  // until status === "done".
+  async bulkJob(jobId: string): Promise<BulkJob> {
+    const { data } = await http.get(`/v1/bulk-score/${encodeURIComponent(jobId)}`);
     return data;
   },
 

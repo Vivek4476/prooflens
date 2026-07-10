@@ -9,6 +9,6 @@ RealLSQClient, stubbing the unknowns tracked in the README with marked TODOs:
 """
 
 from .base import FieldUpdate, LSQClient
-from .fake import FakeLSQClient
+from .fake import BAD_FETCH_MARKER, FakeLSQClient
 
-__all__ = ["LSQClient", "FieldUpdate", "FakeLSQClient"]
+__all__ = ["LSQClient", "FieldUpdate", "FakeLSQClient", "BAD_FETCH_MARKER"]

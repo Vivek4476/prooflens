@@ -20,6 +20,7 @@ from ..service.repo import Repo
 from ..telemetry import configure_logging
 from ..telemetry import metrics as m
 from .admin import router as admin_router
+from .bulk import router as bulk_router
 from .deps import get_repo
 from .dse import router as dse_router
 from .hierarchy_admin import router as hierarchy_admin_router
@@ -27,11 +28,31 @@ from .schemas import WebhookAck, WebhookPayload
 from .scoring import router as scoring_router
 from .security import SIGNATURE_HEADER, verify
 
+# Hard ceiling on any request body. Generous enough for a legitimate /v1/score
+# image upload or a full 1000-row bulk batch (~a few MB), but it rejects the
+# multi-hundred-MB/GB bodies that would OOM the instance BEFORE per-field
+# validation runs (Starlette buffers the whole body first). Enforced by
+# Content-Length so oversized requests are refused before the body is read.
+MAX_REQUEST_BODY_BYTES = 25 * 1024 * 1024  # 25 MiB
+
 
 def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings.log_level)
     app = FastAPI(title="ProofLens", version="0.1.0")
+
+    @app.middleware("http")
+    async def _limit_body_size(request: Request, call_next):  # type: ignore[no-untyped-def]
+        cl = request.headers.get("content-length")
+        if cl is not None:
+            try:
+                too_big = int(cl) > MAX_REQUEST_BODY_BYTES
+            except ValueError:
+                too_big = False
+            if too_big:
+                return Response(status_code=413, content="request body too large")
+        return await call_next(request)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins_list,
@@ -42,6 +63,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_router)
     app.include_router(scoring_router)
     app.include_router(hierarchy_admin_router)
+    app.include_router(bulk_router)
     app.include_router(dse_router)
 
     @app.get("/healthz")

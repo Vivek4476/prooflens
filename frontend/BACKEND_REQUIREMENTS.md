@@ -119,6 +119,79 @@ match_rate, matched, unmapped}` (match rate vs distinct `rep_id`s in the last
 NOT tenant-scoped (single-demo-tenant assumption; real fix is the SSO/RBAC
 milestone). CSV-only upload; XLSX deferred.
 
+### Bulk photo scoring (Phase 1 — additive; see
+`docs/superpowers/specs/2026-07-10-bulk-upload-design.md`)
+
+Lets an operator score a batch of field-visit photos (e.g. from an LSQ export
+CSV) in one go, attributed to the agent/opportunity. Runs the exact same
+engine + persistence as `/v1/score` — no scoring/engine/webhook logic changed.
+Images are fetched **server-side** (LSQ photo URLs are private) and are
+**never stored**: only the perceptual hash + verdict persist, same as today.
+
+**`POST /v1/bulk-score`** — body:
+```jsonc
+{
+  "rows": [
+    { "image_url": "https://...", "rep_id": "A123", "opportunity_id": "OPP1" },
+    { "image_url": "https://...", "rep_id": null, "opportunity_id": null }
+  ],
+  "label": "July 10 export"   // optional, cosmetic only
+}
+```
+Starts a background job (throttled concurrency, fixed cap of 4 — never the
+whole folder held in memory at once) and returns immediately:
+```jsonc
+{ "job_id": "…", "total": 2 }
+```
+
+**`GET /v1/bulk-score/{job_id}`** — poll for progress/results:
+```jsonc
+{
+  "status": "queued" | "running" | "done",
+  "processed": 1,
+  "total": 2,
+  "results": [
+    { "image_url": "https://...", "rep_id": "A123", "opportunity_id": "OPP1",
+      "band": "Suspect", "score": 15, "reason_code": "recycled",
+      "result_id": "…", "error": null },
+    { "image_url": "https://...", "rep_id": null, "opportunity_id": null,
+      "band": null, "score": null, "reason_code": null, "result_id": null,
+      "error": "fetch failed: …" }
+  ]
+}
+```
+404 for an unknown `job_id`. `results[]` is index-aligned with the request's
+`rows[]` and populated progressively as rows complete — poll until
+`status == "done"` (or `processed == total`).
+
+**Fail-open per row.** A fetch or scoring error for one row is caught,
+recorded as that row's `error` (band/score/reason_code/result_id stay
+`null`), and the batch continues — one bad photo/URL never aborts the job.
+
+**Persistence.** Every successfully-scored row is written as a normal
+`Result` row with `source="bulk"` plus that row's `rep_id`/`opportunity_id`
+(normalized the same way as webhook ingestion) — so bulk-scored photos show
+up in `/v1/results`, `/v1/analytics/summary`, and the Review Queue exactly
+like any other result, immediately and permanently (independent of the
+in-memory job registry below).
+
+**Job store is in-memory (Phase 1 scope).** `job_id` state (status/progress)
+lives in the API process's memory, not the database — a process restart
+loses in-flight job progress (the already-scored rows are NOT lost; they're
+already `Result` rows). A durable queue/worker is the Phase 3 seam if folders
+reach thousands of rows; not built.
+
+**Column mapping is a frontend concern.** LSQ field names are
+tenant-configurable, so this endpoint takes already-mapped rows
+(`image_url`/`rep_id`/`opportunity_id`); the CSV → column-mapping UI lives
+client-side (parses the LSQ export, lets the operator map columns, then
+POSTs the normalized rows here).
+
+**Not yet built (Phase 2 seam, documented only):** pulling photos directly
+from the LSQ activities API (pick agent/team + date range) instead of a
+manual CSV export — would reuse this exact job engine, just with a different
+row source.
+
 ## Known trade-offs (by design)
 
 - **No thumbnails.** The backend **never stores images** — only an 8-byte
