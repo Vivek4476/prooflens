@@ -65,6 +65,23 @@ class Tenant(Base):
     jobs: Mapped[list[Job]] = relationship(back_populates="tenant")
 
 
+class ApiKey(Base):
+    __tablename__ = "api_keys"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id"), index=True
+    )
+    # sha256(raw key), hex (64 chars). The raw key is shown once at mint, never stored.
+    key_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    # First chars of the raw key, for display/debugging only (never reconstructable).
+    prefix: Mapped[str] = mapped_column(String(16))
+    label: Mapped[str] = mapped_column(String(120), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Non-null => inactive. Revocation sets this instead of deleting the row.
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class Job(Base):
     __tablename__ = "jobs"
     __table_args__ = (
