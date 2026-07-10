@@ -198,3 +198,40 @@ export interface ReviewBlock {
 }
 
 export type HealthState = "ok" | "degraded" | "down" | "loading";
+
+// --- Bulk upload (Phase 1) ---------------------------------------------
+
+/** One row of the POST /v1/bulk-score request body — a mapped CSV row. */
+export interface BulkScoreRow {
+  image_url: string;
+  rep_id: string | null;
+  opportunity_id: string | null;
+}
+
+export interface BulkScoreResponse {
+  job_id: string;
+  total: number;
+}
+
+export type BulkJobStatus = "queued" | "running" | "done";
+
+/** Per-photo outcome inside a bulk job. `band`/`score`/`reason_code`/`result_id`
+ *  are null until scored; `error` is set (and the rest stay null) on a
+ *  fail-open per-row failure — the batch continues regardless. */
+export interface BulkResultItem {
+  image_url: string;
+  rep_id: string | null;
+  opportunity_id: string | null;
+  band: Band | null;
+  score: number | null;
+  reason_code: string | null;
+  result_id: string | null;
+  error: string | null;
+}
+
+export interface BulkJob {
+  status: BulkJobStatus;
+  processed: number;
+  total: number;
+  results: BulkResultItem[];
+}
