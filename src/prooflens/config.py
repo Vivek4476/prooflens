@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     # Admin API bearer token (X-Admin-Token). Staging/prod MUST override.
     admin_token: str = Field(default="dev-admin-token", alias="PROOFLENS_ADMIN_TOKEN")
 
+    # Rate limits (per 60s window) for /v1/*. 0 disables that tier. Multi-instance
+    # deploys need a shared store (Redis) — single-process counters otherwise.
+    ratelimit_general_per_min: int = Field(default=120, alias="RATELIMIT_GENERAL_PER_MIN")
+    ratelimit_compute_per_min: int = Field(default=20, alias="RATELIMIT_COMPUTE_PER_MIN")
+
     # CORS origins for the frontend (comma-separated). Dev default = Next.js.
     cors_origins: str = Field(
         default="http://localhost:3000,http://127.0.0.1:3000", alias="CORS_ORIGINS"

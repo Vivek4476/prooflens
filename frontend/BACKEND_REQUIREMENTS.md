@@ -348,3 +348,10 @@ key once; only its sha256 is stored; revocable). **Never** shipped to the browse
 **Frontend:** the dashboard calls same-origin `/api/*`; the Next.js BFF proxy
 (`src/app/api/[...path]/route.ts`) injects the key from server-only env
 (`PROOFLENS_API_URL`, `PROOFLENS_TENANT_KEY`, `PROOFLENS_ADMIN_TOKEN`).
+
+## Rate limiting (#22)
+`/v1/*` is rate-limited per 60s window, bucketed by API key (hashed) or client IP: general
+`RATELIMIT_GENERAL_PER_MIN` (default 120), compute (`/v1/score`, `/v1/bulk-score`)
+`RATELIMIT_COMPUTE_PER_MIN` (default 20); `0` disables a tier. Over limit → `429` + `Retry-After`.
+`/healthz`/`/readyz`/`/metrics` are exempt. **Single-instance only** — counters are per-process; a
+multi-instance deploy needs a shared store (Redis).
