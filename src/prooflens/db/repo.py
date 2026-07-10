@@ -146,13 +146,13 @@ class PostgresRepo:
         return str(row.id)
 
     def list_results(
-        self, *, limit: int = 50, offset: int = 0, band: str | None = None,
+        self, *, tenant_id: str, limit: int = 50, offset: int = 0, band: str | None = None,
         review: str | None = None, reason: str | None = None, rep_id: str | None = None,
         start: datetime | None = None, end: datetime | None = None,
     ) -> tuple[list[ResultView], int]:
         from ..service.ids import normalize_id
 
-        query = self._session.query(Result)
+        query = self._session.query(Result).filter(Result.tenant_id == uuid.UUID(tenant_id))
         if band:
             query = query.filter(Result.band == band)
         if reason is not None:

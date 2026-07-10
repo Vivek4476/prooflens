@@ -65,11 +65,11 @@ class Repo(Protocol):
         ...
 
     def list_results(
-        self, *, limit: int = 50, offset: int = 0, band: str | None = None,
+        self, *, tenant_id: str, limit: int = 50, offset: int = 0, band: str | None = None,
         review: str | None = None, reason: str | None = None, rep_id: str | None = None,
         start: datetime | None = None, end: datetime | None = None,
     ) -> tuple[list[ResultView], int]:
-        """Newest-first page of results + total matching count.
+        """Newest-first page of results + total matching count, scoped to tenant_id.
         review="pending" => undecided only; other value => exact review_status match.
         reason filters exact reason_code; rep_id filters normalized-exact rep_id.
         start/end are a half-open range: created_at >= start AND created_at < end."""
@@ -213,11 +213,12 @@ class InMemoryRepo:
         return rid
 
     def list_results(
-        self, *, limit: int = 50, offset: int = 0, band: str | None = None,
+        self, *, tenant_id: str, limit: int = 50, offset: int = 0, band: str | None = None,
         review: str | None = None, reason: str | None = None, rep_id: str | None = None,
         start: datetime | None = None, end: datetime | None = None,
     ) -> tuple[list[ResultView], int]:
-        rows = [r for r in self.results if band is None or r.band == band]
+        rows = [r for r in self.results if r.tenant_id == tenant_id]
+        rows = [r for r in rows if band is None or r.band == band]
         if reason is not None:
             rows = [r for r in rows if r.reason_code == reason]
         if rep_id is not None:
