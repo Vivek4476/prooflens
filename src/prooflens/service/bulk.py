@@ -96,6 +96,12 @@ class BulkJob:
 # oldest once over the cap. Phase 3's durable queue removes this ceiling.
 MAX_RETAINED_JOBS = 200
 
+# Cap concurrent in-flight (queued/running) bulk jobs. Each running job fans out
+# fetches + scorings; without this a caller could loop POST /v1/bulk-score and
+# spawn unbounded background jobs (compounding the OOM surface even with the
+# shared score limiter). Over this cap the endpoint rejects with 429.
+MAX_INFLIGHT_JOBS = 3
+
 
 class BulkJobRegistry:
     """In-memory job store keyed by job_id. Not persisted — Phase 1 scope
@@ -115,6 +121,10 @@ class BulkJobRegistry:
 
     def get(self, job_id: str) -> BulkJob | None:
         return self._jobs.get(job_id)
+
+    def active_count(self) -> int:
+        """Jobs not yet done (queued or running) — the in-flight fan-out."""
+        return sum(1 for j in self._jobs.values() if j.status != "done")
 
 
 # Process-wide singleton registry (mirrors the process-wide score concurrency

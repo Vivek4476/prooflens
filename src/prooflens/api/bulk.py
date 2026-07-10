@@ -16,7 +16,13 @@ from pydantic import BaseModel, Field
 
 from ..lsq.base import LSQClient
 from ..lsq.fake import FakeLSQClient
-from ..service.bulk import BulkRow, RepoFactory, registry, run_bulk_job
+from ..service.bulk import (
+    MAX_INFLIGHT_JOBS,
+    BulkRow,
+    RepoFactory,
+    registry,
+    run_bulk_job,
+)
 from ..service.repo import Repo
 from .deps import get_repo, get_repo_factory
 
@@ -63,6 +69,15 @@ def start_bulk_score(
         raise HTTPException(
             status_code=404,
             detail=f"unknown tenant {DEFAULT_TENANT!r} (seed a tenant first)",
+        )
+
+    if registry.active_count() >= MAX_INFLIGHT_JOBS:
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                f"too many bulk jobs in progress (max {MAX_INFLIGHT_JOBS}); "
+                "wait for one to finish and retry"
+            ),
         )
 
     rows = [

@@ -133,6 +133,33 @@ def test_bulk_score_rejects_empty_batch(client):
     assert r.status_code == 422
 
 
+def test_bulk_score_rejects_when_too_many_inflight(client):
+    # A caller can't spawn unbounded background jobs: at the in-flight cap the
+    # endpoint returns 429 instead of starting another fan-out.
+    from prooflens.service.bulk import MAX_INFLIGHT_JOBS, registry
+
+    # Jobs created but never run stay "queued" (== in-flight).
+    created = [registry.create(total=1) for _ in range(MAX_INFLIGHT_JOBS)]
+    try:
+        assert registry.active_count() >= MAX_INFLIGHT_JOBS
+        r = client.post("/v1/bulk-score", json={"rows": [{"image_url": "https://x/p.jpg"}]})
+        assert r.status_code == 429
+    finally:
+        for j in created:
+            registry._jobs.pop(j.id, None)
+
+
+def test_bulk_registry_active_count_ignores_done():
+    from prooflens.service.bulk import BulkJobRegistry
+
+    reg = BulkJobRegistry()
+    a = reg.create(total=1)
+    b = reg.create(total=1)
+    a.status = "done"
+    b.status = "running"
+    assert reg.active_count() == 1  # only the running one counts
+
+
 def test_bulk_registry_evicts_oldest_over_cap():
     # The in-memory registry can't grow without bound: once over the retention
     # cap, the oldest job is evicted (returns 404), newest stay resolvable.
