@@ -353,5 +353,11 @@ key once; only its sha256 is stored; revocable). **Never** shipped to the browse
 `/v1/*` is rate-limited per 60s window, bucketed by API key (hashed) or client IP: general
 `RATELIMIT_GENERAL_PER_MIN` (default 120), compute (`/v1/score`, `/v1/bulk-score`)
 `RATELIMIT_COMPUTE_PER_MIN` (default 20); `0` disables a tier. Over limit → `429` + `Retry-After`.
-`/healthz`/`/readyz`/`/metrics` are exempt. **Single-instance only** — counters are per-process; a
-multi-instance deploy needs a shared store (Redis).
+`/healthz`/`/readyz`/`/metrics` and the LSQ webhook (`/v1/webhooks/*`) are exempt. **Single-instance
+only** — counters are per-process; a multi-instance deploy needs a shared store (Redis).
+
+**Shared-key caveat (multi-operator):** the dashboard's BFF proxy injects ONE tenant key for every
+browser user, so all operators share a single bucket (per-IP fallback never engages for dashboard
+traffic). Fine for a small operator pool; with many concurrent operators, raise
+`RATELIMIT_COMPUTE_PER_MIN` (the 20/min compute tier is the tight one, e.g. several people scoring at
+once) or move to per-user keys when SSO/RBAC lands. This is a conscious go-live sizing decision.
