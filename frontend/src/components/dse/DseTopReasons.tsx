@@ -20,7 +20,10 @@ function historyHref(agentId: string, reasonCode: string): string {
  *  scoped to a single agent_id and drilling into /history?rep_id=&reason=. */
 export function DseTopReasons({ agentId, reasons }: { agentId: string; reasons: DseTopReason[] }) {
   const router = useRouter();
-  const sorted = [...reasons].sort((a, b) => b.count - a.count);
+  // `clear` is a non-flag verdict — it never belongs in a "flag reasons" ranking (the
+  // backend's top_reasons includes it as the majority reason). Same discipline as
+  // analytics' excludeClear; the %-of-flags denominator excludes it too.
+  const sorted = [...reasons].filter((r) => r.reason_code !== "clear").sort((a, b) => b.count - a.count);
   const total = sorted.reduce((sum, r) => sum + r.count, 0) || 1;
   const maxCount = Math.max(1, ...sorted.map((r) => r.count));
 

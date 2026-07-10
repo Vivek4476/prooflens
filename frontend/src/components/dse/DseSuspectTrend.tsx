@@ -1,4 +1,5 @@
 "use client";
+import type { Key } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { DotProps } from "recharts";
 
@@ -65,7 +66,12 @@ export function DseSuspectTrend({ trend }: { trend: DseTrendPoint[] }) {
               stroke="var(--accent)"
               strokeWidth={2}
               fill="url(#dseSuspectFill)"
-              dot={(props: DotProps & { payload?: TrendPoint }) => <DseTrendDot {...props} />}
+              dot={(props: DotProps & { payload?: TrendPoint; key?: Key }) => {
+                // Pull `key` out of the spread — recharts passes it inside the props object,
+                // and spreading a `key` into JSX warns in React 18+ (see React docs).
+                const { key, ...rest } = props;
+                return <DseTrendDot key={key} {...rest} />;
+              }}
               activeDot={{ r: 4, fill: "var(--accent)", stroke: "var(--surface)", strokeWidth: 2 }}
               isAnimationActive={!reducedMotion}
               animationDuration={ANIMATION_DURATION_MS}
@@ -80,11 +86,11 @@ export function DseSuspectTrend({ trend }: { trend: DseTrendPoint[] }) {
 /** Same honesty device as CaptureRiskTrend's TrendDot: the current in-progress bucket
  *  gets a hollow marker so an unfinished period never reads as a completed dip. */
 function DseTrendDot(props: DotProps & { payload?: TrendPoint }) {
-  const { cx, cy, payload, key } = props;
-  if (cx == null || cy == null || !payload?.incomplete) return <g key={key} />;
+  const { cx, cy, payload } = props;
+  // `key` is applied by the parent `dot` render fn — this component only draws the marker.
+  if (cx == null || cy == null || !payload?.incomplete) return <g />;
   return (
     <circle
-      key={key}
       cx={cx}
       cy={cy}
       r={4}
