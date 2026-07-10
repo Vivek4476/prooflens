@@ -99,6 +99,17 @@ class Repo(Protocol):
         """Current hierarchy rows for the tenant (dicts incl. upload_id)."""
         ...
 
+    def search_hierarchy(self, tenant_id: str, q: str, limit: int) -> list[dict]:
+        """Latest hierarchy row per agent whose agent_id/agent_name contains q
+        (case-insensitive, % and _ literal), capped to limit, sorted by agent_id."""
+        ...
+
+    def result_counts_by_rep(
+        self, tenant_id: str, start: datetime | None, end: datetime | None
+    ) -> dict[str, int]:
+        """rep_id -> result count for this tenant in [start, end) (None = unbounded)."""
+        ...
+
     def hierarchy_status(self, tenant_id: str) -> dict:
         """Current version + match rate vs distinct rep_ids in the last 90 days."""
         ...
@@ -292,6 +303,40 @@ class InMemoryRepo:
 
     def get_hierarchy_rows(self, tenant_id: str) -> list[dict]:
         return [dict(r) for r in self._hierarchy.get(tenant_id, [])]
+
+    def search_hierarchy(self, tenant_id: str, q: str, limit: int) -> list[dict]:
+        rows = self._hierarchy.get(tenant_id, [])
+        latest: dict[str, dict] = {}
+        for r in rows:
+            aid = r.get("agent_id")
+            if aid is None:
+                continue
+            cur = latest.get(aid)
+            if cur is None or r["valid_from"] > cur["valid_from"]:
+                latest[aid] = r
+        needle = q.strip().lower()
+        matches = [
+            r for r in latest.values()
+            if needle in (r["agent_id"] or "").lower()
+            or needle in (r.get("agent_name") or "").lower()
+        ]
+        matches.sort(key=lambda r: r["agent_id"])
+        return [dict(r) for r in matches[:limit]]
+
+    def result_counts_by_rep(
+        self, tenant_id: str, start: datetime | None, end: datetime | None
+    ) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for r in self.results:
+            if r.tenant_id != tenant_id or not r.rep_id or not r.created_at:
+                continue
+            ts = datetime.fromisoformat(r.created_at)
+            if start is not None and ts < start:
+                continue
+            if end is not None and ts >= end:
+                continue
+            counts[r.rep_id] = counts.get(r.rep_id, 0) + 1
+        return counts
 
     def hierarchy_status(self, tenant_id: str) -> dict:
         rows = self._hierarchy.get(tenant_id, [])
