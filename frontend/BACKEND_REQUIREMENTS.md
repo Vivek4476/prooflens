@@ -331,3 +331,20 @@ band_distribution, suspect_rate, avg_score, top_reasons[], trend[], recent[] }`
 bucketing filtered to the rep; recent = latest flagged captures). Honest
 small-sample values (never fabricated). Analytics `group_by=agent` added
 (labels with the agent name).
+
+## Auth (per-tenant API key) — implemented (#18)
+
+All `/v1/*` **tenant data** routes require `Authorization: Bearer <key>`;
+missing/invalid/revoked → `401`. The key resolves the tenant and every query is
+filtered to it — a valid key for the wrong tenant gets an honest `404` on a
+single-result lookup (e.g. `GET /v1/results/{id}`), never a leak of another
+tenant's data. The `/v1/admin/*` admin routes (e.g. `POST /v1/admin/hierarchy`)
+use `X-Admin-Token` instead, exactly like the legacy `/admin/*` routes. Webhook
+(HMAC) and `/healthz`/`/readyz`/`/metrics` are unaffected.
+
+**Keys:** minted via `python scripts/mint_api_key.py --tenant <slug> --label <note>` (prints the raw
+key once; only its sha256 is stored; revocable). **Never** shipped to the browser.
+
+**Frontend:** the dashboard calls same-origin `/api/*`; the Next.js BFF proxy
+(`src/app/api/[...path]/route.ts`) injects the key from server-only env
+(`PROOFLENS_API_URL`, `PROOFLENS_TENANT_KEY`, `PROOFLENS_ADMIN_TOKEN`).

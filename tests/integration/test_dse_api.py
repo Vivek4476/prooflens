@@ -47,6 +47,8 @@ def repo():
 def client(repo):
     app = create_app()
     app.dependency_overrides[get_repo] = lambda: repo
+    from prooflens.api.auth import require_tenant
+    app.dependency_overrides[require_tenant] = lambda: repo.get_tenant_by_slug("dev")
     return TestClient(app, raise_server_exceptions=False)
 
 
@@ -130,6 +132,8 @@ def test_search_caps_results_at_limit(repo):
     r.replace_hierarchy("t1", rows, "up-many")
     app = create_app()
     app.dependency_overrides[get_repo] = lambda: r
+    from prooflens.api.auth import require_tenant
+    app.dependency_overrides[require_tenant] = lambda: r.get_tenant_by_slug("dev")
     c = TestClient(app, raise_server_exceptions=False)
 
     body = c.get("/v1/dse", params={"q": "agt"}).json()  # matches all by id

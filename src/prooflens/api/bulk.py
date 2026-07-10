@@ -23,12 +23,11 @@ from ..service.bulk import (
     registry,
     run_bulk_job,
 )
-from ..service.repo import Repo
-from .deps import get_repo, get_repo_factory
+from ..service.views import TenantView
+from .auth import require_tenant
+from .deps import get_repo_factory
 
 router = APIRouter(tags=["bulk"])
-
-DEFAULT_TENANT = "dev"
 
 # Hard cap on rows per bulk request. Every row's {url, ids, result} is held in
 # memory for the job's lifetime; an uncapped `rows` list lets a single POST
@@ -63,17 +62,10 @@ def get_lsq_client() -> LSQClient:
 def start_bulk_score(
     body: BulkScoreRequest,
     background_tasks: BackgroundTasks,
-    repo: Repo = Depends(get_repo),
     lsq: LSQClient = Depends(get_lsq_client),
     repo_factory: RepoFactory = Depends(get_repo_factory),
+    tenant: TenantView = Depends(require_tenant),
 ) -> dict:
-    tenant_view = repo.get_tenant_by_slug(DEFAULT_TENANT)
-    if tenant_view is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"unknown tenant {DEFAULT_TENANT!r} (seed a tenant first)",
-        )
-
     if registry.active_count() >= MAX_INFLIGHT_JOBS:
         raise HTTPException(
             status_code=429,
@@ -93,7 +85,7 @@ def start_bulk_score(
         run_bulk_job,
         job,
         rows,
-        tenant_slug=DEFAULT_TENANT,
+        tenant_slug=tenant.slug,
         lsq=lsq,
         repo_factory=repo_factory,
     )
@@ -101,7 +93,10 @@ def start_bulk_score(
 
 
 @router.get("/v1/bulk-score/{job_id}")
-def get_bulk_score(job_id: str) -> dict:
+def get_bulk_score(
+    job_id: str,
+    tenant: TenantView = Depends(require_tenant),
+) -> dict:
     job = registry.get(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail=f"no bulk job {job_id!r}")

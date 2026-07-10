@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useHealth, useTenants } from "@/lib/api/hooks";
-import { API_URL } from "@/lib/api/client";
+import { API_BASE } from "@/lib/api/client";
 import type { HealthState } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 
@@ -54,7 +54,7 @@ export default function SettingsPage() {
           <div className="divide-y divide-border">
             <Row label="API (/healthz)" value={<StatusPill up={health.data?.live} label="Healthy" />} />
             <Row label="Database (/readyz)" value={<StatusPill up={health.data?.ready} label="Ready" />} />
-            <Row label="API base URL" value={API_URL} mono />
+            <Row label="API base URL" value={API_BASE} mono />
           </div>
         </Card>
 

@@ -15,7 +15,7 @@ from ..queue import queue as q
 from ..service.views import JobView, ResultView, TenantView
 from ..tenants.service import resolve_scoring
 from .hashstore import PostgresHashStore
-from .models import AuditLog, Hierarchy, Job, Result, Tenant
+from .models import ApiKey, AuditLog, Hierarchy, Job, Result, Tenant
 
 
 def _tenant_view(t: Tenant) -> TenantView:
@@ -56,6 +56,42 @@ class PostgresRepo:
     def get_tenant(self, tenant_id: str) -> TenantView | None:
         t = self._session.get(Tenant, uuid.UUID(tenant_id))
         return _tenant_view(t) if t else None
+
+    def record_api_key(self, tenant_id: str, key_hash: str, prefix: str, label: str) -> str:
+        import uuid as _uuid
+        row = ApiKey(
+            tenant_id=_uuid.UUID(tenant_id), key_hash=key_hash, prefix=prefix, label=label
+        )
+        self._session.add(row)
+        self._session.flush()
+        return str(row.id)
+
+    def tenant_for_api_key(self, key_hash: str) -> TenantView | None:
+        row = (
+            self._session.query(ApiKey)
+            .filter(ApiKey.key_hash == key_hash, ApiKey.revoked_at.is_(None))
+            .one_or_none()
+        )
+        if row is None:
+            return None
+        t = (
+            self._session.query(Tenant)
+            .filter(Tenant.id == row.tenant_id, Tenant.active.is_(True))
+            .one_or_none()
+        )
+        return _tenant_view(t) if t else None
+
+    def revoke_api_key(self, key_id: str) -> None:
+        import uuid as _uuid
+
+        from sqlalchemy import func as _func
+        row = (
+            self._session.query(ApiKey)
+            .filter(ApiKey.id == _uuid.UUID(key_id))
+            .one_or_none()
+        )
+        if row is not None:
+            row.revoked_at = _func.now()
 
     def enqueue(self, tenant_id: str, event_id: str, payload: dict) -> tuple[str, bool]:
         tid = uuid.UUID(tenant_id)
@@ -110,13 +146,13 @@ class PostgresRepo:
         return str(row.id)
 
     def list_results(
-        self, *, limit: int = 50, offset: int = 0, band: str | None = None,
+        self, *, tenant_id: str, limit: int = 50, offset: int = 0, band: str | None = None,
         review: str | None = None, reason: str | None = None, rep_id: str | None = None,
         start: datetime | None = None, end: datetime | None = None,
     ) -> tuple[list[ResultView], int]:
         from ..service.ids import normalize_id
 
-        query = self._session.query(Result)
+        query = self._session.query(Result).filter(Result.tenant_id == uuid.UUID(tenant_id))
         if band:
             query = query.filter(Result.band == band)
         if reason is not None:
@@ -145,25 +181,36 @@ class PostgresRepo:
         views = [self._to_view(r, jobs.get(r.job_id) if r.job_id else None) for r in rows]
         return views, total
 
-    def get_result(self, result_id: str) -> ResultView | None:
+    def get_result(self, result_id: str, *, tenant_id: str) -> ResultView | None:
         try:
             rid = uuid.UUID(result_id)
+            tid = uuid.UUID(tenant_id)
         except (ValueError, AttributeError):
             return None  # not a valid id => treat as not found, not a 500
-        row = self._session.get(Result, rid)
+        row = (
+            self._session.query(Result)
+            .filter(Result.id == rid, Result.tenant_id == tid)
+            .one_or_none()
+        )
         if row is None:
             return None
         job = self._session.get(Job, row.job_id) if row.job_id else None
         return self._to_view(row, job)
 
     def record_review(
-        self, result_id: str, decision: str, note: str | None, reviewer: str
+        self, result_id: str, decision: str, note: str | None, reviewer: str,
+        *, tenant_id: str,
     ) -> ResultView | None:
         try:
             rid = uuid.UUID(result_id)
+            tid = uuid.UUID(tenant_id)
         except (ValueError, AttributeError):
             return None
-        row = self._session.get(Result, rid)
+        row = (
+            self._session.query(Result)
+            .filter(Result.id == rid, Result.tenant_id == tid)
+            .one_or_none()
+        )
         if row is None:
             return None
         row.review_status = decision

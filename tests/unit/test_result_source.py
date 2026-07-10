@@ -40,7 +40,7 @@ def _verdict() -> Verdict:
 def test_inmemory_direct_result_has_direct_source():
     repo = _repo()
     rid = repo.record_result("t1", None, _verdict())
-    view = repo.get_result(rid)
+    view = repo.get_result(rid, tenant_id="t1")
     assert view is not None
     assert view.source == "direct"
 
@@ -48,7 +48,7 @@ def test_inmemory_direct_result_has_direct_source():
 def test_inmemory_webhook_result_has_webhook_source():
     repo = _repo()
     rid = repo.record_result("t1", "job-123", _verdict())
-    view = repo.get_result(rid)
+    view = repo.get_result(rid, tenant_id="t1")
     assert view is not None
     assert view.source == "webhook"
 
@@ -56,7 +56,7 @@ def test_inmemory_webhook_result_has_webhook_source():
 def test_inmemory_seed_result_round_trips_as_seed():
     repo = _repo()
     rid = repo.record_result("t1", None, _verdict(), source="seed")
-    view = repo.get_result(rid)
+    view = repo.get_result(rid, tenant_id="t1")
     assert view is not None
     assert view.source == "seed"
 
@@ -65,7 +65,7 @@ def test_inmemory_seed_override_wins_even_with_job_id():
     # Explicit source overrides the job_id-based derivation entirely.
     repo = _repo()
     rid = repo.record_result("t1", "job-456", _verdict(), source="seed")
-    view = repo.get_result(rid)
+    view = repo.get_result(rid, tenant_id="t1")
     assert view is not None
     assert view.source == "seed"
 

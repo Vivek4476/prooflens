@@ -214,7 +214,7 @@ def _seed(args: argparse.Namespace, plan: list[SeedRecord]) -> None:
             # calls — no new column, no new endpoint.
             decision = sample_review_decision(record.verdict, review_rng)
             if decision is not None:
-                repo.record_review(result_id, decision, REVIEW_NOTE, REVIEWER)
+                repo.record_review(result_id, decision, REVIEW_NOTE, REVIEWER, tenant_id=tenant.id)
 
             if i % COMMIT_BATCH_SIZE == 0:
                 repo.commit()
