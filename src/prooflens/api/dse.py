@@ -24,6 +24,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..engine.verdicts import REASON_SHORT_LABEL, Reason
 from ..service.hierarchy import agent_display_name
+from ..service.ids import normalize_id
 from ..service.repo import Repo
 from .analytics import _tally, build_buckets
 from .date_range import resolve_range
@@ -131,7 +132,10 @@ def dse_scorecard(
     )
 
     latest = _latest_rows_by_agent(rows)
-    hierarchy_row = latest.get(agent_id.strip().upper()) if agent_id else None
+    # Same canonical id rule used everywhere (upload, list_results filter), so
+    # the hierarchy lookup can't drift from how ids are stored/compared.
+    norm_id = normalize_id(agent_id)
+    hierarchy_row = latest.get(norm_id) if norm_id else None
 
     if hierarchy_row is None and total == 0:
         # Also check for ANY result ever (outside the range) before declaring
@@ -192,7 +196,7 @@ def dse_scorecard(
     recent = [r.to_dict() for r in flagged[:_RECENT_LIMIT]]
 
     return {
-        "agent_id": agent_id.strip().upper() if agent_id else agent_id,
+        "agent_id": norm_id if norm_id else agent_id,
         "name": name,
         "chain": chain,
         "total": tally["total"],

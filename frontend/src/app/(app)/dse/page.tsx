@@ -70,10 +70,14 @@ function DsePageInner() {
             Retry
           </Button>
         </Card>
-      ) : isLoading || !data ? (
+      ) : isLoading || !data || isPlaceholderData ? (
+        // The only query variable is agentId, so placeholder data here is the
+        // PREVIOUS agent's scorecard held while the new one loads — showing it
+        // under the new URL would mislabel another DSE's name/numbers. Show the
+        // skeleton across the identity switch instead.
         <ScorecardSkeleton />
       ) : (
-        <div className={isPlaceholderData ? "space-y-8 opacity-60 transition-opacity" : "space-y-8"}>
+        <div className="space-y-8">
           <Card className="p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">

@@ -109,6 +109,9 @@ export interface AnalyticsGroup {
   avg_score: number;
   suspect_rate: number;
   share: number;
+  // Present only for group_by=agent: the real agent_id (node is the display
+  // name). Used to link a DSE row to /dse?agent=<id> — the name won't resolve.
+  agent_id?: string;
 }
 
 export interface AnalyticsSummary {

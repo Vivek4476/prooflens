@@ -99,6 +99,43 @@ def test_search_no_match_returns_empty_list(client):
     assert r.json()["results"] == []
 
 
+def test_search_empty_query_orders_by_activity(client, repo):
+    # Empty q -> "most active first" (by result count). A2 has more results
+    # than A1, so it must lead despite sorting after A1 alphabetically.
+    _seed_results(repo, "A1", [(date(2026, 6, 1), "Clear")])
+    _seed_results(repo, "A2", [
+        (date(2026, 6, 1), "Clear"),
+        (date(2026, 6, 2), "Suspect"),
+        (date(2026, 6, 3), "Suspect"),
+    ])
+    r = client.get("/v1/dse")
+    ids = [x["agent_id"] for x in r.json()["results"]]
+    assert ids == ["A2", "A1"]  # most-active first, not alphabetical
+
+
+def test_search_caps_results_at_limit(repo):
+    # More matching agents than the cap -> only _SEARCH_LIMIT returned.
+    from prooflens.api.dse import _SEARCH_LIMIT
+
+    r = InMemoryRepo([_tenant()])
+    rows = [
+        {
+            "agent_id": f"AGT{i:03d}", "agent_name": f"Agent {i}",
+            "sm": "Sam", "rsm": "Ravi", "srsm": "Sr1",
+            "zonal_head": "ZoneN", "branch": "North", "city": "Delhi",
+            "valid_from": date(2026, 1, 1),
+        }
+        for i in range(_SEARCH_LIMIT + 10)
+    ]
+    r.replace_hierarchy("t1", rows, "up-many")
+    app = create_app()
+    app.dependency_overrides[get_repo] = lambda: r
+    c = TestClient(app, raise_server_exceptions=False)
+
+    body = c.get("/v1/dse", params={"q": "agt"}).json()  # matches all by id
+    assert len(body["results"]) == _SEARCH_LIMIT
+
+
 # --- scorecard ----------------------------------------------------------
 
 

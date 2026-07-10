@@ -80,15 +80,21 @@ export function useTenants() {
   return useQuery({ queryKey: ["tenants"], queryFn: () => api.tenants(), retry: false });
 }
 
-/** Debounced DSE search-as-you-type. Disabled while the query is empty and shorter
- *  than MIN_QUERY_LEN — an empty q still hits the backend (recent/most-active), but we
- *  don't want to fire a request on every single keystroke of a 1-character query. */
+/** Below this length a non-empty query doesn't fire — a single character matches
+ *  a huge swath of DSEs, so we wait for a more selective query. */
+const MIN_QUERY_LEN = 2;
+
+/** Debounced DSE search-as-you-type. An empty q intentionally hits the backend
+ *  (the recent/most-active default roster shown when the box opens); a 1-char q
+ *  is suppressed so we don't fire an unselective request on every keystroke. */
 export function useDseSearch(q: string, enabled: boolean = true) {
   const debounced = useDebouncedValue(q, 300);
+  const trimmed = debounced.trim();
+  const queryable = trimmed.length === 0 || trimmed.length >= MIN_QUERY_LEN;
   return useQuery({
-    queryKey: ["dse-search", debounced],
-    queryFn: () => api.dseSearch(debounced.trim()),
-    enabled,
+    queryKey: ["dse-search", trimmed],
+    queryFn: () => api.dseSearch(trimmed),
+    enabled: enabled && queryable,
     retry: false,
   });
 }

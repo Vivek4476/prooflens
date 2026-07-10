@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { ChartCard } from "@/components/ui/ChartCard";
 import { useAnalytics } from "@/lib/api/hooks";
-import type { AnalyticsParams, GroupBy } from "@/lib/api/types";
+import type { AnalyticsGroup, AnalyticsParams, GroupBy } from "@/lib/api/types";
 import { rankHotspots } from "@/lib/analytics/hotspots";
 import { formatCount, formatPct } from "@/lib/format";
 
@@ -43,11 +43,14 @@ export function ByTeamPanel({ startDate, endDate }: { startDate?: string; endDat
    * /history can't apply — deferred no-op until /v1/results grows a node filter.
    *
    * The "DSE" dimension is the one exception: group_by=agent's rows ARE individual
-   * DSEs (node = agent_id), so a row genuinely identifies a single scorecard — it
-   * navigates to /dse?agent=<id> rather than deferring.
+   * DSEs, so a row genuinely identifies a single scorecard — it navigates to
+   * /dse?agent=<agent_id>. The link MUST use g.agent_id (the real id), not g.node
+   * (the display name) — /v1/dse/{agent_id} resolves by id only, so a name 404s.
    */
-  function onRowSelect(node: string) {
-    if (dimension === "agent") router.push(`/dse?agent=${encodeURIComponent(node)}`);
+  function onRowSelect(g: AnalyticsGroup) {
+    if (dimension === "agent" && g.agent_id) {
+      router.push(`/dse?agent=${encodeURIComponent(g.agent_id)}`);
+    }
   }
 
   // Own query, keyed on its own dimension — changing "By branch → By city" refetches only
@@ -114,11 +117,11 @@ export function ByTeamPanel({ startDate, endDate }: { startDate?: string; endDat
         <div className={`flex h-full flex-col transition-opacity ${isPlaceholderData ? "opacity-60" : ""}`}>
           <ol className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pr-1">
             {ranked.map((g, i) => (
-              <li key={g.node} className="shrink-0">
+              <li key={g.agent_id ?? g.node} className="shrink-0">
                 <button
                   type="button"
                   title={`${g.node} — ${formatCount(g.suspect)} of ${formatCount(g.total)} scored are Suspect`}
-                  onClick={() => onRowSelect(g.node)}
+                  onClick={() => onRowSelect(g)}
                   className="group relative flex w-full items-center gap-3 overflow-hidden rounded-md px-2.5 py-2 text-left transition-colors hover:bg-surface-2"
                 >
                   {/* Magnitude bar — width relative to the worst node's suspect rate. This IS
