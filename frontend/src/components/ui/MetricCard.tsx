@@ -12,6 +12,7 @@ export function MetricCard({
   sub,
   subDirection,
   accent,
+  className,
 }: {
   label: string;
   value: string | number;
@@ -25,9 +26,10 @@ export function MetricCard({
    */
   subDirection?: MetricSubDirection;
   accent?: boolean; // subtle emphasis for the single most important KPI
+  className?: string; // grid-span / layout overrides from the caller
 }) {
   return (
-    <div className={cn("card flex flex-col gap-2 p-4", accent && "ring-1 ring-border-strong")}>
+    <div className={cn("card flex flex-col gap-2 p-4", accent && "ring-1 ring-border-strong", className)}>
       <span className="text-caption font-medium text-text-muted">{label}</span>
       <div className="flex items-baseline gap-1">
         <span className="text-display leading-none tabular-nums text-text">{value}</span>
