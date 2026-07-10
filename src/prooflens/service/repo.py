@@ -29,6 +29,18 @@ class Repo(Protocol):
     def get_tenant_by_slug(self, slug: str) -> TenantView | None: ...
     def get_tenant(self, tenant_id: str) -> TenantView | None: ...
 
+    def record_api_key(self, tenant_id: str, key_hash: str, prefix: str, label: str) -> str:
+        """Store a hashed API key for a tenant; return the new key's id."""
+        ...
+
+    def tenant_for_api_key(self, key_hash: str) -> TenantView | None:
+        """The active tenant owning a non-revoked key with this hash, else None."""
+        ...
+
+    def revoke_api_key(self, key_id: str) -> None:
+        """Mark a key inactive (idempotent; unknown id is a no-op)."""
+        ...
+
     def enqueue(self, tenant_id: str, event_id: str, payload: dict) -> tuple[str, bool]:
         """Return (job_id, created). created=False for a duplicate event id."""
         ...
@@ -107,6 +119,8 @@ class InMemoryRepo:
         self.audit_log: list[dict] = []
         self._hierarchy: dict[str, list[dict]] = {}
         self._ids = itertools.count(1)
+        # key_hash -> {"id": str, "tenant_id": str, "revoked": bool}
+        self._api_keys: dict[str, dict] = {}
 
     def add_tenant(self, tenant: TenantView) -> None:
         self._tenants[tenant.id] = tenant
@@ -117,6 +131,22 @@ class InMemoryRepo:
 
     def get_tenant(self, tenant_id: str) -> TenantView | None:
         return self._tenants.get(tenant_id)
+
+    def record_api_key(self, tenant_id: str, key_hash: str, prefix: str, label: str) -> str:
+        key_id = str(next(self._ids))
+        self._api_keys[key_hash] = {"id": key_id, "tenant_id": tenant_id, "revoked": False}
+        return key_id
+
+    def tenant_for_api_key(self, key_hash: str) -> TenantView | None:
+        rec = self._api_keys.get(key_hash)
+        if rec is None or rec["revoked"]:
+            return None
+        return self._tenants.get(rec["tenant_id"])
+
+    def revoke_api_key(self, key_id: str) -> None:
+        for rec in self._api_keys.values():
+            if rec["id"] == key_id:
+                rec["revoked"] = True
 
     def enqueue(self, tenant_id: str, event_id: str, payload: dict) -> tuple[str, bool]:
         key = (tenant_id, event_id)

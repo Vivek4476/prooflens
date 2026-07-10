@@ -15,7 +15,7 @@ from ..queue import queue as q
 from ..service.views import JobView, ResultView, TenantView
 from ..tenants.service import resolve_scoring
 from .hashstore import PostgresHashStore
-from .models import AuditLog, Hierarchy, Job, Result, Tenant
+from .models import ApiKey, AuditLog, Hierarchy, Job, Result, Tenant
 
 
 def _tenant_view(t: Tenant) -> TenantView:
@@ -56,6 +56,42 @@ class PostgresRepo:
     def get_tenant(self, tenant_id: str) -> TenantView | None:
         t = self._session.get(Tenant, uuid.UUID(tenant_id))
         return _tenant_view(t) if t else None
+
+    def record_api_key(self, tenant_id: str, key_hash: str, prefix: str, label: str) -> str:
+        import uuid as _uuid
+        row = ApiKey(
+            tenant_id=_uuid.UUID(tenant_id), key_hash=key_hash, prefix=prefix, label=label
+        )
+        self._session.add(row)
+        self._session.flush()
+        return str(row.id)
+
+    def tenant_for_api_key(self, key_hash: str) -> TenantView | None:
+        row = (
+            self._session.query(ApiKey)
+            .filter(ApiKey.key_hash == key_hash, ApiKey.revoked_at.is_(None))
+            .one_or_none()
+        )
+        if row is None:
+            return None
+        t = (
+            self._session.query(Tenant)
+            .filter(Tenant.id == row.tenant_id, Tenant.active.is_(True))
+            .one_or_none()
+        )
+        return _tenant_view(t) if t else None
+
+    def revoke_api_key(self, key_id: str) -> None:
+        import uuid as _uuid
+
+        from sqlalchemy import func as _func
+        row = (
+            self._session.query(ApiKey)
+            .filter(ApiKey.id == _uuid.UUID(key_id))
+            .one_or_none()
+        )
+        if row is not None:
+            row.revoked_at = _func.now()
 
     def enqueue(self, tenant_id: str, event_id: str, payload: dict) -> tuple[str, bool]:
         tid = uuid.UUID(tenant_id)
