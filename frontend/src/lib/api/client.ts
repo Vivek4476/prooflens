@@ -17,14 +17,10 @@ import type {
   Tenant,
 } from "./types";
 
-export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:8000";
-
-// Admin token is dev-only convenience for the demo; in real deployments the
-// admin surface would sit behind SSO, not a public env var.
-const ADMIN_TOKEN = process.env.NEXT_PUBLIC_ADMIN_TOKEN || "dev-admin-token";
-
-export const http = axios.create({ baseURL: API_URL, timeout: 120_000 });
+// All backend calls go through the same-origin BFF proxy (src/app/api/[...path]),
+// which injects the tenant key + admin token server-side. The browser holds no secret.
+export const API_BASE = "/api";
+export const http = axios.create({ baseURL: API_BASE, timeout: 120_000 });
 
 export const api = {
   async health(): Promise<{ status: string }> {
@@ -72,9 +68,7 @@ export const api = {
   },
 
   async tenants(): Promise<Tenant[]> {
-    const { data } = await http.get("/admin/tenants", {
-      headers: { "X-Admin-Token": ADMIN_TOKEN },
-    });
+    const { data } = await http.get("/admin/tenants");
     return data;
   },
 
