@@ -27,7 +27,7 @@ def test_valid_bearer_resolves_tenant():
     assert tenant.id == "t1"
 
 
-@pytest.mark.parametrize("header", [None, "", "Bearer ", "Token abc", "Bearer "])
+@pytest.mark.parametrize("header", [None, "", "Bearer ", "Token abc", "Bearer    "])
 def test_missing_or_malformed_header_401(header):
     repo, _, _ = _repo_with_key()
     with pytest.raises(HTTPException) as exc:
@@ -35,11 +35,18 @@ def test_missing_or_malformed_header_401(header):
     assert exc.value.status_code == 401
 
 
+def test_lowercase_bearer_scheme_is_accepted():
+    repo, raw, _ = _repo_with_key()
+    assert require_tenant(authorization=f"bearer {raw}", repo=repo).id == "t1"
+    assert require_tenant(authorization=f"BEARER {raw}", repo=repo).id == "t1"
+
+
 def test_unknown_key_401():
     repo, _, _ = _repo_with_key()
     with pytest.raises(HTTPException) as exc:
         require_tenant(authorization=f"Bearer {generate_key()}", repo=repo)
     assert exc.value.status_code == 401
+    assert "revoked" not in exc.value.detail and "exists" not in exc.value.detail
 
 
 def test_revoked_key_401():
