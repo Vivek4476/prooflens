@@ -37,8 +37,9 @@ def test_fetch_image_raises_for_bad_fetch_marker():
         lsq.fetch_image(f"https://lsq.example/{BAD_FETCH_MARKER}/photo.jpg")
 
 
-def test_fetch_image_is_deterministic():
+def test_fetch_image_is_deterministic_per_url():
     lsq = FakeLSQClient()
-    a = lsq.fetch_image("https://lsq.example/one.jpg")
-    b = lsq.fetch_image("https://lsq.example/two.jpg")
-    assert a == b  # same synthetic fixture regardless of URL (when fetchable)
+    # Same URL -> identical bytes (stable, cacheable).
+    assert lsq.fetch_image("https://lsq.example/one.jpg") == lsq.fetch_image("https://lsq.example/one.jpg")
+    # Different URLs -> different bytes, so a bulk batch doesn't all dedupe as recycled.
+    assert lsq.fetch_image("https://lsq.example/one.jpg") != lsq.fetch_image("https://lsq.example/two.jpg")
