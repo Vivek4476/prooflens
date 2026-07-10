@@ -10,10 +10,14 @@ from datetime import date, datetime, timedelta
 from statistics import median
 
 from ..engine.verdicts import Reason
-from ..service.hierarchy import resolve_node
+from ..service.hierarchy import agent_display_name, resolve_node
+from ..service.ids import normalize_id
 from ..service.views import ResultView
 
 # API group_by value -> hierarchy node field. "zone" is the friendly alias.
+# "agent" is special-cased: it groups by the result's own rep_id (not a
+# hierarchy node field) and labels with agent_display_name (name, falls back
+# to id) rather than a hierarchy lookup — see _groups below.
 GROUP_BY_FIELD: dict[str, str] = {
     "zone": "zonal_head",
     "srsm": "srsm",
@@ -21,6 +25,7 @@ GROUP_BY_FIELD: dict[str, str] = {
     "sm": "sm",
     "branch": "branch",
     "city": "city",
+    "agent": "agent",
 }
 
 
@@ -175,16 +180,44 @@ def _node_label(rows: list[dict], r: ResultView, field: str) -> str:
 
 
 def _groups(items: list[ResultView], rows: list[dict], field: str) -> list[dict]:
-    buckets: dict[str, list[ResultView]] = {}
+    # For the agent dimension, group by the agent's IDENTITY (normalised rep_id),
+    # not the display name: two DSEs who share a name must stay separate, and each
+    # row must carry the real agent_id so the UI can link to /dse?agent=<id>
+    # (the name won't resolve). For every other dimension the group key IS the
+    # node label. agent_display_name does a linear hierarchy scan, so memoise it
+    # per unique id rather than per result item.
+    is_agent = field == "agent"
+    entries: dict[str, dict] = {}  # key -> {label, agent_id, items}
+    name_cache: dict[str, str] = {}
     for r in items:
-        label = _node_label(rows, r, field)
-        buckets.setdefault(label, []).append(r)
+        agent_id: str | None = None
+        if is_agent:
+            rep = normalize_id(r.rep_id) if r.rep_id else None
+            if not rep:
+                key = label = "Unmapped"
+            else:
+                key = rep
+                agent_id = rep
+                cached = name_cache.get(rep)
+                if cached is None:
+                    cached = agent_display_name(rows, rep)
+                    name_cache[rep] = cached
+                label = cached
+        else:
+            key = label = _node_label(rows, r, field)
+        entry = entries.get(key)
+        if entry is None:
+            entry = {"label": label, "agent_id": agent_id, "items": []}
+            entries[key] = entry
+        entry["items"].append(r)
     total_all = len(items)
     out: list[dict] = []
-    for label, group in sorted(buckets.items()):
-        t = _tally(group)
-        out.append({
-            "node": label,
+    # Sort by display label, then key, so equal-named agents stay deterministic.
+    for key in sorted(entries, key=lambda k: (entries[k]["label"], k)):
+        entry = entries[key]
+        t = _tally(entry["items"])
+        row = {
+            "node": entry["label"],
             "total": t["total"],
             "clear": t["clear"],
             "doubtful": t["doubtful"],
@@ -192,7 +225,10 @@ def _groups(items: list[ResultView], rows: list[dict], field: str) -> list[dict]
             "avg_score": t["avg_score"],
             "suspect_rate": round(t["suspect"] / t["total"], 3) if t["total"] else 0.0,
             "share": round(t["total"] / total_all, 3) if total_all else 0.0,
-        })
+        }
+        if entry["agent_id"] is not None:
+            row["agent_id"] = entry["agent_id"]
+        out.append(row)
     return out
 
 

@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { api } from "./client";
-import type { AnalyticsParams, HealthState } from "./types";
+import type { AnalyticsParams, Bucket, HealthState } from "./types";
 import { useDebouncedValue } from "./useDebouncedValue";
 
 export function useHealth() {
@@ -78,4 +78,37 @@ export function useAnalytics(params: AnalyticsParams = {}, enabled: boolean = tr
 
 export function useTenants() {
   return useQuery({ queryKey: ["tenants"], queryFn: () => api.tenants(), retry: false });
+}
+
+/** Below this length a non-empty query doesn't fire — a single character matches
+ *  a huge swath of DSEs, so we wait for a more selective query. */
+const MIN_QUERY_LEN = 2;
+
+/** Debounced DSE search-as-you-type. An empty q intentionally hits the backend
+ *  (the recent/most-active default roster shown when the box opens); a 1-char q
+ *  is suppressed so we don't fire an unselective request on every keystroke. */
+export function useDseSearch(q: string, enabled: boolean = true) {
+  const debounced = useDebouncedValue(q, 300);
+  const trimmed = debounced.trim();
+  const queryable = trimmed.length === 0 || trimmed.length >= MIN_QUERY_LEN;
+  return useQuery({
+    queryKey: ["dse-search", trimmed],
+    queryFn: () => api.dseSearch(trimmed),
+    enabled: enabled && queryable,
+    retry: false,
+  });
+}
+
+export function useDseScorecard(
+  agentId: string | undefined,
+  params?: { from?: string; to?: string; bucket?: Bucket },
+) {
+  const debounced = useDebouncedValue(params, 300);
+  return useQuery({
+    queryKey: ["dse-scorecard", agentId, debounced],
+    queryFn: () => api.dseScorecard(agentId as string, debounced),
+    enabled: !!agentId,
+    placeholderData: (prev) => prev,
+    retry: false,
+  });
 }

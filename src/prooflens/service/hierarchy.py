@@ -34,3 +34,20 @@ def resolve_node(rows: list[dict], agent_id: str | None, scored_date: date) -> d
         if best is None or vf > best["valid_from"]:
             best = row
     return best
+
+
+def agent_display_name(rows: list[dict], rep_id: str | None) -> str:
+    """The DSE's display name for `rep_id`: the hierarchy's `agent_name` when any
+    row for this agent carries one (across all effective-dated versions, newest
+    first — a name is a slow-changing fact, not effective-dated like the org
+    chain), else the normalized agent_id itself (honest fallback, never blank)."""
+    key = normalize_id(rep_id)
+    if key is None:
+        return rep_id or ""
+    candidates = [row for row in rows if normalize_id(row.get("agent_id")) == key]
+    candidates.sort(key=lambda r: r["valid_from"], reverse=True)
+    for row in candidates:
+        name = row.get("agent_name")
+        if name:
+            return str(name)
+    return key

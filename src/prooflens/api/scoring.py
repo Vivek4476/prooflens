@@ -242,9 +242,9 @@ def analytics_summary(
     from_: str | None = Query(default=None, alias="from"),
     to: str | None = Query(default=None, alias="to"),
     bucket: Literal["daily", "weekly", "monthly"] = Query(default="daily"),
-    group_by: Literal["none", "zone", "srsm", "rsm", "sm", "branch", "city"] = Query(
-        default="none"
-    ),
+    group_by: Literal[
+        "none", "zone", "srsm", "rsm", "sm", "branch", "city", "agent"
+    ] = Query(default="none"),
 ) -> dict:
     # `from`/`to` are aliases of start_date/end_date; the explicit ones win if both given.
     start_arg = start_date if start_date is not None else from_

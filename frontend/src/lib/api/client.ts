@@ -4,9 +4,12 @@ import axios from "axios";
 import type {
   AnalyticsParams,
   AnalyticsSummary,
+  Bucket,
   BulkJob,
   BulkScoreResponse,
   BulkScoreRow,
+  DseScorecard,
+  DseSearchResponse,
   ResultItem,
   ResultsPage,
   ReviewDecision,
@@ -95,6 +98,21 @@ export const api = {
   // until status === "done".
   async bulkJob(jobId: string): Promise<BulkJob> {
     const { data } = await http.get(`/v1/bulk-score/${encodeURIComponent(jobId)}`);
+    return data;
+  },
+
+  // Search DSEs (frontline agents) by name or id — empty q returns recent/most-active.
+  async dseSearch(q: string): Promise<DseSearchResponse> {
+    const { data } = await http.get("/v1/dse", { params: q ? { q } : undefined });
+    return data;
+  },
+
+  // A single DSE's scorecard: chain, KPIs, trend, band mix, top reasons, recent flags.
+  async dseScorecard(
+    agentId: string,
+    params?: { from?: string; to?: string; bucket?: Bucket },
+  ): Promise<DseScorecard> {
+    const { data } = await http.get(`/v1/dse/${encodeURIComponent(agentId)}`, { params });
     return data;
   },
 };
