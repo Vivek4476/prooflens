@@ -242,3 +242,19 @@ it is listed as a request per the build's hard rule.
 **`GET /v1/results?review=pending|approve|reject|false_positive`** — optional
 filter so the Review Queue can hide already-actioned items. Until added, the
 frontend filters client-side on the `review` block when present.
+
+## DSE (agent) scorecard — implemented additively
+
+**`GET /v1/dse?q=<name-or-id>`** → `{ results: [{ agent_id, name, branch, sm }] }`.
+Search the hierarchy by agent name (case-insensitive substring) or agent_id;
+capped, tenant-scoped; empty `q` returns the first N. `agent_name` is a new
+optional hierarchy column (migration `0006_agent_name`); missing → falls back
+to the agent_id.
+
+**`GET /v1/dse/{agent_id}?from=&to=&bucket=daily`** → the scorecard:
+`{ agent_id, name, chain: {sm,rsm,srsm,zone,branch,city}, total,
+band_distribution, suspect_rate, avg_score, top_reasons[], trend[], recent[] }`
+— computed over that rep_id's results in the range (trend reuses the analytics
+bucketing filtered to the rep; recent = latest flagged captures). Honest
+small-sample values (never fabricated). Analytics `group_by=agent` added
+(labels with the agent name).

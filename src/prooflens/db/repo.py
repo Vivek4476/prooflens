@@ -192,6 +192,7 @@ class PostgresRepo:
             self._session.add(Hierarchy(
                 tenant_id=tid,
                 agent_id=normalize_id(r.get("agent_id")),
+                agent_name=r.get("agent_name") or None,
                 sm=r.get("sm"), rsm=r.get("rsm"), srsm=r.get("srsm"),
                 zonal_head=r.get("zonal_head"), branch=r.get("branch"), city=r.get("city"),
                 valid_from=r["valid_from"], upload_id=upload_id,
@@ -202,7 +203,8 @@ class PostgresRepo:
         tid = uuid.UUID(tenant_id)
         rows = self._session.query(Hierarchy).filter(Hierarchy.tenant_id == tid).all()
         return [{
-            "agent_id": h.agent_id, "sm": h.sm, "rsm": h.rsm, "srsm": h.srsm,
+            "agent_id": h.agent_id, "agent_name": h.agent_name,
+            "sm": h.sm, "rsm": h.rsm, "srsm": h.srsm,
             "zonal_head": h.zonal_head, "branch": h.branch, "city": h.city,
             "valid_from": h.valid_from, "upload_id": h.upload_id,
         } for h in rows]

@@ -164,6 +164,7 @@ class Hierarchy(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"))
     agent_id: Mapped[str] = mapped_column(String(200))
+    agent_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     sm: Mapped[str | None] = mapped_column(String(200), nullable=True)
     rsm: Mapped[str | None] = mapped_column(String(200), nullable=True)
     srsm: Mapped[str | None] = mapped_column(String(200), nullable=True)

@@ -122,7 +122,7 @@ def test_template_returns_csv_file(client, admin_headers):
     assert "attachment" in r.headers["content-disposition"]
     assert "hierarchy_template.csv" in r.headers["content-disposition"]
     lines = r.text.strip().split("\n")
-    assert lines[0] == "agent_id,sm,rsm,srsm,zonal_head,branch,city,valid_from"
+    assert lines[0] == "agent_id,agent_name,sm,rsm,srsm,zonal_head,branch,city,valid_from"
     assert len(lines) == 2  # header + one example row
 
 

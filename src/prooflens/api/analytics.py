@@ -10,10 +10,13 @@ from datetime import date, datetime, timedelta
 from statistics import median
 
 from ..engine.verdicts import Reason
-from ..service.hierarchy import resolve_node
+from ..service.hierarchy import agent_display_name, resolve_node
 from ..service.views import ResultView
 
 # API group_by value -> hierarchy node field. "zone" is the friendly alias.
+# "agent" is special-cased: it groups by the result's own rep_id (not a
+# hierarchy node field) and labels with agent_display_name (name, falls back
+# to id) rather than a hierarchy lookup — see _groups below.
 GROUP_BY_FIELD: dict[str, str] = {
     "zone": "zonal_head",
     "srsm": "srsm",
@@ -21,6 +24,7 @@ GROUP_BY_FIELD: dict[str, str] = {
     "sm": "sm",
     "branch": "branch",
     "city": "city",
+    "agent": "agent",
 }
 
 
@@ -174,10 +178,16 @@ def _node_label(rows: list[dict], r: ResultView, field: str) -> str:
     return value if value else "Unmapped"
 
 
+def _agent_label(rows: list[dict], r: ResultView) -> str:
+    if not r.rep_id:
+        return "Unmapped"
+    return agent_display_name(rows, r.rep_id)
+
+
 def _groups(items: list[ResultView], rows: list[dict], field: str) -> list[dict]:
     buckets: dict[str, list[ResultView]] = {}
     for r in items:
-        label = _node_label(rows, r, field)
+        label = _agent_label(rows, r) if field == "agent" else _node_label(rows, r, field)
         buckets.setdefault(label, []).append(r)
     total_all = len(items)
     out: list[dict] = []

@@ -129,6 +129,24 @@ def test_aggregate_group_by_includes_unmapped():
     assert round(groups["North"]["share"] + groups["Unmapped"]["share"], 3) == 1.0
 
 
+def test_aggregate_group_by_agent_labels_with_name_and_falls_back_to_id():
+    start, end = _dt(date(2026, 6, 1)), _dt(date(2026, 6, 8))
+    rows = [{"agent_id": "A1", "agent_name": "Asha Verma", "sm": None, "rsm": None,
+             "srsm": None, "zonal_head": None, "branch": "North", "city": None,
+             "valid_from": date(2026, 1, 1)}]
+    items = [
+        _r(date(2026, 6, 2), "Suspect", 10, "recycled", rep_id="A1"),   # Asha Verma
+        _r(date(2026, 6, 3), "Clear", 90, "clear", rep_id="A1"),        # Asha Verma
+        _r(date(2026, 6, 4), "Suspect", 10, "recycled", rep_id="A2"),   # no hierarchy row -> id
+    ]
+    out = aggregate_range(items, [], rows, start=start, end=end, bucket="daily",
+                          group_by="agent", today=date(2026, 6, 20))
+    groups = {g["node"]: g for g in out["groups"]}
+    assert set(groups) == {"Asha Verma", "A2"}
+    assert groups["Asha Verma"]["total"] == 2 and groups["Asha Verma"]["suspect"] == 1
+    assert groups["A2"]["total"] == 1 and groups["A2"]["suspect"] == 1
+
+
 def test_weekly_bucket_end_clamped_to_range_end_when_not_multiple_of_7():
     # Range Jun 1–Jun 10 (10 days): NOT a multiple of 7.
     # Without the fix, the 2nd bucket reports end=2026-06-14 (4 days past range end).

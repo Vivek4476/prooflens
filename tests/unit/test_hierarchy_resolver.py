@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from prooflens.service.hierarchy import NODE_FIELDS, resolve_node
+from prooflens.service.hierarchy import NODE_FIELDS, agent_display_name, resolve_node
 
 
 def _row(agent, valid_from, **kw):
@@ -46,3 +46,38 @@ def test_resolve_normalizes_ids_on_both_sides():
 
 def test_node_fields_are_the_six_levels():
     assert NODE_FIELDS == ("sm", "rsm", "srsm", "zonal_head", "branch", "city")
+
+
+# --- agent_display_name --------------------------------------------------
+
+
+def test_agent_display_name_returns_the_name_when_present():
+    rows = [_row("A1", date(2026, 1, 1), agent_name="Asha Verma")]
+    assert agent_display_name(rows, "A1") == "Asha Verma"
+
+
+def test_agent_display_name_falls_back_to_agent_id_when_absent():
+    rows = [_row("A1", date(2026, 1, 1), branch="North")]  # no agent_name key
+    assert agent_display_name(rows, "A1") == "A1"
+
+
+def test_agent_display_name_falls_back_when_name_is_blank():
+    rows = [_row("A1", date(2026, 1, 1), agent_name=None)]
+    assert agent_display_name(rows, "A1") == "A1"
+
+
+def test_agent_display_name_unknown_agent_falls_back_to_normalized_id():
+    rows = [_row("A1", date(2026, 1, 1), agent_name="Asha Verma")]
+    assert agent_display_name(rows, "  a2 ") == "A2"
+
+
+def test_agent_display_name_none_rep_id_returns_empty_string():
+    assert agent_display_name([], None) == ""
+
+
+def test_agent_display_name_prefers_latest_version_name():
+    rows = [
+        _row("A1", date(2026, 1, 1), agent_name="Old Name"),
+        _row("A1", date(2026, 5, 1), agent_name="New Name"),
+    ]
+    assert agent_display_name(rows, "A1") == "New Name"
