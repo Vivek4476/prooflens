@@ -178,16 +178,23 @@ def _node_label(rows: list[dict], r: ResultView, field: str) -> str:
     return value if value else "Unmapped"
 
 
-def _agent_label(rows: list[dict], r: ResultView) -> str:
-    if not r.rep_id:
-        return "Unmapped"
-    return agent_display_name(rows, r.rep_id)
-
-
 def _groups(items: list[ResultView], rows: list[dict], field: str) -> list[dict]:
     buckets: dict[str, list[ResultView]] = {}
+    # agent_display_name does a linear scan over all hierarchy rows, so memoise
+    # per unique rep_id (not per item) — group_by=agent over thousands of
+    # results otherwise repeats that scan for every row.
+    agent_name_cache: dict[str, str] = {}
     for r in items:
-        label = _agent_label(rows, r) if field == "agent" else _node_label(rows, r, field)
+        if field == "agent":
+            if not r.rep_id:
+                label = "Unmapped"
+            elif r.rep_id in agent_name_cache:
+                label = agent_name_cache[r.rep_id]
+            else:
+                label = agent_display_name(rows, r.rep_id)
+                agent_name_cache[r.rep_id] = label
+        else:
+            label = _node_label(rows, r, field)
         buckets.setdefault(label, []).append(r)
     total_all = len(items)
     out: list[dict] = []

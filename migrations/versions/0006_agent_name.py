@@ -22,7 +22,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("hierarchy", sa.Column("agent_name", sa.String(120), nullable=True))
+    op.add_column("hierarchy", sa.Column("agent_name", sa.String(200), nullable=True))
 
 
 def downgrade() -> None:
