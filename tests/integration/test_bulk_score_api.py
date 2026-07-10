@@ -54,6 +54,10 @@ def client(repo, lsq) -> TestClient:
     # (safe — it has no per-call session state) with a no-op close.
     app.dependency_overrides[get_repo_factory] = lambda: (lambda: (repo, lambda: None))
     app.dependency_overrides[get_lsq_client] = lambda: lsq
+
+    from prooflens.api.auth import require_tenant
+
+    app.dependency_overrides[require_tenant] = lambda: repo.get_tenant_by_slug("dev")
     return TestClient(app, raise_server_exceptions=False)
 
 
