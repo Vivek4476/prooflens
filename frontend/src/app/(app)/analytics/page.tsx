@@ -75,7 +75,7 @@ function AnalyticsPageInner() {
         actions={
           <>
             {/* Export the current view (CSV + print/PDF) — only once data has loaded. */}
-            {a && <ExportControls buckets={a.buckets} period={a.period} />}
+            {a && <ExportControls analytics={a} />}
             {/* Primary next-action for the page (BRAND: one decision, one primary action).
                 Links to the full review queue — it isn't period-filterable, so the label
                 doesn't promise a filter the queue can't honour. Classes mirror Button's

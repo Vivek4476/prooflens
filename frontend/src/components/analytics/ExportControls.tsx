@@ -3,27 +3,22 @@
 import { Download, Printer } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
-import { bucketsToCsv, csvFilename } from "@/lib/analytics/exportCsv";
-import type { AnalyticsBucket, PeriodBounds } from "@/lib/api/types";
+import { analyticsToCsv, csvFilename } from "@/lib/analytics/exportCsv";
+import type { AnalyticsSummary } from "@/lib/api/types";
 
 /**
- * CSV download + print/PDF for the current analytics view. The CSV mirrors exactly what's
- * charted (the per-bucket series for the selected range/cadence), so an export never
- * disagrees with the screen. Marked `no-print` so the controls don't appear in the PDF.
+ * CSV download + print/PDF for the current analytics view. The CSV is a sectioned report
+ * (summary KPIs + time series + top reasons) built from the same summary the page shows, so
+ * an export never disagrees with the screen. Marked `no-print` so the controls don't appear
+ * in the PDF.
  */
-export function ExportControls({
-  buckets,
-  period,
-}: {
-  buckets: AnalyticsBucket[];
-  period: PeriodBounds;
-}) {
+export function ExportControls({ analytics }: { analytics: AnalyticsSummary }) {
   function downloadCsv() {
-    const blob = new Blob([bucketsToCsv(buckets)], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob([analyticsToCsv(analytics)], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = csvFilename(period);
+    a.download = csvFilename(analytics.period);
     document.body.appendChild(a);
     a.click();
     a.remove();
