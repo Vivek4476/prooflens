@@ -138,9 +138,9 @@ api_keys(
   `frontend/src/app/api/[...path]/route.ts`, tests noted above.
 - **Modify:** `src/prooflens/db/models.py` (+`ApiKey`), `db/repo.py` + `service/repo.py`
   (`list_results(tenant_id=...)`, `get_api_key_by_hash`), `api/scoring.py`, `api/analytics.py`
-  (caller signatures), `api/dse.py`, `service/bulk.py`, `api/app.py` (router deps), `config.py`
-  (`AUTH_ENABLED`), admin router (mint/revoke, optional), `frontend/src/lib/api/client.ts`,
-  `frontend/.env.local.example` + `.env.production` (server env), `frontend/BACKEND_REQUIREMENTS.md`.
+  (caller signatures), `api/dse.py`, `service/bulk.py`, `api/app.py` (router deps),
+  `frontend/src/lib/api/client.ts`, `frontend/.env.local.example` + `.env.production` (server env),
+  `frontend/BACKEND_REQUIREMENTS.md`.
 
 ## Non-negotiables
 Additive to the scoring engine/verdict/webhook (zero change). Honest 401s (no info leak). No stored
