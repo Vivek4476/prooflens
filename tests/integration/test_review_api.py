@@ -24,6 +24,8 @@ def repo() -> InMemoryRepo:
 def client(repo) -> TestClient:
     app = create_app()
     app.dependency_overrides[get_repo] = lambda: repo
+    from prooflens.api.auth import require_tenant
+    app.dependency_overrides[require_tenant] = lambda: repo.get_tenant_by_slug("dev")
     return TestClient(app, raise_server_exceptions=False)
 
 
