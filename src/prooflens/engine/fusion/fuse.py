@@ -91,7 +91,11 @@ def _gates(checks: dict[str, CheckOutcome], cfg: ScoringConfig) -> list[tuple[Re
         pc = int(d.get("people_count", 0))
         if pc == 0:
             fired.append((Reason.NO_PEOPLE_OR_IRRELEVANT, caps.no_people))
-        elif int(d.get("plausibility", 100)) < cfg.thresholds.plausibility_gate:
+        # Fail CLOSED: a missing/malformed plausibility must not read as
+        # "perfectly plausible" (the old default of 100 silently skipped this
+        # gate). Absent -> 0 -> treated as low plausibility, aligning with the
+        # schema's own coercion of unparseable values to 0.
+        elif int(d.get("plausibility", 0)) < cfg.thresholds.plausibility_gate:
             fired.append((Reason.NO_PEOPLE_OR_IRRELEVANT, caps.low_plausibility))
 
         # A valid proof-of-meeting needs >=2 people in a genuine interaction. These

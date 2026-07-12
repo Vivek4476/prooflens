@@ -19,6 +19,7 @@ Open items (see README "LSQ unknowns"):
 from __future__ import annotations
 
 from .base import FieldUpdate
+from .ssrf import validate_public_http_url
 
 # TODO(LSQ): confirm base URL / region host (e.g. https://api-in21.leadsquared.com).
 _DEFAULT_BASE_URL = "https://api.leadsquared.com"
@@ -66,8 +67,14 @@ class RealLSQClient:
         resp.raise_for_status()
 
     def fetch_image(self, image_url: str) -> bytes:
+        # SSRF gate FIRST: image_url traces back to an operator-uploaded CSV, so
+        # it must be validated before any network call. Wired in now so the
+        # Phase-3 implementer physically cannot add the fetch without the guard.
+        validate_public_http_url(image_url)
         # TODO(LSQ): fetch-by-reference — auth for the image endpoint is unknown.
         # Only needed if the webhook delivers a URL rather than inline bytes.
+        # When implemented: pin the connection to the address validated above
+        # (do not re-resolve the hostname) to be DNS-rebinding safe.
         raise NotImplementedError("LSQ image fetch-by-reference is not yet specified")
 
     def close(self) -> None:

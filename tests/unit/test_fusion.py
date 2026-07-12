@@ -41,6 +41,36 @@ def test_clean_scene_is_clear():
     assert r.reason_code == Reason.CLEAR.value
 
 
+def test_missing_plausibility_fails_closed():
+    # A content assessment with people but NO plausibility key must NOT read as
+    # "perfectly plausible" (the old default of 100 skipped the gate). Absent
+    # plausibility -> 0 -> the low-plausibility gate fires -> capped to Doubtful.
+    content = CheckOutcome(
+        "content",
+        available=True,
+        score=80.0,
+        summary="",
+        data={
+            "people_count": 2,
+            "looks_like_photo_of_a_screen": False,
+            "is_designed_graphic": False,
+            "is_meme_or_screenshot": False,
+            # plausibility deliberately omitted
+        },
+    )
+    checks = [
+        _co("exif", 60.0),
+        _co("sharpness", 100.0, too_blurred=False),
+        _co("uniqueness", 100.0, exact_duplicate=False, near_duplicate=False),
+        _co("recapture", 100.0, screen_detected=False),
+        content,
+    ]
+    r = fuse(checks, DEFAULT_SCORING)
+    assert r.score <= DEFAULT_SCORING.caps.low_plausibility
+    assert r.band != "Clear"
+    assert r.reason_code == Reason.NO_PEOPLE_OR_IRRELEVANT.value
+
+
 def test_exact_duplicate_gates_to_suspect():
     checks = _clean_checks()
     checks[2] = _co("uniqueness", 0.0, exact_duplicate=True, near_duplicate=False)
