@@ -28,6 +28,13 @@ export const BAND_META: Record<
     ring: "var(--verdict-suspect)",
     dot: "bg-verdict-suspect",
   },
+  Unassessed: {
+    label: "Unassessed",
+    fg: "text-verdict-unassessed-fg",
+    bg: "bg-verdict-unassessed-bg",
+    ring: "var(--verdict-unassessed)",
+    dot: "bg-verdict-unassessed",
+  },
 };
 
 // Friendly labels for each check the backend can return. Only checks present in
@@ -95,7 +102,10 @@ export function checkConfidence(c: CheckOutcome): number | null {
 }
 
 export function bandState(band: Band): CheckState {
-  return band === "Clear" ? "pass" : band === "Doubtful" ? "warn" : "fail";
+  if (band === "Clear") return "pass";
+  if (band === "Suspect") return "fail";
+  // Doubtful and Unassessed both mean "a human should look" — not a hard flag.
+  return "warn";
 }
 
 export const STATE_WORD: Record<CheckState, string> = {

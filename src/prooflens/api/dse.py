@@ -147,6 +147,7 @@ def dse_scorecard(
     tally = _tally(items)
     band_distribution = {
         "Clear": tally["clear"], "Doubtful": tally["doubtful"], "Suspect": tally["suspect"],
+        "Unassessed": tally["unassessed"],
     }
     suspect_rate = round(tally["suspect"] / tally["total"], 3) if tally["total"] else 0.0
 

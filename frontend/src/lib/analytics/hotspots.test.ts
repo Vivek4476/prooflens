@@ -10,6 +10,7 @@ function group(node: string, total: number, suspect_rate: number): AnalyticsGrou
     clear: Math.round(total * (1 - suspect_rate)),
     doubtful: 0,
     suspect: Math.round(total * suspect_rate),
+    unassessed: 0,
     avg_score: 75,
     suspect_rate,
     share: 0,

@@ -228,10 +228,25 @@ def test_fraud_outranks_blur():
     assert r.reason_code == Reason.RECYCLED.value  # recycled beats too_blurred
 
 
-def test_vision_unavailable_never_clear():
+def test_vision_unavailable_is_unassessed():
+    # Vision down and nothing else fired -> the image was NOT assessed. It gets
+    # its own state, never a graded band (not even Doubtful/near-Clear).
     checks = _clean_checks()
     checks[4] = CheckOutcome("content", available=False, score=None, summary="",
                              data={"error": True})
     r = fuse(checks, DEFAULT_SCORING)
-    assert r.band != "Clear"
+    assert r.band == "Unassessed"
+    assert r.band not in ("Clear", "Doubtful", "Suspect")
     assert r.reason_code == Reason.NO_CONTENT_ANALYSIS.value
+
+
+def test_vision_unavailable_but_real_gate_stays_graded():
+    # A definite integrity failure (exact duplicate) outranks "unavailable":
+    # we assessed enough to reject, so it stays Suspect/RECYCLED, not Unassessed.
+    checks = _clean_checks()
+    checks[2] = _co("uniqueness", 0.0, exact_duplicate=True, near_duplicate=False)
+    checks[4] = CheckOutcome("content", available=False, score=None, summary="",
+                             data={"error": True})
+    r = fuse(checks, DEFAULT_SCORING)
+    assert r.band == "Suspect"
+    assert r.reason_code == Reason.RECYCLED.value

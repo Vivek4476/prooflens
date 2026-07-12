@@ -32,6 +32,11 @@
   --verdict-clear-fg: #14713e;
   --verdict-doubtful-fg: #8a5300;
   --verdict-suspect-fg: #a3132a;
+  /* Unassessed — a neutral slate, deliberately NOT a verdict hue: it is the
+     absence of an assessment, not a risk grade. */
+  --verdict-unassessed: #64748b;
+  --verdict-unassessed-bg: #eef1f5;
+  --verdict-unassessed-fg: #475569;
 
   /* Neutral canvas — warm grays on near-white (light mode) */
   --canvas: #fafaf8;
@@ -76,6 +81,9 @@
   --verdict-clear-fg: #58d493;
   --verdict-doubtful-fg: #f4bd6a;
   --verdict-suspect-fg: #f57e8e;
+  --verdict-unassessed: #94a3b8;
+  --verdict-unassessed-bg: #1f2836;
+  --verdict-unassessed-fg: #cbd5e1;
 
   --canvas: #101012;
   --surface: #17171a;

@@ -178,7 +178,7 @@ def test_scorecard_totals_and_band_distribution(client, repo):
     r = client.get("/v1/dse/A1", params={"from": "2026-06-01", "to": "2026-06-05"})
     body = r.json()
     assert body["total"] == 4
-    assert body["band_distribution"] == {"Clear": 1, "Doubtful": 1, "Suspect": 2}
+    assert body["band_distribution"] == {"Clear": 1, "Doubtful": 1, "Suspect": 2, "Unassessed": 0}
     assert body["suspect_rate"] == 0.5
     assert body["avg_score"] == round((90 + 10 + 10 + 90) / 4, 1)
 
@@ -233,7 +233,7 @@ def test_scorecard_agent_with_hierarchy_row_but_no_results_in_range_is_not_404(c
     assert r.status_code == 200
     body = r.json()
     assert body["total"] == 0
-    assert body["band_distribution"] == {"Clear": 0, "Doubtful": 0, "Suspect": 0}
+    assert body["band_distribution"] == {"Clear": 0, "Doubtful": 0, "Suspect": 0, "Unassessed": 0}
     assert body["suspect_rate"] == 0.0
     assert body["recent"] == []
 

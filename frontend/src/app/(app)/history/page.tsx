@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 
 const PAGE = 12;
 const BANDS: (Band | "All")[] = ["All", "Clear", "Doubtful", "Suspect"];
-const BAND_ORDER: Record<Band, number> = { Suspect: 0, Doubtful: 1, Clear: 2 };
+const BAND_ORDER: Record<Band, number> = { Suspect: 0, Doubtful: 1, Clear: 2, Unassessed: 3 };
 
 // The drill-down contract: /history reads these straight off the querystring and
 // applies them server-side via /v1/results (which honours exactly this set — see

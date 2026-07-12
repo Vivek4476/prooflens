@@ -219,7 +219,7 @@ export default function BulkUploadPage() {
   }
 
   const bandCounts = useMemo(() => {
-    const counts: Record<Band, number> = { Clear: 0, Doubtful: 0, Suspect: 0 };
+    const counts: Record<Band, number> = { Clear: 0, Doubtful: 0, Suspect: 0, Unassessed: 0 };
     let errors = 0;
     for (const r of job?.results ?? []) {
       if (r.band) counts[r.band] += 1;

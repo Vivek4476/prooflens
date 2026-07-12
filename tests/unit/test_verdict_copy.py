@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from prooflens.engine.verdicts import BANDS, REASON_TEXT, Reason, most_severe
+from prooflens.engine.verdicts import ALL_BANDS, BANDS, REASON_TEXT, Reason, most_severe
 
 # Internal check names must NEVER leak into rep-facing copy.
 _FORBIDDEN = ["laplacian", "dhash", "hamming", "fft", "moire", "bezel", "exif", "plausibility"]
@@ -31,8 +31,11 @@ def test_reason_copy_does_not_depend_on_colour():
             assert colour not in words, f"copy must not rely on colour: {text!r}"
 
 
-def test_bands_are_the_three_expected():
+def test_bands_are_the_three_graded_expected():
+    # BANDS is the graded risk scale only; Unassessed is a separate non-graded state.
     assert set(BANDS) == {"Clear", "Doubtful", "Suspect"}
+    assert "Unassessed" not in BANDS
+    assert set(ALL_BANDS) == {"Clear", "Doubtful", "Suspect", "Unassessed"}
 
 
 def test_severity_precedence():
