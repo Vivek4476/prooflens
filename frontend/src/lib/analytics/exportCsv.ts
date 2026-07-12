@@ -83,10 +83,6 @@ export function analyticsToCsv(a: AnalyticsSummary): string {
   lines.push(csvRow(["Suspect rate (%)", a.suspect_pct]));
   lines.push(csvRow(["Avg score", a.avg_score]));
   lines.push(csvRow(["Duplicates caught", a.duplicates_caught]));
-  if (a.flag_precision) {
-    lines.push(csvRow(["Flag precision (%)", a.flag_precision.precision_pct ?? "insufficient reviews"]));
-    lines.push(csvRow(["Reviewed flags", a.flag_precision.reviewed]));
-  }
   if (a.system_health) {
     lines.push(csvRow(["Scored without content check (%)", a.system_health.scored_without_content_pct ?? ""]));
     lines.push(csvRow(["Median time-to-score (ms)", a.system_health.median_processing_ms ?? ""]));

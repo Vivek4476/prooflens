@@ -1,6 +1,5 @@
 import {
   BarChart3,
-  ClipboardCheck,
   LayoutDashboard,
   ScanSearch,
   Settings,
@@ -20,7 +19,6 @@ export const NAV: NavItem[] = [
   { label: "Analyze Photo", href: "/analyze", icon: ScanSearch },
   { label: "Bulk upload", href: "/bulk", icon: UploadCloud },
   { label: "Upload History", href: "/history", icon: HistoryIcon },
-  { label: "Review Queue", href: "/review", icon: ClipboardCheck },
   { label: "Analytics", href: "/analytics", icon: BarChart3 },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
