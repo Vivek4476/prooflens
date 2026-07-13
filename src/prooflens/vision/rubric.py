@@ -43,3 +43,9 @@ _ACTIVE = load_rubric(RUBRIC_VERSION)
 SYSTEM_PROMPT: str = _ACTIVE["system_prompt"]
 USER_PROMPT: str = _ACTIVE["user_prompt"]
 OUTPUT_FIELDS: tuple[str, ...] = tuple(_ACTIVE["output_fields"])
+
+# Reasoner prompt (Stage 2 of the hybrid backend). Versioned like the rubric.
+REASONER_VERSION = "reasoner_v1"
+_REASONER = load_rubric(REASONER_VERSION)
+REASONER_SYSTEM_PROMPT: str = _REASONER["system_prompt"]
+REASONER_USER_TEMPLATE: str = _REASONER["user_prompt"]

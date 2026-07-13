@@ -98,6 +98,49 @@ class ContentAssessment(BaseModel):
         )
 
 
+class Judgment(BaseModel):
+    """The reasoner's refined judgment over a perception. Same 4 fields the
+    reasoner is allowed to set on the final ContentAssessment."""
+
+    plausibility: int = Field(ge=0, le=100)
+    visit_context: int | None = None
+    context_confidence: str = "moderate"
+    reason: str = ""
+
+    @field_validator("reason", mode="before")
+    @classmethod
+    def _coerce_reason(cls, v: Any) -> str:
+        return "" if v is None else str(v)[:300]
+
+    @field_validator("context_confidence", mode="before")
+    @classmethod
+    def _coerce_conf(cls, v: Any) -> str:
+        s = str(v or "").strip().lower()
+        if s in {"high", "moderate", "low"}:
+            return s
+        if s in {"medium", "mid"}:
+            return "moderate"
+        return "moderate"
+
+    @field_validator("visit_context", mode="before")
+    @classmethod
+    def _coerce_vc(cls, v: Any) -> int | None:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        try:
+            return max(0, min(100, int(round(float(v)))))
+        except (TypeError, ValueError):
+            return None
+
+    @field_validator("plausibility", mode="before")
+    @classmethod
+    def _coerce_plaus(cls, v: Any) -> int:
+        try:
+            return max(0, min(100, int(round(float(v)))))
+        except (TypeError, ValueError):
+            return 0
+
+
 def parse_model_json(text: str) -> dict:
     """Extract a JSON object from a model's text response, robust to code fences."""
     text = text.strip()
