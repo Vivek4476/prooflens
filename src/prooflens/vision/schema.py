@@ -141,8 +141,19 @@ class Judgment(BaseModel):
             return 0
 
 
-def parse_model_json(text: str) -> dict:
-    """Extract a JSON object from a model's text response, robust to code fences."""
+def parse_model_json(text: Any) -> dict:
+    """Extract a JSON object from a model's response, robust to code fences.
+
+    Accepts either a JSON string (Groq/OpenAI) or an already-decoded object
+    (Cloudflare Workers AI's OpenAI-compatible endpoint returns
+    ``message.content`` as a dict). A list of content parts is joined first.
+    """
+    if isinstance(text, dict):
+        return text
+    if isinstance(text, list):  # OpenAI-style content parts: join their text
+        text = "".join(
+            p.get("text", "") if isinstance(p, dict) else str(p) for p in text
+        )
     text = text.strip()
     fence = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
     if fence:
