@@ -2,8 +2,7 @@
 
 import { Suspense, useMemo } from "react";
 
-import Link from "next/link";
-import { ArrowRight, BarChart3 } from "lucide-react";
+import { BarChart3 } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -18,7 +17,6 @@ import { BandMixChart } from "@/components/analytics/BandMixChart";
 import { TopFlagReasons } from "@/components/analytics/TopFlagReasons";
 import { ByTeamPanel } from "@/components/analytics/ByTeamPanel";
 import { ExportControls } from "@/components/analytics/ExportControls";
-import { ReviewQuality } from "@/components/analytics/ReviewQuality";
 import { SystemHealthLine } from "@/components/analytics/SystemHealthLine";
 import { useAnalytics } from "@/lib/api/hooks";
 import { useAnalyticsFilters } from "@/lib/analytics/useAnalyticsFilters";
@@ -73,21 +71,8 @@ function AnalyticsPageInner() {
         title="Analytics"
         description="Is capture risk trending up, and where should you look?"
         actions={
-          <>
-            {/* Export the current view (CSV + print/PDF) — only once data has loaded. */}
-            {a && <ExportControls analytics={a} />}
-            {/* Primary next-action for the page (BRAND: one decision, one primary action).
-                Links to the full review queue — it isn't period-filterable, so the label
-                doesn't promise a filter the queue can't honour. Classes mirror Button's
-                primary (Focus Indigo); a Link can't wrap <button> as valid HTML. */}
-            <Link
-              href="/review"
-              className="no-print inline-flex h-10 min-h-[44px] items-center justify-center gap-2 rounded-md bg-accent px-4 text-body-sm font-medium text-accent-fg transition-colors hover:bg-accent-hover sm:min-h-0"
-            >
-              Review flagged captures
-              <ArrowRight aria-hidden className="h-4 w-4" />
-            </Link>
-          </>
+          /* Export the current view (CSV + print/PDF) — only once data has loaded. */
+          a ? <ExportControls analytics={a} /> : undefined
         }
       />
       <FilterBar
@@ -138,7 +123,6 @@ function AnalyticsPageInner() {
             <div className="xl:hidden">
               <InsightsRail analytics={a} prevDuplicatesCaught={prevDuplicatesCaught} dataUpdatedAt={dataUpdatedAt} />
             </div>
-            {a.flag_precision && <ReviewQuality flagPrecision={a.flag_precision} />}
             <div className="grid gap-6 lg:grid-cols-2">
               <CaptureRiskTrend
                 buckets={a.buckets}

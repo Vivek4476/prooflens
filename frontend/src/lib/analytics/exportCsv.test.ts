@@ -64,7 +64,6 @@ function summary(): AnalyticsSummary {
     suspect_pct: 4.5,
     avg_score: 78.9,
     duplicates_caught: 11,
-    flag_precision: { reviewed: 95, confirmed: 80, overturned: 15, precision_pct: 84.2 },
     system_health: { scored_without_content_pct: 3.3, median_processing_ms: 0 },
     buckets: [bucket({ suspect: 4, total: 100 })],
     top_reasons: [
@@ -80,7 +79,6 @@ describe("analyticsToCsv", () => {
     expect(csv).toContain("ProofLens — Analytics export");
     expect(csv).toContain("Period,2026-06-10,to,2026-07-09");
     expect(csv).toContain("Total scored,1322");
-    expect(csv).toContain("Flag precision (%),84.2");
     expect(csv).toContain("Median time-to-score (ms),0"); // 0 kept, not blank
     expect(csv).toContain("Time series");
     expect(csv).toContain("Top flag reasons");

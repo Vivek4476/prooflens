@@ -586,13 +586,6 @@ function ResultsStep({
 
       <div className="flex flex-wrap items-center gap-4">
         <Link
-          href="/review"
-          className="inline-flex items-center gap-1.5 text-body-sm font-medium text-text-secondary hover:text-text"
-        >
-          These are now in your Review Queue
-          <ArrowRight size={14} />
-        </Link>
-        <Link
           href="/analytics"
           className="inline-flex items-center gap-1.5 text-body-sm font-medium text-text-secondary hover:text-text"
         >
