@@ -9,28 +9,15 @@ same everywhere.
 from __future__ import annotations
 
 import base64
-import json
 import logging
-import urllib.error
-import urllib.request
+import urllib.error  # noqa: F401 - keeps `urllib` bound so tests can patch openai_compat.urllib.request
 
+from ._http import VisionUnavailable, post_chat  # VisionUnavailable re-exported for back-compat
 from .base import VisionBackend, resize_for_model
 from .rubric import SYSTEM_PROMPT, USER_PROMPT
 from .schema import ContentAssessment, parse_model_json
 
 logger = logging.getLogger("prooflens.vision")
-
-
-class VisionUnavailable(RuntimeError):
-    """The vision provider could not be reached or returned an error.
-
-    Carries the exact, actionable reason (HTTP status or transport failure) so
-    the API can surface it instead of a generic "could not score" message.
-    """
-
-    def __init__(self, message: str, *, status: int | None = None):
-        super().__init__(message)
-        self.status = status
 
 
 class OpenAICompatBackend(VisionBackend):
@@ -77,43 +64,10 @@ class OpenAICompatBackend(VisionBackend):
                 },
             ],
         }
-        req = urllib.request.Request(
-            self.invoke_url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-                # Some providers (e.g. AI/ML API) sit behind Cloudflare and block
-                # the default "Python-urllib" agent with a 403/1010 bot signature.
-                "User-Agent": "ProofLens/0.1 (+https://prooflens.app)",
-            },
-            method="POST",
+        data, request_id = post_chat(
+            invoke_url=self.invoke_url, api_key=self.api_key,
+            payload=payload, timeout=self.timeout, name=self.name, model=self.model,
         )
-        try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-                request_id = resp.headers.get("x-request-id") or resp.headers.get("cf-ray")
-                data = json.loads(resp.read())
-        except urllib.error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", "replace")[:300]
-            req_id = exc.headers.get("x-request-id") if exc.headers else None
-            logger.warning(
-                "vision inference FAILED backend=%s model=%s http=%s request_id=%s detail=%s",
-                self.name, self.model, exc.code, req_id, detail,
-            )
-            raise VisionUnavailable(
-                f"{self.name} API error {exc.code}: {detail}", status=exc.code
-            ) from exc
-        except (urllib.error.URLError, TimeoutError) as exc:
-            reason = getattr(exc, "reason", exc)
-            logger.warning(
-                "vision inference FAILED backend=%s model=%s transport=%r",
-                self.name, self.model, reason,
-            )
-            raise VisionUnavailable(
-                f"{self.name} could not be reached (timeout/connection): {reason}"
-            ) from exc
-
-        # Req #6: log the model + a provider request id for every inference.
         generation_id = data.get("id")
         logger.info(
             "vision inference OK backend=%s model=%s request_id=%s generation_id=%s",
