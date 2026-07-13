@@ -158,7 +158,7 @@ class Settings(BaseSettings):
         )
 
     def build_vision_backend(self, name: str | None = None) -> VisionBackend:
-        """Construct the configured vision backend. Defaults to groq."""
+        """Construct the configured vision backend. Defaults to hybrid."""
         name = (name or self.vision_backend or "groq").strip().lower()
         per_backend = {
             "stub": {},

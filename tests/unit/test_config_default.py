@@ -5,6 +5,5 @@ from prooflens import config
 
 
 def test_default_backend_is_hybrid(monkeypatch):
-    for var in ("VISION_BACKEND",):
-        monkeypatch.delenv(var, raising=False)
-    assert config.Settings().vision_backend == "hybrid"
+    monkeypatch.delenv("VISION_BACKEND", raising=False)
+    assert config.Settings(_env_file=None).vision_backend == "hybrid"
