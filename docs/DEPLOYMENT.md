@@ -29,9 +29,19 @@ its URL). Secrets are **not** in the repo — you set them in each dashboard.
 | `DATABASE_URL` | auto-wired from the Render Postgres |
 | `PROOFLENS_SECRET_KEY` | auto-generated |
 | `PROOFLENS_ADMIN_TOKEN` | auto-generated — **copy it**, the frontend needs it |
-| `VISION_BACKEND` | `groq` (default; requires `GROQ_API_KEY`). If no key is set, scoring caps to `Doubtful` (never a fake `Clear`). For development/CI without a key, use `stub` — a test-only fixture, never production. |
-| `GROQ_API_KEY` | **required for production** — the default backend cannot work without it. |
+| `VISION_BACKEND` | `hybrid` (default) — two-stage Cloudflare Workers AI (Scout vision + reasoning), requires `CF_ACCOUNT_ID` + `CF_API_TOKEN`. If no CF creds are set, scoring degrades honestly (`Doubtful`/`Unassessed`, never a fake `Clear`). Alternatives: `groq` (single-call, needs `GROQ_API_KEY`) or `stub` (test-only, never production). |
+| `CF_ACCOUNT_ID` | **required for `hybrid`/`cloudflare`** — your Cloudflare account ID. |
+| `CF_API_TOKEN` | **required for `hybrid`/`cloudflare`** — a Workers AI **Read** token. |
+| `CF_VISION_MODEL` | optional — Stage 1 Scout vision model. Default `@cf/meta/llama-4-scout-17b-16e-instruct`. |
+| `CF_REASONER_MODEL` | optional — Stage 2 reasoning model. Default `@cf/openai/gpt-oss-120b`. |
+| `GROQ_API_KEY` | required only if `VISION_BACKEND=groq` — no longer the default. |
 | `CORS_ORIGINS` | **set after step 2** to your Vercel URL (below) |
+
+> **Rollout nuance:** flipping the `VISION_BACKEND` env default to `hybrid` only
+> drives the sync `/v1/score` API and the CLI. Production async scoring (the LSQ
+> webhook path) uses each tenant's own `vision_backend` column, which still
+> defaults to `groq` — so to actually run the hybrid backend in production you
+> also need to set that tenant's `vision_backend` to `hybrid` via the admin path.
 
 > The **async worker** is not in the free blueprint (Render workers need a paid
 > plan). It is only used for the async LSQ webhook path — the UI and `/v1/score`
