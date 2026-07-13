@@ -11,6 +11,7 @@ function bucket(over: Partial<AnalyticsBucket>): AnalyticsBucket {
     clear: 90,
     doubtful: 6,
     suspect: 4,
+    unassessed: 0,
     total: 100,
     avg_score: 79.2,
     incomplete: false,

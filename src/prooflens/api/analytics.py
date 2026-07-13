@@ -37,11 +37,16 @@ def _tally(items: list[ResultView]) -> dict:
     clear = sum(1 for r in items if r.band == "Clear")
     doubtful = sum(1 for r in items if r.band == "Doubtful")
     suspect = sum(1 for r in items if r.band == "Suspect")
+    # Not a graded band — vision was unavailable, so the image was never
+    # assessed. Counted separately so the graded bands stay honest and the
+    # segments still sum to total.
+    unassessed = sum(1 for r in items if r.band == "Unassessed")
     scores = [r.score for r in items]
     return {
         "clear": clear,
         "doubtful": doubtful,
         "suspect": suspect,
+        "unassessed": unassessed,
         "total": len(items),
         "avg_score": round(sum(scores) / len(scores), 1) if scores else 0.0,
     }
@@ -116,6 +121,7 @@ def build_buckets(
             "clear": tally["clear"],
             "doubtful": tally["doubtful"],
             "suspect": tally["suspect"],
+            "unassessed": tally["unassessed"],
             "total": tally["total"],
             "avg_score": tally["avg_score"],
             "incomplete": bs <= today < be,
@@ -137,7 +143,9 @@ def flag_precision(items: list[ResultView]) -> dict:
     confirmed = 0
     overturned = 0
     for r in items:
-        if r.band == "Clear":
+        # Clear = not flagged; Unassessed = a coverage gap, not a fraud flag —
+        # neither belongs in a flag-precision estimate.
+        if r.band in ("Clear", "Unassessed"):
             continue
         if r.review_status in _CONFIRMED_STATUSES:
             confirmed += 1
@@ -222,6 +230,7 @@ def _groups(items: list[ResultView], rows: list[dict], field: str) -> list[dict]
             "clear": t["clear"],
             "doubtful": t["doubtful"],
             "suspect": t["suspect"],
+            "unassessed": t["unassessed"],
             "avg_score": t["avg_score"],
             "suspect_rate": round(t["suspect"] / t["total"], 3) if t["total"] else 0.0,
             "share": round(t["total"] / total_all, 3) if total_all else 0.0,

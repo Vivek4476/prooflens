@@ -8,7 +8,7 @@ function makeSummary(overrides: Partial<AnalyticsSummary> = {}): AnalyticsSummar
   return {
     total: 100,
     images_today: 10,
-    band_distribution: { Clear: 80, Doubtful: 10, Suspect: 10 },
+    band_distribution: { Clear: 80, Doubtful: 10, Suspect: 10, Unassessed: 0 },
     suspect_pct: 10,
     avg_score: 75,
     avg_processing_ms: 500,
@@ -17,7 +17,7 @@ function makeSummary(overrides: Partial<AnalyticsSummary> = {}): AnalyticsSummar
     series: [],
     buckets: [],
     incomplete: false,
-    previous: { clear: 80, doubtful: 10, suspect: 10, total: 100, avg_score: 75 },
+    previous: { clear: 80, doubtful: 10, suspect: 10, unassessed: 0, total: 100, avg_score: 75 },
     period: { from: "2026-06-09", to: "2026-07-08" },
     previous_period: { from: "2026-05-10", to: "2026-06-08" },
     groups: [],
@@ -38,8 +38,8 @@ function reason(overrides: Partial<TopReason>): TopReason {
 describe("computeInsights — suspectRateShift rule", () => {
   it("does not fire when current suspect count is below the absolute gate (cur=9), even with huge relative change", () => {
     const a = makeSummary({
-      band_distribution: { Clear: 80, Doubtful: 11, Suspect: 9 },
-      previous: { clear: 80, doubtful: 15, suspect: 5, total: 100, avg_score: 75 },
+      band_distribution: { Clear: 80, Doubtful: 11, Suspect: 9, Unassessed: 0 },
+      previous: { clear: 80, doubtful: 15, suspect: 5, unassessed: 0, total: 100, avg_score: 75 },
     });
     const insights = computeInsights(a, null);
     expect(insights.find((i) => i.id === "suspect-rate-shift")).toBeUndefined();
@@ -47,8 +47,8 @@ describe("computeInsights — suspectRateShift rule", () => {
 
   it("fires when cur=10, prev=8 (relative change 25% >= 20%)", () => {
     const a = makeSummary({
-      band_distribution: { Clear: 80, Doubtful: 10, Suspect: 10 },
-      previous: { clear: 80, doubtful: 12, suspect: 8, total: 100, avg_score: 75 },
+      band_distribution: { Clear: 80, Doubtful: 10, Suspect: 10, Unassessed: 0 },
+      previous: { clear: 80, doubtful: 12, suspect: 8, unassessed: 0, total: 100, avg_score: 75 },
     });
     const insights = computeInsights(a, null);
     const hit = insights.find((i) => i.id === "suspect-rate-shift");
@@ -59,8 +59,8 @@ describe("computeInsights — suspectRateShift rule", () => {
 
   it("does not fire when cur=10, prev=9 (relative change ~11% < 20%)", () => {
     const a = makeSummary({
-      band_distribution: { Clear: 80, Doubtful: 10, Suspect: 10 },
-      previous: { clear: 80, doubtful: 11, suspect: 9, total: 100, avg_score: 75 },
+      band_distribution: { Clear: 80, Doubtful: 10, Suspect: 10, Unassessed: 0 },
+      previous: { clear: 80, doubtful: 11, suspect: 9, unassessed: 0, total: 100, avg_score: 75 },
     });
     const insights = computeInsights(a, null);
     expect(insights.find((i) => i.id === "suspect-rate-shift")).toBeUndefined();
@@ -71,8 +71,8 @@ describe("computeInsights — suspectRateShift rule", () => {
     // case — it's a genuine "no prior Suspect captures" case. Percent-of-zero is
     // still undefined, so no relative-% bullet may be emitted for it.
     const a = makeSummary({
-      band_distribution: { Clear: 90, Doubtful: 0, Suspect: 10 },
-      previous: { clear: 100, doubtful: 0, suspect: 0, total: 100, avg_score: 75 },
+      band_distribution: { Clear: 90, Doubtful: 0, Suspect: 10, Unassessed: 0 },
+      previous: { clear: 100, doubtful: 0, suspect: 0, unassessed: 0, total: 100, avg_score: 75 },
     });
     const insights = computeInsights(a, null);
     const hit = insights.find((i) => i.id === "suspect-rate-shift");
@@ -85,8 +85,8 @@ describe("computeInsights — suspectRateShift rule", () => {
 
   it("never emits Infinity/NaN/% text when previous.total is below MIN_PREV_N, even with a huge current suspect count", () => {
     const a = makeSummary({
-      band_distribution: { Clear: 0, Doubtful: 0, Suspect: 133 },
-      previous: { clear: 0, doubtful: 0, suspect: 0, total: 0, avg_score: 0 },
+      band_distribution: { Clear: 0, Doubtful: 0, Suspect: 133, Unassessed: 0 },
+      previous: { clear: 0, doubtful: 0, suspect: 0, unassessed: 0, total: 0, avg_score: 0 },
     });
     const insights = computeInsights(a, null);
     for (const i of insights) {
@@ -101,8 +101,8 @@ describe("computeInsights — suspectRateShift rule", () => {
 
   it("fires with info severity and 'fell' wording when suspect volume falls", () => {
     const a = makeSummary({
-      band_distribution: { Clear: 90, Doubtful: 0, Suspect: 10 },
-      previous: { clear: 70, doubtful: 15, suspect: 15, total: 100, avg_score: 75 },
+      band_distribution: { Clear: 90, Doubtful: 0, Suspect: 10, Unassessed: 0 },
+      previous: { clear: 70, doubtful: 15, suspect: 15, unassessed: 0, total: 100, avg_score: 75 },
     });
     const insights = computeInsights(a, null);
     const hit = insights.find((i) => i.id === "suspect-rate-shift");
@@ -160,7 +160,7 @@ describe("computeInsights — avgScoreShift rule", () => {
   it("does not fire when previous.total=29 regardless of diff (small-sample guard)", () => {
     const a = makeSummary({
       avg_score: 90,
-      previous: { clear: 20, doubtful: 5, suspect: 4, total: 29, avg_score: 50 },
+      previous: { clear: 20, doubtful: 5, suspect: 4, unassessed: 0, total: 29, avg_score: 50 },
     });
     const insights = computeInsights(a, null);
     expect(insights.find((i) => i.id === "avg-score-shift")).toBeUndefined();
@@ -169,7 +169,7 @@ describe("computeInsights — avgScoreShift rule", () => {
   it("fires when previous.total=30 and diff=5.0 (boundary inclusive)", () => {
     const a = makeSummary({
       avg_score: 80,
-      previous: { clear: 20, doubtful: 5, suspect: 5, total: 30, avg_score: 75 },
+      previous: { clear: 20, doubtful: 5, suspect: 5, unassessed: 0, total: 30, avg_score: 75 },
     });
     const insights = computeInsights(a, null);
     const hit = insights.find((i) => i.id === "avg-score-shift");
@@ -181,7 +181,7 @@ describe("computeInsights — avgScoreShift rule", () => {
   it("does not fire when previous.total=30 and diff=4.9", () => {
     const a = makeSummary({
       avg_score: 79.9,
-      previous: { clear: 20, doubtful: 5, suspect: 5, total: 30, avg_score: 75 },
+      previous: { clear: 20, doubtful: 5, suspect: 5, unassessed: 0, total: 30, avg_score: 75 },
     });
     const insights = computeInsights(a, null);
     expect(insights.find((i) => i.id === "avg-score-shift")).toBeUndefined();
@@ -190,7 +190,7 @@ describe("computeInsights — avgScoreShift rule", () => {
   it("fires with warn severity and 'dropped' wording when avg score falls by >= 5 pts", () => {
     const a = makeSummary({
       avg_score: 65,
-      previous: { clear: 20, doubtful: 5, suspect: 5, total: 30, avg_score: 75 },
+      previous: { clear: 20, doubtful: 5, suspect: 5, unassessed: 0, total: 30, avg_score: 75 },
     });
     const insights = computeInsights(a, null);
     const hit = insights.find((i) => i.id === "avg-score-shift");
@@ -232,7 +232,7 @@ describe("computeInsights — duplicatesShift rule", () => {
   it("does not emit Infinity/NaN/% text when previous.total is below MIN_PREV_N, even though prevDuplicatesCaught=0 and current=34 (honest-states guard, reproduces reported bug)", () => {
     const a = makeSummary({
       duplicates_caught: 34,
-      previous: { clear: 0, doubtful: 0, suspect: 0, total: 0, avg_score: 0 },
+      previous: { clear: 0, doubtful: 0, suspect: 0, unassessed: 0, total: 0, avg_score: 0 },
     });
     const insights = computeInsights(a, 0);
     const hit = insights.find((i) => i.id === "duplicates-shift");
@@ -246,7 +246,7 @@ describe("computeInsights — duplicatesShift rule", () => {
   it("still fires a normal relative-% duplicates insight when previous.total is sufficient (regression guard)", () => {
     const a = makeSummary({
       duplicates_caught: 5,
-      previous: { clear: 80, doubtful: 12, suspect: 8, total: 100, avg_score: 75 },
+      previous: { clear: 80, doubtful: 12, suspect: 8, unassessed: 0, total: 100, avg_score: 75 },
     });
     const insights = computeInsights(a, 4);
     const hit = insights.find((i) => i.id === "duplicates-shift");
@@ -274,8 +274,8 @@ describe("computeInsights — fallback, ordering, and cap", () => {
 
   it("never labels insights as AI/model output", () => {
     const a = makeSummary({
-      band_distribution: { Clear: 80, Doubtful: 10, Suspect: 10 },
-      previous: { clear: 80, doubtful: 12, suspect: 8, total: 100, avg_score: 75 },
+      band_distribution: { Clear: 80, Doubtful: 10, Suspect: 10, Unassessed: 0 },
+      previous: { clear: 80, doubtful: 12, suspect: 8, unassessed: 0, total: 100, avg_score: 75 },
     });
     const insights = computeInsights(a, null);
     for (const insight of insights) {
@@ -286,10 +286,10 @@ describe("computeInsights — fallback, ordering, and cap", () => {
   it("sorts so that high severity precedes warn precedes info when all rules fire, and caps at MAX_INSIGHTS", () => {
     const a = makeSummary({
       // suspect-rate-shift: rising -> high
-      band_distribution: { Clear: 60, Doubtful: 20, Suspect: 20 },
+      band_distribution: { Clear: 60, Doubtful: 20, Suspect: 20, Unassessed: 0 },
       avg_score: 60,
       duplicates_caught: 5,
-      previous: { clear: 80, doubtful: 12, suspect: 8, total: 100, avg_score: 75 }, // avg-score-shift: falling -> warn
+      previous: { clear: 80, doubtful: 12, suspect: 8, unassessed: 0, total: 100, avg_score: 75 }, // avg-score-shift: falling -> warn
       top_reasons: [
         // dominant-reason -> warn
         reason({ reason_code: "blur", short_label: "Blurry", count: 30 }),
@@ -318,10 +318,10 @@ describe("computeInsights — fallback, ordering, and cap", () => {
     // With today's 4 rules we can't exceed 5, but assert the cap contract directly:
     // every returned list length must never exceed 5 regardless of how many fire.
     const a = makeSummary({
-      band_distribution: { Clear: 60, Doubtful: 20, Suspect: 20 },
+      band_distribution: { Clear: 60, Doubtful: 20, Suspect: 20, Unassessed: 0 },
       avg_score: 60,
       duplicates_caught: 5,
-      previous: { clear: 80, doubtful: 12, suspect: 8, total: 100, avg_score: 75 },
+      previous: { clear: 80, doubtful: 12, suspect: 8, unassessed: 0, total: 100, avg_score: 75 },
       top_reasons: [
         reason({ reason_code: "blur", short_label: "Blurry", count: 30 }),
         reason({ reason_code: "dup", short_label: "Duplicate", count: 70 }),
@@ -335,8 +335,8 @@ describe("computeInsights — fallback, ordering, and cap", () => {
 describe("computeInsights — drill-down href", () => {
   it("suspect-rate-shift links to /history?band=Suspect with the current period", () => {
     const a = makeSummary({
-      band_distribution: { Clear: 80, Doubtful: 10, Suspect: 10 },
-      previous: { clear: 80, doubtful: 12, suspect: 8, total: 100, avg_score: 75 },
+      band_distribution: { Clear: 80, Doubtful: 10, Suspect: 10, Unassessed: 0 },
+      previous: { clear: 80, doubtful: 12, suspect: 8, unassessed: 0, total: 100, avg_score: 75 },
       period: { from: "2026-06-09", to: "2026-07-08" },
     });
     const hit = computeInsights(a, null).find((i) => i.id === "suspect-rate-shift");
@@ -367,7 +367,7 @@ describe("computeInsights — drill-down href", () => {
   it("avg-score-shift has no href — /v1/results has no avg-score filter to honour", () => {
     const a = makeSummary({
       avg_score: 65,
-      previous: { clear: 20, doubtful: 5, suspect: 5, total: 30, avg_score: 75 },
+      previous: { clear: 20, doubtful: 5, suspect: 5, unassessed: 0, total: 30, avg_score: 75 },
     });
     const hit = computeInsights(a, null).find((i) => i.id === "avg-score-shift");
     expect(hit).toBeDefined();

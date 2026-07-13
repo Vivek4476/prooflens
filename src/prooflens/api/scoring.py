@@ -301,7 +301,9 @@ def analytics_summary(
     return {
         "total": total,
         "images_today": images_today,
-        "band_distribution": {b: bands.get(b, 0) for b in ("Clear", "Doubtful", "Suspect")},
+        "band_distribution": {
+            b: bands.get(b, 0) for b in ("Clear", "Doubtful", "Suspect", "Unassessed")
+        },
         "suspect_pct": round(100 * bands.get("Suspect", 0) / total, 1) if total else 0.0,
         "avg_score": round(sum(scores) / len(scores), 1) if scores else 0.0,
         "avg_processing_ms": round(sum(proc) / len(proc), 1) if proc else 0.0,

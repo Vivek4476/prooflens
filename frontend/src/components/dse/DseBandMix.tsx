@@ -2,11 +2,12 @@ import { Card, CardHeader } from "@/components/ui/Card";
 import { formatCount, formatPct } from "@/lib/format";
 import type { Band } from "@/lib/api/types";
 
-const BAND_ORDER: Band[] = ["Clear", "Doubtful", "Suspect"];
+const BAND_ORDER: Band[] = ["Clear", "Doubtful", "Suspect", "Unassessed"];
 const BAND_DOT: Record<Band, string> = {
   Clear: "bg-verdict-clear",
   Doubtful: "bg-verdict-doubtful",
   Suspect: "bg-verdict-suspect",
+  Unassessed: "bg-verdict-unassessed",
 };
 
 /** Simple horizontal band-mix summary — a lighter-weight sibling of BandMixChart's

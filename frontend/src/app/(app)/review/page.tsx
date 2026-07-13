@@ -14,7 +14,7 @@ import { api } from "@/lib/api/client";
 import { useResults } from "@/lib/api/hooks";
 import type { ResultItem, ReviewDecision } from "@/lib/api/types";
 
-const BAND_ORDER = { Suspect: 0, Doubtful: 1, Clear: 2 };
+const BAND_ORDER = { Suspect: 0, Doubtful: 1, Unassessed: 2, Clear: 3 };
 const DECISION_KEYS: Record<string, ReviewDecision> = {
   a: "approve",
   r: "reject",

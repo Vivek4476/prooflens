@@ -23,8 +23,16 @@ from enum import StrEnum
 BAND_CLEAR = "Clear"
 BAND_DOUBTFUL = "Doubtful"
 BAND_SUSPECT = "Suspect"
+# Not a graded outcome: the content/vision check was unavailable so the image
+# was NOT assessed. It is never Clear/Doubtful/Suspect and always routes to a
+# human — "we didn't check" must not read as "almost clear". Not on the score
+# axis: it is decided by the NO_CONTENT_ANALYSIS reason, not a score threshold.
+BAND_UNASSESSED = "Unassessed"
 
+# Graded bands, worst→best. UNASSESSED is intentionally excluded — it is not a
+# point on the risk scale, it is the absence of an assessment.
 BANDS = (BAND_SUSPECT, BAND_DOUBTFUL, BAND_CLEAR)
+ALL_BANDS = (BAND_SUSPECT, BAND_DOUBTFUL, BAND_CLEAR, BAND_UNASSESSED)
 
 
 class Reason(StrEnum):

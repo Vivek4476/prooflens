@@ -56,7 +56,7 @@ export function BandMixChart({
     return (
       <ChartCard
         title="Band mix"
-        subtitle="Clear / Doubtful / Suspect share per period."
+        subtitle="Verdict share per period (Clear / Doubtful / Suspect / Unassessed)."
         height={280}
         action={action}
       >
@@ -76,7 +76,7 @@ export function BandMixChart({
     return (
       <ChartCard
         title="Band mix"
-        subtitle="Clear / Doubtful / Suspect share per period."
+        subtitle="Verdict share per period (Clear / Doubtful / Suspect / Unassessed)."
         height={280}
         action={action}
       >
@@ -93,7 +93,7 @@ export function BandMixChart({
   const data = toBandMixData(effectiveBuckets);
 
   return (
-    <ChartCard title="Band mix" subtitle="Clear / Doubtful / Suspect share per period." height={280} action={action}>
+    <ChartCard title="Band mix" subtitle="Verdict share per period (Clear / Doubtful / Suspect / Unassessed)." height={280} action={action}>
       <div className="flex h-full flex-col">
         <div className="min-h-0 flex-1">
           <ResponsiveContainer
@@ -150,6 +150,13 @@ export function BandMixChart({
                 dataKey="Suspect"
                 stackId="mix"
                 fill="var(--verdict-suspect)"
+                isAnimationActive={!reducedMotion}
+                animationDuration={ANIMATION_DURATION_MS}
+              />
+              <Bar
+                dataKey="Unassessed"
+                stackId="mix"
+                fill="var(--verdict-unassessed)"
                 radius={[3, 3, 0, 0]}
                 isAnimationActive={!reducedMotion}
                 animationDuration={ANIMATION_DURATION_MS}
@@ -186,6 +193,9 @@ function BandMixTooltip({
         { label: "Clear", value: formatCount(point.rawClear), swatchColor: "var(--verdict-clear)" },
         { label: "Doubtful", value: formatCount(point.rawDoubtful), swatchColor: "var(--verdict-doubtful)" },
         { label: "Suspect", value: formatCount(point.rawSuspect), swatchColor: "var(--verdict-suspect)" },
+        ...(point.rawUnassessed > 0
+          ? [{ label: "Unassessed", value: formatCount(point.rawUnassessed), swatchColor: "var(--verdict-unassessed)" }]
+          : []),
       ]}
       // No per-bucket "previous" exists (backend's `previous` is a single period
       // aggregate, not per-bucket) — omitted here rather than fabricated. The total

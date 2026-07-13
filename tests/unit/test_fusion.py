@@ -41,6 +41,36 @@ def test_clean_scene_is_clear():
     assert r.reason_code == Reason.CLEAR.value
 
 
+def test_missing_plausibility_fails_closed():
+    # A content assessment with people but NO plausibility key must NOT read as
+    # "perfectly plausible" (the old default of 100 skipped the gate). Absent
+    # plausibility -> 0 -> the low-plausibility gate fires -> capped to Doubtful.
+    content = CheckOutcome(
+        "content",
+        available=True,
+        score=80.0,
+        summary="",
+        data={
+            "people_count": 2,
+            "looks_like_photo_of_a_screen": False,
+            "is_designed_graphic": False,
+            "is_meme_or_screenshot": False,
+            # plausibility deliberately omitted
+        },
+    )
+    checks = [
+        _co("exif", 60.0),
+        _co("sharpness", 100.0, too_blurred=False),
+        _co("uniqueness", 100.0, exact_duplicate=False, near_duplicate=False),
+        _co("recapture", 100.0, screen_detected=False),
+        content,
+    ]
+    r = fuse(checks, DEFAULT_SCORING)
+    assert r.score <= DEFAULT_SCORING.caps.low_plausibility
+    assert r.band != "Clear"
+    assert r.reason_code == Reason.NO_PEOPLE_OR_IRRELEVANT.value
+
+
 def test_exact_duplicate_gates_to_suspect():
     checks = _clean_checks()
     checks[2] = _co("uniqueness", 0.0, exact_duplicate=True, near_duplicate=False)
@@ -198,10 +228,25 @@ def test_fraud_outranks_blur():
     assert r.reason_code == Reason.RECYCLED.value  # recycled beats too_blurred
 
 
-def test_vision_unavailable_never_clear():
+def test_vision_unavailable_is_unassessed():
+    # Vision down and nothing else fired -> the image was NOT assessed. It gets
+    # its own state, never a graded band (not even Doubtful/near-Clear).
     checks = _clean_checks()
     checks[4] = CheckOutcome("content", available=False, score=None, summary="",
                              data={"error": True})
     r = fuse(checks, DEFAULT_SCORING)
-    assert r.band != "Clear"
+    assert r.band == "Unassessed"
+    assert r.band not in ("Clear", "Doubtful", "Suspect")
     assert r.reason_code == Reason.NO_CONTENT_ANALYSIS.value
+
+
+def test_vision_unavailable_but_real_gate_stays_graded():
+    # A definite integrity failure (exact duplicate) outranks "unavailable":
+    # we assessed enough to reject, so it stays Suspect/RECYCLED, not Unassessed.
+    checks = _clean_checks()
+    checks[2] = _co("uniqueness", 0.0, exact_duplicate=True, near_duplicate=False)
+    checks[4] = CheckOutcome("content", available=False, score=None, summary="",
+                             data={"error": True})
+    r = fuse(checks, DEFAULT_SCORING)
+    assert r.band == "Suspect"
+    assert r.reason_code == Reason.RECYCLED.value

@@ -26,6 +26,9 @@ const config: Config = {
           "clear-fg": "var(--verdict-clear-fg)",
           "doubtful-fg": "var(--verdict-doubtful-fg)",
           "suspect-fg": "var(--verdict-suspect-fg)",
+          unassessed: "var(--verdict-unassessed)",
+          "unassessed-bg": "var(--verdict-unassessed-bg)",
+          "unassessed-fg": "var(--verdict-unassessed-fg)",
         },
         canvas: "var(--canvas)",
         surface: {

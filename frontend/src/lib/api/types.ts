@@ -2,7 +2,9 @@
 // src/lib/api/schema.ts from the live /openapi.json; these hand types give the
 // app ergonomic access (and document checks[].data, which is loosely typed).
 
-export type Band = "Clear" | "Doubtful" | "Suspect";
+// "Unassessed" is NOT a graded risk band — it means the vision check was
+// unavailable so the image was never assessed (always routes to review).
+export type Band = "Clear" | "Doubtful" | "Suspect" | "Unassessed";
 
 export type CheckName = "exif" | "sharpness" | "uniqueness" | "recapture" | "content";
 
@@ -82,6 +84,7 @@ export interface AnalyticsBucket {
   clear: number;
   doubtful: number;
   suspect: number;
+  unassessed: number;
   total: number;
   avg_score: number;
   incomplete: boolean;
@@ -91,6 +94,7 @@ export interface PeriodAggregate {
   clear: number;
   doubtful: number;
   suspect: number;
+  unassessed: number;
   total: number;
   avg_score: number;
 }
@@ -106,6 +110,7 @@ export interface AnalyticsGroup {
   clear: number;
   doubtful: number;
   suspect: number;
+  unassessed: number;
   avg_score: number;
   suspect_rate: number;
   share: number;

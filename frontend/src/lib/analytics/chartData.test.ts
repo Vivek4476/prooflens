@@ -16,6 +16,7 @@ function bucket(overrides: Partial<AnalyticsBucket>): AnalyticsBucket {
     clear: 0,
     doubtful: 0,
     suspect: 0,
+    unassessed: 0,
     total: 0,
     avg_score: 0,
     incomplete: false,
@@ -60,12 +61,12 @@ describe("toTrendData", () => {
 
 describe("previousPeriodRate", () => {
   it("computes the previous period's overall suspect rate as a percentage", () => {
-    const previous: PeriodAggregate = { clear: 70, doubtful: 20, suspect: 10, total: 100, avg_score: 80 };
+    const previous: PeriodAggregate = { clear: 70, doubtful: 20, suspect: 10, unassessed: 0, total: 100, avg_score: 80 };
     expect(previousPeriodRate(previous)).toBe(10);
   });
 
   it("returns 0 (not NaN) when the previous period had no scored volume", () => {
-    const previous: PeriodAggregate = { clear: 0, doubtful: 0, suspect: 0, total: 0, avg_score: 0 };
+    const previous: PeriodAggregate = { clear: 0, doubtful: 0, suspect: 0, unassessed: 0, total: 0, avg_score: 0 };
     expect(previousPeriodRate(previous)).toBe(0);
   });
 });
@@ -102,6 +103,14 @@ describe("toBandMixData", () => {
     expect(point.rawDoubtful).toBe(3);
     expect(point.rawSuspect).toBe(2);
     expect(point.total).toBe(10);
+  });
+
+  it("includes Unassessed as its own segment so the stack still sums to 100%", () => {
+    const buckets = [bucket({ clear: 5, doubtful: 2, suspect: 1, unassessed: 2, total: 10 })];
+    const [point] = toBandMixData(buckets);
+    expect(point.Unassessed).toBe(20);
+    expect(point.rawUnassessed).toBe(2);
+    expect(point.Clear + point.Doubtful + point.Suspect + point.Unassessed).toBe(100);
   });
 
   it("excludes empty (total===0) buckets from the output entirely — the X-domain rule", () => {

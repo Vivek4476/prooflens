@@ -19,6 +19,7 @@ from ..verdicts import (
     BAND_CLEAR,
     BAND_DOUBTFUL,
     BAND_SUSPECT,
+    BAND_UNASSESSED,
     Reason,
     most_severe,
     reason_text,
@@ -91,7 +92,11 @@ def _gates(checks: dict[str, CheckOutcome], cfg: ScoringConfig) -> list[tuple[Re
         pc = int(d.get("people_count", 0))
         if pc == 0:
             fired.append((Reason.NO_PEOPLE_OR_IRRELEVANT, caps.no_people))
-        elif int(d.get("plausibility", 100)) < cfg.thresholds.plausibility_gate:
+        # Fail CLOSED: a missing/malformed plausibility must not read as
+        # "perfectly plausible" (the old default of 100 silently skipped this
+        # gate). Absent -> 0 -> treated as low plausibility, aligning with the
+        # schema's own coercion of unparseable values to 0.
+        elif int(d.get("plausibility", 0)) < cfg.thresholds.plausibility_gate:
             fired.append((Reason.NO_PEOPLE_OR_IRRELEVANT, caps.low_plausibility))
 
         # A valid proof-of-meeting needs >=2 people in a genuine interaction. These
@@ -149,9 +154,18 @@ def fuse(outcomes: list[CheckOutcome], cfg: ScoringConfig) -> FusionResult:
     score = max(0.0, min(100.0, round(score, 1)))
 
     reason_code = most_severe([r for r, _ in fired])
+    # When the ONLY thing that fired is "vision unavailable" (no other gate
+    # out-ranked it), the image was never actually assessed — surface that
+    # honestly as its own state instead of a near-Clear graded score. Any real
+    # gate (duplicate/screen/blur/…) outranks NO_CONTENT_ANALYSIS in
+    # most_severe, so those stay graded.
+    if reason_code is Reason.NO_CONTENT_ANALYSIS:
+        band = BAND_UNASSESSED
+    else:
+        band = _band_for(score, cfg)
     return FusionResult(
         score=score,
-        band=_band_for(score, cfg),
+        band=band,
         reason=reason_text(reason_code),
         reason_code=reason_code.value,
     )

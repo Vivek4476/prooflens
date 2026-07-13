@@ -45,6 +45,7 @@ class OpenAICompatBackend(VisionBackend):
         base_url: str,
         max_edge: int = 768,
         timeout: float = 30.0,
+        temperature: float = 0.0,
     ):
         if not api_key:
             raise ValueError(f"an API key is required for the {name} backend")
@@ -54,6 +55,9 @@ class OpenAICompatBackend(VisionBackend):
         self.invoke_url = base_url.rstrip("/") + "/chat/completions"
         self.max_edge = max_edge
         self.timeout = timeout
+        # Deterministic by default: the same photo must yield the same assessment
+        # (reproducibility — a fraud verdict that flips between calls is indefensible).
+        self.temperature = temperature
 
     def assess(self, image_bytes: bytes) -> ContentAssessment:
         jpeg = resize_for_model(image_bytes, self.max_edge)
@@ -61,7 +65,7 @@ class OpenAICompatBackend(VisionBackend):
         payload = {
             "model": self.model,
             "max_tokens": 512,
-            "temperature": 0.2,
+            "temperature": self.temperature,
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {
