@@ -36,8 +36,8 @@ def get_backend(name: str = "stub", **kwargs) -> VisionBackend:
             model=kwargs.get("model", "claude-haiku-4-5"),
             max_edge=kwargs.get("max_edge", 768),
         )
-    # OpenAI-compatible hosted/local endpoints (Gemini, OpenRouter, AI/ML API, Groq, ...).
-    if name in ("local_vlm", "gemini", "openrouter", "aimlapi", "groq"):
+    # OpenAI-compatible hosted/local endpoints (Gemini, OpenRouter, Groq, Cloudflare, ...).
+    if name in ("local_vlm", "gemini", "openrouter", "aimlapi", "groq", "cloudflare"):
         from .openai_compat import OpenAICompatBackend
 
         return OpenAICompatBackend(
@@ -45,6 +45,16 @@ def get_backend(name: str = "stub", **kwargs) -> VisionBackend:
             api_key=kwargs.get("api_key", "not-needed"),
             model=kwargs["model"],
             base_url=kwargs["base_url"],
+            max_edge=kwargs.get("max_edge", 768),
+        )
+    if name == "hybrid":
+        from .hybrid import HybridBackend
+
+        return HybridBackend(
+            api_key=kwargs["api_key"],
+            base_url=kwargs["base_url"],
+            vision_model=kwargs["vision_model"],
+            reasoner_model=kwargs["reasoner_model"],
             max_edge=kwargs.get("max_edge", 768),
         )
     if name == "nvidia":

@@ -52,9 +52,9 @@ class Settings(BaseSettings):
     )
     secret_key: str = Field(default=_DEV_SECRET_KEY, alias="PROOFLENS_SECRET_KEY")
 
-    # Vision backend (default groq = real scoring out of the box; set
-    # VISION_BACKEND=stub for a fully offline / zero-key run).
-    vision_backend: str = Field(default="groq", alias="VISION_BACKEND")
+    # Vision backend: default is the two-stage Cloudflare hybrid. Set
+    # VISION_BACKEND=groq (or stub) to revert instantly.
+    vision_backend: str = Field(default="hybrid", alias="VISION_BACKEND")
     vision_max_edge: int = Field(default=768, alias="VISION_MAX_EDGE")
 
     anthropic_api_key: str = Field(default="", alias="ANTHROPIC_API_KEY")
@@ -108,6 +108,16 @@ class Settings(BaseSettings):
         default="https://api.groq.com/openai/v1", alias="GROQ_BASE_URL"
     )
 
+    # Cloudflare Workers AI (OpenAI-compatible). Powers the default hybrid backend.
+    cf_account_id: str = Field(default="", alias="CF_ACCOUNT_ID")
+    cf_api_token: str = Field(default="", alias="CF_API_TOKEN")
+    cf_vision_model: str = Field(
+        default="@cf/meta/llama-4-scout-17b-16e-instruct", alias="CF_VISION_MODEL"
+    )
+    cf_reasoner_model: str = Field(
+        default="@cf/openai/gpt-oss-120b", alias="CF_REASONER_MODEL"
+    )
+
     # Queue / worker.
     queue_max_attempts: int = Field(default=5, alias="QUEUE_MAX_ATTEMPTS")
     queue_backoff_base_seconds: int = Field(default=5, alias="QUEUE_BACKOFF_BASE_SECONDS")
@@ -139,6 +149,13 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def cf_base_url(self) -> str:
+        return (
+            "https://api.cloudflare.com/client/v4/accounts/"
+            f"{self.cf_account_id}/ai/v1"
+        )
 
     def build_vision_backend(self, name: str | None = None) -> VisionBackend:
         """Construct the configured vision backend. Defaults to groq."""
@@ -175,6 +192,17 @@ class Settings(BaseSettings):
                 "api_key": self.openrouter_api_key,
                 "model": self.openrouter_model,
                 "base_url": self.openrouter_base_url,
+            },
+            "cloudflare": {
+                "api_key": self.cf_api_token,
+                "model": self.cf_vision_model,
+                "base_url": self.cf_base_url,
+            },
+            "hybrid": {
+                "api_key": self.cf_api_token,
+                "base_url": self.cf_base_url,
+                "vision_model": self.cf_vision_model,
+                "reasoner_model": self.cf_reasoner_model,
             },
         }
         kwargs = per_backend.get(name, {})
