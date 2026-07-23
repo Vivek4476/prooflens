@@ -337,10 +337,11 @@ def test_sample_review_decision_precision_lands_in_target_band():
 # ---------------------------------------------------------------------------
 
 def test_sample_processing_checks_have_realistic_latencies():
-    from prooflens.service.repo import processing_ms
-    from prooflens.engine.types import Verdict
     from scripts.lib.seed_data import sample_processing_checks
+
+    from prooflens.engine.types import Verdict
     from prooflens.engine.verdicts import BAND_CLEAR
+    from prooflens.service.repo import processing_ms
     rng = Random(7)
     checks = sample_processing_checks(rng, BAND_CLEAR)
     names = {c.name for c in checks}
@@ -351,8 +352,9 @@ def test_sample_processing_checks_have_realistic_latencies():
 
 
 def test_generate_seed_plan_records_have_nonzero_processing_ms():
-    from prooflens.service.repo import processing_ms
     from statistics import median
+
+    from prooflens.service.repo import processing_ms
     pool = ["AGENT-1", "AGENT-2"]
     plan = generate_seed_plan(days=30, records_per_day_range=(3, 8),
                               agent_pool=pool, rng=Random(7))
