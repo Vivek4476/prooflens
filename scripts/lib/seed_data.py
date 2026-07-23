@@ -234,11 +234,16 @@ def sample_processing_checks(rng: Random, band: str) -> list[CheckOutcome]:
     def _lat(lo: float, hi: float) -> float:
         return round(rng.uniform(lo, hi), 1)
 
+    def _c(name: str, summary: str, lo: float, hi: float) -> CheckOutcome:
+        return CheckOutcome(
+            name=name, available=True, score=None, summary=summary, latency_ms=_lat(lo, hi)
+        )
+
     checks = [
-        CheckOutcome(name="exif", available=True, score=None, summary="metadata read", latency_ms=_lat(0.4, 3.0)),
-        CheckOutcome(name="blur", available=True, score=None, summary="sharpness ok", latency_ms=_lat(8.0, 35.0)),
-        CheckOutcome(name="uniqueness", available=True, score=None, summary="hash checked", latency_ms=_lat(4.0, 25.0)),
-        CheckOutcome(name="recapture", available=True, score=None, summary="screen check", latency_ms=_lat(12.0, 55.0)),
+        _c("exif", "metadata read", 0.4, 3.0),
+        _c("blur", "sharpness ok", 8.0, 35.0),
+        _c("uniqueness", "hash checked", 4.0, 25.0),
+        _c("recapture", "screen check", 12.0, 55.0),
     ]
     # ~45% of Suspect rows short-circuit before the paid vision call; everything
     # else pays for it (~0.3–1.4s, the real gpt-4o-mini range).
