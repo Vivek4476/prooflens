@@ -108,6 +108,14 @@ class Settings(BaseSettings):
         default="https://api.groq.com/openai/v1", alias="GROQ_BASE_URL"
     )
 
+    # GitHub Models (OpenAI-compatible; Azure/US-hosted). Free vision via a GitHub
+    # fine-grained token with the Models:read permission. Token format github_pat_…
+    github_api_key: str = Field(default="", alias="GITHUB_MODELS_TOKEN")
+    github_model: str = Field(default="openai/gpt-4o-mini", alias="GITHUB_MODEL")
+    github_base_url: str = Field(
+        default="https://models.github.ai/inference", alias="GITHUB_BASE_URL"
+    )
+
     # Cloudflare Workers AI (OpenAI-compatible). Powers the default hybrid backend.
     cf_account_id: str = Field(default="", alias="CF_ACCOUNT_ID")
     cf_api_token: str = Field(default="", alias="CF_API_TOKEN")
@@ -192,6 +200,11 @@ class Settings(BaseSettings):
                 "api_key": self.openrouter_api_key,
                 "model": self.openrouter_model,
                 "base_url": self.openrouter_base_url,
+            },
+            "github": {
+                "api_key": self.github_api_key,
+                "model": self.github_model,
+                "base_url": self.github_base_url,
             },
             "cloudflare": {
                 "api_key": self.cf_api_token,
