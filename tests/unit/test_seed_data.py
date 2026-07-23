@@ -330,3 +330,32 @@ def test_sample_review_decision_precision_lands_in_target_band():
     reviewed = confirmed + overturned
     precision_pct = 100.0 * confirmed / reviewed
     assert 78.0 <= precision_pct <= 85.0, precision_pct
+
+
+# ---------------------------------------------------------------------------
+# processing_ms enrichment (system-health median is non-zero)
+# ---------------------------------------------------------------------------
+
+def test_sample_processing_checks_have_realistic_latencies():
+    from prooflens.service.repo import processing_ms
+    from prooflens.engine.types import Verdict
+    from scripts.lib.seed_data import sample_processing_checks
+    from prooflens.engine.verdicts import BAND_CLEAR
+    rng = Random(7)
+    checks = sample_processing_checks(rng, BAND_CLEAR)
+    names = {c.name for c in checks}
+    assert {"exif", "blur", "uniqueness", "recapture", "content"} <= names
+    v = Verdict(score=90.0, band=BAND_CLEAR, reason="", reason_code="clear",
+                checks=checks, rubric_version="v3")
+    assert processing_ms(v) > 0  # non-zero total wall-clock
+
+
+def test_generate_seed_plan_records_have_nonzero_processing_ms():
+    from prooflens.service.repo import processing_ms
+    from statistics import median
+    pool = ["AGENT-1", "AGENT-2"]
+    plan = generate_seed_plan(days=30, records_per_day_range=(3, 8),
+                              agent_pool=pool, rng=Random(7))
+    procs = [processing_ms(r.verdict) for r in plan]
+    assert all(p >= 0 for p in procs)
+    assert median(procs) > 50  # a realistic median, not 0 ms

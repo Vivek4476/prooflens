@@ -16,12 +16,12 @@ reproducible given the same seed.
 from __future__ import annotations
 
 import csv
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from random import Random
 
-from prooflens.engine.types import Verdict
+from prooflens.engine.types import CheckOutcome, Verdict
 from prooflens.engine.verdicts import BAND_CLEAR, BAND_DOUBTFUL, BAND_SUSPECT, REASON_TEXT, Reason
 from prooflens.service.ids import normalize_id
 from prooflens.vision.rubric import RUBRIC_VERSION
@@ -222,6 +222,39 @@ def sample_verdict(rng: Random) -> Verdict:
 # ---------------------------------------------------------------------------
 
 
+def sample_processing_checks(rng: Random, band: str) -> list[CheckOutcome]:
+    """Realistic per-check wall-clock latencies for one seeded record, so the
+    system-health median (derived from ``sum(check.latency_ms)``) reflects a
+    plausible pipeline instead of 0 ms.
+
+    Mirrors the real pipeline's cost profile: the cheap free hard gates (exif,
+    blur, uniqueness, recapture) always run and are fast; the paid vision
+    ``content`` call dominates and is *skipped* on some Suspect rows where a
+    free hard gate already fired (the real short-circuit in engine.score)."""
+    def _lat(lo: float, hi: float) -> float:
+        return round(rng.uniform(lo, hi), 1)
+
+    checks = [
+        CheckOutcome(name="exif", available=True, score=None, summary="metadata read", latency_ms=_lat(0.4, 3.0)),
+        CheckOutcome(name="blur", available=True, score=None, summary="sharpness ok", latency_ms=_lat(8.0, 35.0)),
+        CheckOutcome(name="uniqueness", available=True, score=None, summary="hash checked", latency_ms=_lat(4.0, 25.0)),
+        CheckOutcome(name="recapture", available=True, score=None, summary="screen check", latency_ms=_lat(12.0, 55.0)),
+    ]
+    # ~45% of Suspect rows short-circuit before the paid vision call; everything
+    # else pays for it (~0.3–1.4s, the real gpt-4o-mini range).
+    skipped = band == BAND_SUSPECT and rng.random() < 0.45
+    if skipped:
+        checks.append(CheckOutcome(
+            name="content", available=False, score=None,
+            summary="Skipped — a free hard gate already rejected the image.",
+            latency_ms=0.0))
+    else:
+        checks.append(CheckOutcome(
+            name="content", available=True, score=None,
+            summary="vision assessed", latency_ms=_lat(300.0, 1400.0)))
+    return checks
+
+
 @dataclass(frozen=True)
 class SeedRecord:
     created_at: datetime
@@ -264,6 +297,10 @@ def generate_seed_plan(
             created_at = sample_timestamp(day, rng)
             rep_id = rng.choice(agent_pool)
             verdict = sample_verdict(rng)
+            # Attach realistic per-check latencies at persist-planning time so
+            # the seeded system-health median is non-zero. sample_verdict keeps
+            # its checks==[] vocabulary contract; the enrichment lives here.
+            verdict = replace(verdict, checks=sample_processing_checks(rng, verdict.band))
             opportunity_id = f"OPP-{counter:06d}"
             counter += 1
             records.append(
