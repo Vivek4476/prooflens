@@ -101,9 +101,11 @@ class Settings(BaseSettings):
 
     # Groq (groq.com) — fast (~1s), genuinely free tier, Llama-4 vision; keys gsk_…
     groq_api_key: str = Field(default="", alias="GROQ_API_KEY")
-    groq_model: str = Field(
-        default="meta-llama/llama-4-scout-17b-16e-instruct", alias="GROQ_MODEL"
-    )
+    # NOTE: the previous default (llama-4-scout) was DELETED by Groq (2026-07-20) and
+    # 404s. qwen/qwen3.6-27b was the only vision model on Groq's live /models list at
+    # that time. Groq is not the demo path (we use `github`); re-verify against a live
+    # /models call with a key before relying on it.
+    groq_model: str = Field(default="qwen/qwen3.6-27b", alias="GROQ_MODEL")
     groq_base_url: str = Field(
         default="https://api.groq.com/openai/v1", alias="GROQ_BASE_URL"
     )
