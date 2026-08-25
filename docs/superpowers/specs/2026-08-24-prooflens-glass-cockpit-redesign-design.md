@@ -1,7 +1,7 @@
 # ProofLens Redesign — The Glass Cockpit
 
-**Date:** 2026-08-24
-**Status:** Design approved (brainstorm); Phase 1 ready for implementation planning
+**Date:** 2026-08-24 (updated 2026-08-25)
+**Status:** Design + open items resolved; deployment target set. **Ready for Phase-1 implementation plan.**
 **Supersedes:** the multi-page reviewer UI (now collapsed to a single page)
 
 ---
@@ -81,8 +81,8 @@ each row opens the same read-only drawer. This is the dispute/compliance backbon
 
 **The one deliberate escape hatch:** a **dispute → automatic re-score** path. A contested decision
 can be *re-run by the machine* (fresh vision pass, updated provenance), producing a new immutable
-decision linked to the original. This is **not** manual grading — no human sets a band. Flagged
-here because it softens the "zero override" instruction; **owner to confirm on spec review.**
+decision linked to the original. This is **not** manual grading — no human sets a band. **DECIDED
+2026-08-25 (kept):** machine-driven re-score only; the verdict always comes from the engine.
 
 ### Phase 2 — Analytics *(separate follow-on spec)*
 Fraud trends over time, rep/team leaderboards, region drill-down. Kill the misleading `avg_score`
@@ -101,8 +101,12 @@ verdict. Reuses the drawer's anatomy with orchestrated motion.
   C2PA, nonce-in-frame). Highest-leverage audit gap (stops stock/AI/screenshot photos scoring
   Clear). Requires mobile-capture (LSQ camera) integration — **out of scope for the Phase-1 UI
   build**, but the UI is designed provenance-first (seal, coverage gauge) so it lands cleanly.
-- **Paid first-party vision model** (Gemini Flash / Claude Haiku) replacing the POC GitHub Models
-  backend — backends already wired; owner sets key + `VISION_BACKEND`.
+- **Vision backend — DECIDED 2026-08-25: NVIDIA free tier.** `meta/llama-3.2-90b-vision-instruct`
+  @ `integrate.api.nvidia.com/v1` via the already-wired `nvidia_backend` (`VISION_BACKEND=nvidia`,
+  `NVIDIA_API_KEY=nvapi-…`). Validated live: authenticates, reads images (counted people, ID'd
+  meeting scene), returns clean JSON (no reasoning-model `<think>` noise), ~8.4s. Free, DPDP-viable
+  (US-hosted). Paid first-party (Gemini Flash / Claude Haiku, both wired) is a **future hardening
+  option**, not a blocker.
 - **Calibrated thresholds** against a labelled validation set (audit C2).
 
 ### 4b. Copilot — reviewer experience *(built alongside Phase 1)*
@@ -157,19 +161,37 @@ a typed API client + TanStack Query hooks; components never fetch directly.
   `next build` + tsc + lint green as the existing gate.
 - Visual truth: the approved artifact is the reference for layout/tokens.
 
-## 8. Out of scope / deferred
+## 8. Deployment target — DigitalOcean droplet *(validated 2026-08-25)*
+
+Production runs on the **existing DO droplet `68.183.94.47`** (shared with the Iris agent), **not**
+Render. Validated feasible: 1 vCPU / 1.9 GB RAM (~1.5 GB available), 45 GB disk, Python 3.12.3,
+**reaches the NVIDIA vision API (HTTP 200)**. It fits *because* vision is offloaded to NVIDIA's
+cloud — the droplet only orchestrates (light FastAPI + small Postgres).
+
+Topology — **native, not Docker** (leaner on a 2 GB shared box; Docker isn't installed):
+- **uvicorn** ProofLens API as a **systemd** service (mirror `iris-listen`), bound to `127.0.0.1`.
+- **system Postgres** (apt), tuned small (`shared_buffers ~128MB`, `max_connections ~20`), local socket.
+- **Caddy** reverse proxy → automatic HTTPS (sslip.io or a real domain), same pattern as the n8n→DO plan.
+- **1–2 GB swapfile** added (box has 0 swap today) as headroom on the single vCPU.
+- `VISION_BACKEND=nvidia` + `NVIDIA_API_KEY` from a secrets file; migrations + seed via the start script.
+- Deploy from `main` via `git pull` + service restart (a small deploy script), **after Phase 1 merges**.
+
+Risk: small shared box. If Iris + ProofLens ever spike together, resize (~$12/mo) or split to a
+dedicated droplet. Deploy is a **post-build** step; Phase-1 development uses a fresh local/staging env.
+
+## 9. Out of scope / deferred
 - Provenance/liveness capture SDK (§4a) — separate sub-project, gated on LSQ camera + mobile work.
 - Phases 2 and 3 — separate specs.
 - **Prod revival is deferred deliberately.** The old free-tier Render Postgres expired (~2026-08-05,
   the 30-day free limit), so `prooflens-api` crash-loops on a dead DB host (`failed to resolve host
   dpg-…`). We are **not** resurrecting free-tier prod (it would re-expire). Phase 1 builds against a
-  **fresh seeded local/staging environment**; production redeploys on a **durable tier** (paid Render
-  Postgres or the DigitalOcean droplet) once the makeover is ready. Old prod data is unrecoverable
-  and near-zero loss (seed/demo only; the webhook path never took real traffic).
-- Paid-vision cutover (POC GitHub Models → first-party Gemini Flash / Claude Haiku) — ops task, apart.
+  **fresh seeded local/staging environment**; production redeploys on the **DigitalOcean droplet (§8)**
+  once the makeover is ready. Old prod data is unrecoverable and near-zero loss (seed/demo only; the
+  webhook path never took real traffic).
 
-## 9. Open items (owner review)
-1. **Dispute → re-score escape hatch** (§3) — keep it, or truly zero-override?
-2. Paid vision provider choice (Gemini Flash vs Claude Haiku) for the production cutover.
-3. ~~Prod DB vs fresh env~~ — **DECIDED 2026-08-24: build on a fresh seeded environment; defer
-   durable prod deploy until the redesign is ready.**
+## 10. Decisions log & open actions
+- ✅ **Dispute → re-score hatch** — KEPT (§3): machine-driven re-score, never manual grading.
+- ✅ **Vision provider** — NVIDIA free tier (§4a); paid first-party is future hardening.
+- ✅ **Prod DB vs fresh env** — build on a fresh seeded env; defer durable deploy.
+- ✅ **Hosting** — DigitalOcean droplet, native systemd (§8).
+- ⏳ **Owner action:** rotate the Render API key (`rnd_vyVk…`) pasted in chat — exposed in transcript.
