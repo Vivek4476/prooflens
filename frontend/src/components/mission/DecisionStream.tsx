@@ -24,7 +24,7 @@ export function DecisionStream({
             className={`grid grid-cols-[1fr_auto_auto] items-center gap-3 border-b border-border px-4 py-2.5 text-left hover:bg-surface-2 ${newIds.has(r.id) ? "motion-safe:animate-[fadein_.45s_ease]" : ""}`}
           >
             <div>
-              <div className="text-[13px] font-semibold">{r.rep_id ?? r.opportunity_id}</div>
+              <div className="text-[13px] font-semibold">{r.rep_id ?? r.opportunity_id ?? r.id}</div>
               <div className="font-mono text-[10px] text-text-muted">{r.opportunity_id}</div>
             </div>
             <VerdictBadge band={r.band} size="sm" />

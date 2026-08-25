@@ -8,12 +8,12 @@ const SEG = [
 ] as const;
 
 export function DecisionMixBar({ dist }: { dist: AnalyticsSummary["band_distribution"] | undefined }) {
-  const total = SEG.reduce((s, x) => s + (dist?.[x.key] ?? 0), 0) || 1;
+  const total = SEG.reduce((s, x) => s + Math.max(0, dist?.[x.key] ?? 0), 0) || 1;
   return (
     <div>
       <div className="flex h-3 overflow-hidden rounded-md">
         {SEG.map((s) => (
-          <div key={s.key} className={s.cls} style={{ width: `${((dist?.[s.key] ?? 0) / total) * 100}%` }} />
+          <div key={s.key} className={s.cls} style={{ width: `${(Math.max(0, dist?.[s.key] ?? 0) / total) * 100}%` }} />
         ))}
       </div>
       <div className="mt-3 flex flex-col gap-2">

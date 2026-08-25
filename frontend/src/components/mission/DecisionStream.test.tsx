@@ -16,7 +16,7 @@ describe("DecisionStream", () => {
     render(<DecisionStream items={items} newIds={new Set(["1"])} onSelect={onSelect} />);
     expect(screen.getByText("Amit")).toBeInTheDocument();
     expect(screen.getByText("Raj")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("Amit"));
+    fireEvent.click(screen.getByText("Amit").closest("button")!);
     expect(onSelect).toHaveBeenCalledWith(items[0]);
   });
 });

@@ -8,9 +8,12 @@ export function AlertsPanel({ a }: { a: AnalyticsSummary | undefined }) {
       alerts.push({ cls: "text-verdict-suspect-fg", title: "Fraud rate elevated",
         body: `Suspect rate at ${a.suspect_pct}% today (threshold 8%).` });
     const health = a.system_health;
-    if (health && (health.scored_without_content_pct ?? 0) >= 10)
-      alerts.push({ cls: "text-verdict-doubtful-fg", title: "Vision degradation",
-        body: `${health.scored_without_content_pct}% scored without vision (fail-open).` });
+    if (health) {
+      const pct = health.scored_without_content_pct ?? 0;
+      if (pct >= 10)
+        alerts.push({ cls: "text-verdict-doubtful-fg", title: "Vision degradation",
+          body: `${pct}% scored without vision (fail-open).` });
+    }
   }
   if (alerts.length === 0)
     return <p className="px-4 py-6 text-sm text-text-muted">No active alerts. System nominal.</p>;

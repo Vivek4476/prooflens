@@ -25,9 +25,9 @@ export default function MissionControlPage() {
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <MetricCard label="Decisions today" value={a?.images_today ?? "—"} />
-        <MetricCard label="Suspect / fraud" value={a?.suspect_pct ?? "—"} suffix="%" />
+        <MetricCard label="Suspect / fraud" value={a?.suspect_pct ?? "—"} suffix={a ? "%" : undefined} />
         <MetricCard label="Avg score" value={a?.avg_score ?? "—"} />
-        <MetricCard label="Avg latency" value={a?.avg_processing_ms ?? "—"} suffix="ms" />
+        <MetricCard label="Avg latency" value={a?.avg_processing_ms ?? "—"} suffix={a ? "ms" : undefined} />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.55fr_1fr]">
