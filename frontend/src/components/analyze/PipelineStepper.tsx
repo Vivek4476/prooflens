@@ -19,6 +19,50 @@ const HINT: Record<string, string> = {
 };
 
 /**
+ * Shared row body (icon + label/hint) — extracted to avoid duplication
+ * between reduced-motion and full-motion branches.
+ */
+function RowBody({
+  stage,
+  state,
+  done,
+}: {
+  stage: typeof PIPELINE_STAGES[number];
+  state: StageState;
+  done: boolean;
+}) {
+  const isPending = state === "pending";
+  const isActive = state === "active";
+
+  return (
+    <>
+      <div className="grid h-6 w-6 shrink-0 place-items-center">
+        {isPending && (
+          <span className="h-2.5 w-2.5 rounded-full bg-border-strong" />
+        )}
+        {isActive && (
+          <Loader2 size={18} className="animate-spin text-text-secondary" />
+        )}
+        {done && <StateIcon state={state as CheckState} size={18} />}
+      </div>
+      <div className="flex flex-1 items-center justify-between gap-3">
+        <span
+          className={cn(
+            "text-body-sm font-medium",
+            isPending ? "text-text-muted" : "text-text",
+          )}
+        >
+          {stage.label}
+        </span>
+        <span className="text-caption text-text-muted">
+          {done ? STATE_WORD[state as CheckState] : isActive ? HINT[stage.key] : ""}
+        </span>
+      </div>
+    </>
+  );
+}
+
+/**
  * The real pipeline stages, resolving against the response's checks[]. The
  * animation is derived from real results — not a theatrical fake.
  */
@@ -40,28 +84,7 @@ export function PipelineStepper({ states }: { states: StageState[] }) {
                 state === "active" && "bg-surface-2",
               )}
             >
-              <div className="grid h-6 w-6 shrink-0 place-items-center">
-                {state === "pending" && (
-                  <span className="h-2.5 w-2.5 rounded-full bg-border-strong" />
-                )}
-                {state === "active" && (
-                  <Loader2 size={18} className="animate-spin text-text-secondary" />
-                )}
-                {done && <StateIcon state={state as CheckState} size={18} />}
-              </div>
-              <div className="flex flex-1 items-center justify-between gap-3">
-                <span
-                  className={cn(
-                    "text-body-sm font-medium",
-                    state === "pending" ? "text-text-muted" : "text-text",
-                  )}
-                >
-                  {stage.label}
-                </span>
-                <span className="text-caption text-text-muted">
-                  {done ? STATE_WORD[state as CheckState] : state === "active" ? HINT[stage.key] : ""}
-                </span>
-              </div>
+              <RowBody stage={stage} state={state} done={done} />
             </li>
           );
         })}
@@ -99,28 +122,7 @@ export function PipelineStepper({ states }: { states: StageState[] }) {
               isActive && "ring-1 ring-border-strong/40 motion-safe:animate-pulse",
             )}
           >
-            <div className="grid h-6 w-6 shrink-0 place-items-center">
-              {isPending && (
-                <span className="h-2.5 w-2.5 rounded-full bg-border-strong" />
-              )}
-              {isActive && (
-                <Loader2 size={18} className="animate-spin text-text-secondary" />
-              )}
-              {done && <StateIcon state={state as CheckState} size={18} />}
-            </div>
-            <div className="flex flex-1 items-center justify-between gap-3">
-              <span
-                className={cn(
-                  "text-body-sm font-medium",
-                  isPending ? "text-text-muted" : "text-text",
-                )}
-              >
-                {stage.label}
-              </span>
-              <span className="text-caption text-text-muted">
-                {done ? STATE_WORD[state as CheckState] : isActive ? HINT[stage.key] : ""}
-              </span>
-            </div>
+            <RowBody stage={stage} state={state} done={done} />
           </motion.li>
         );
       })}
