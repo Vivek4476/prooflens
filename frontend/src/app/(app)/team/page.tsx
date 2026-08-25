@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Users } from "lucide-react";
 
@@ -26,6 +26,13 @@ function TeamInner() {
   const router = useRouter();
   const { dim, node, params, bucket } = useTeamFilters();
   const { data: a, isLoading } = useAnalytics(params, Boolean(dim && node));
+
+  // Memoize member ranking to capture both ranked and belowCount
+  // Call hook unconditionally at top level, before any early returns
+  const members = useMemo(
+    () => rankHotspots(a?.groups ?? [], { minTotal: MIN_TOTAL_FOR_RATE, maxRows: MAX_MEMBER_ROWS }),
+    [a?.groups],
+  );
 
   if (!dim || !node) {
     return (
@@ -77,7 +84,7 @@ function TeamInner() {
               subtitle="Reps in this team, highest risk first."
             />
             <ul className="p-2">
-              {rankHotspots(a.groups, { minTotal: MIN_TOTAL_FOR_RATE, maxRows: MAX_MEMBER_ROWS }).ranked.map(
+              {members.ranked.map(
                 (g, i) => (
                   <li key={g.agent_id ?? g.node}>
                     <button
@@ -100,6 +107,11 @@ function TeamInner() {
                 ),
               )}
             </ul>
+            {members.belowCount > 0 && (
+              <p className="px-3 pt-1 text-caption text-text-muted">
+                Not ranked: {members.belowCount} below 20 scored
+              </p>
+            )}
           </Card>
         </div>
       )}
