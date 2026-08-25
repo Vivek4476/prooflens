@@ -5,6 +5,8 @@ import {
   Settings,
   UploadCloud,
   History as HistoryIcon,
+  Radar,
+  FileSearch,
   type LucideIcon,
 } from "lucide-react";
 
@@ -15,6 +17,8 @@ export interface NavItem {
 }
 
 export const NAV: NavItem[] = [
+  { label: "Mission Control", href: "/mission-control", icon: Radar },
+  { label: "Audit Ledger", href: "/ledger", icon: FileSearch },
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
   { label: "Analyze Photo", href: "/analyze", icon: ScanSearch },
   { label: "Bulk upload", href: "/bulk", icon: UploadCloud },
