@@ -155,6 +155,7 @@ def score_bytes(
     payload["backend"] = vision.name
     payload["backend_is_real"] = vision.is_real
     payload["backend_note"] = None
+    payload["copilot_summary"] = copilot_summary
     return payload
 
 

@@ -57,6 +57,14 @@ def test_score_returns_real_verdict(client):
     assert body["rubric_version"] == "v3"
 
 
+def test_score_response_includes_copilot_summary(client):
+    r = _upload(client, "meeting.jpg")
+    assert r.status_code == 200
+    body = r.json()
+    assert "copilot_summary" in body
+    assert body["copilot_summary"] is None or isinstance(body["copilot_summary"], str)
+
+
 def test_get_single_result_returns_full_evidence(client):
     rid = _upload(client, "meeting.jpg").json()["result_id"]
     r = client.get(f"/v1/results/{rid}")
