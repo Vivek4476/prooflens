@@ -36,20 +36,23 @@ export function useHealth() {
   return { state, ...query };
 }
 
-export function useResults(params?: {
-  limit?: number;
-  offset?: number;
-  band?: string;
-  review?: string;
-  reason?: string;
-  rep_id?: string;
-  from?: string;
-  to?: string;
-}) {
+export function useResults(
+  params?: {
+    limit?: number;
+    offset?: number;
+    band?: string;
+    review?: string;
+    reason?: string;
+    rep_id?: string;
+    from?: string;
+    to?: string;
+  },
+  refetchInterval: number = 20_000,
+) {
   return useQuery({
     queryKey: ["results", params],
     queryFn: () => api.results(params),
-    refetchInterval: 20_000,
+    refetchInterval,
   });
 }
 
