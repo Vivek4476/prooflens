@@ -5,6 +5,8 @@ instant, and testable. Copilot is additive: callers fall back to verdict.reason.
 """
 from __future__ import annotations
 
+import textwrap
+
 from .types import Verdict
 
 # reason_code -> a plain-language clause explaining the driver.
@@ -24,19 +26,22 @@ _REASON_CLAUSE = {
 
 def _evidence(verdict: Verdict) -> str:
     """The most informative available check summary, if any."""
-    for c in verdict.checks:
+    for c in (verdict.checks or []):
         if c.available and c.summary:
             return c.summary.strip().rstrip(".")
     return ""
 
 
 def summarize_decision(verdict: Verdict) -> str:
-    clause = _REASON_CLAUSE.get(verdict.reason_code, verdict.reason.lower())
-    if verdict.band == "Unassessed":
-        body = f"Not graded — {clause}. Routed for automatic retry."
-    else:
-        body = f"Scored {verdict.band} because {clause}."
-    ev = _evidence(verdict)
-    if ev:
-        body = f"{body} Detail: {ev}."
-    return body[:400]
+    try:
+        clause = _REASON_CLAUSE.get(verdict.reason_code, (verdict.reason or "").lower())
+        if verdict.band == "Unassessed":
+            body = f"Not graded — {clause}."
+        else:
+            body = f"Scored {verdict.band} because {clause}."
+        ev = _evidence(verdict)
+        if ev:
+            body = f"{body} Detail: {ev}."
+        return textwrap.shorten(body, width=400, placeholder="…")
+    except Exception:
+        return (getattr(verdict, "reason", "") or "")[:400]
