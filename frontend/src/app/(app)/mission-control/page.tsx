@@ -11,6 +11,8 @@ import { ProvenanceGauge } from "@/components/mission/ProvenanceGauge";
 import { DecisionDrawer } from "@/components/decision/DecisionDrawer";
 import { useAnalytics } from "@/lib/api/hooks";
 import { useLiveDecisions } from "@/lib/live";
+import { formatMs } from "@/lib/utils";
+import { formatPct, formatScore } from "@/lib/format";
 import type { ResultItem } from "@/lib/api/types";
 
 export default function MissionControlPage() {
@@ -25,9 +27,9 @@ export default function MissionControlPage() {
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <MetricCard label="Decisions today" value={a?.images_today ?? "—"} />
-        <MetricCard label="Suspect / fraud" value={a?.suspect_pct ?? "—"} suffix={a ? "%" : undefined} />
-        <MetricCard label="Avg score" value={a?.avg_score ?? "—"} />
-        <MetricCard label="Avg latency" value={a?.avg_processing_ms ?? "—"} suffix={a ? "ms" : undefined} />
+        <MetricCard label="Suspect / fraud" value={a ? formatPct(a.suspect_pct) : "—"} />
+        <MetricCard label="Avg score" value={a ? formatScore(a.avg_score) : "—"} />
+        <MetricCard label="Avg latency" value={a ? formatMs(a.avg_processing_ms) : "—"} />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.55fr_1fr]">
