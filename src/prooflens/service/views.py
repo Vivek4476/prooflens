@@ -48,6 +48,7 @@ class ResultView:
     review_note: str | None = None
     reviewed_at: str | None = None     # ISO 8601
     reviewer: str | None = None
+    copilot_summary: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -64,6 +65,7 @@ class ResultView:
             "rep_id": self.rep_id,
             "checks": self.checks,
             "review": self._review_dict(),
+            "copilot_summary": self.copilot_summary,
         }
 
     def _review_dict(self) -> dict | None:

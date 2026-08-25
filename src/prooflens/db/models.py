@@ -161,6 +161,7 @@ class Result(Base):
     # Provenance: "direct" (/v1/score) | "webhook" (LSQ job) | "seed" (demo data).
     # Stored (not derived) so the realistic-seed script can mark rows honestly.
     source: Mapped[str] = mapped_column(String(16), default="direct")
+    copilot_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     review_status: Mapped[str | None] = mapped_column(String(24), nullable=True)
     review_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
