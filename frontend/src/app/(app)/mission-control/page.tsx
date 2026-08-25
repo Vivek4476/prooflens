@@ -1,0 +1,60 @@
+"use client";
+
+import { useState } from "react";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Card, CardHeader } from "@/components/ui/Card";
+import { MetricCard } from "@/components/ui/MetricCard";
+import { DecisionStream } from "@/components/mission/DecisionStream";
+import { AlertsPanel } from "@/components/mission/AlertsPanel";
+import { DecisionMixBar } from "@/components/mission/DecisionMixBar";
+import { ProvenanceGauge } from "@/components/mission/ProvenanceGauge";
+import { DecisionDrawer } from "@/components/decision/DecisionDrawer";
+import { useAnalytics } from "@/lib/api/hooks";
+import { useLiveDecisions } from "@/lib/live";
+import type { ResultItem } from "@/lib/api/types";
+
+export default function MissionControlPage() {
+  const analytics = useAnalytics();
+  const { items, newIds } = useLiveDecisions(25);
+  const [selected, setSelected] = useState<ResultItem | null>(null);
+  const a = analytics.data;
+
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Mission Control" description="Automated decisions, live — watch, trust, audit." />
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <MetricCard label="Decisions today" value={a?.images_today ?? "—"} />
+        <MetricCard label="Suspect / fraud" value={a?.suspect_pct ?? "—"} suffix="%" />
+        <MetricCard label="Avg score" value={a?.avg_score ?? "—"} />
+        <MetricCard label="Avg latency" value={a?.avg_processing_ms ?? "—"} suffix="ms" />
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.55fr_1fr]">
+        <Card>
+          <CardHeader title="Live decision stream" subtitle="auto-scored & written to LSQ" />
+          <DecisionStream items={items} newIds={newIds} onSelect={setSelected} />
+        </Card>
+        <div className="space-y-6">
+          <Card>
+            <CardHeader title="Alerts" subtitle="system-level" />
+            <AlertsPanel a={a} />
+          </Card>
+          <Card>
+            <CardHeader title="Decision mix" subtitle="today" />
+            <div className="p-4"><DecisionMixBar dist={a?.band_distribution} /></div>
+          </Card>
+          <Card>
+            <CardHeader title="Provenance coverage" />
+            <div className="p-4">
+              {/* TODO(provenance-engine): replace with real coverage */}
+              <ProvenanceGauge pct={64} />
+            </div>
+          </Card>
+        </div>
+      </div>
+
+      <DecisionDrawer result={selected} onClose={() => setSelected(null)} />
+    </div>
+  );
+}
