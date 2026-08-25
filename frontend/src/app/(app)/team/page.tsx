@@ -45,7 +45,7 @@ function TeamInner() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader title={node} description={`Team scorecard · by ${dim}`} />
       {isLoading || !a ? (
         <CardsSkeleton count={4} className="grid-cols-2 gap-4 md:grid-cols-2 lg:grid-cols-4" />
@@ -56,7 +56,7 @@ function TeamInner() {
           what={`No scored captures for ${node} in range.`}
         />
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-6">
           <KpiRow analytics={a} />
           <div className="grid gap-6 lg:grid-cols-2">
             <CaptureRiskTrend
