@@ -5,7 +5,6 @@ import { X } from "lucide-react";
 import { ScoreRing } from "@/components/verdict/ScoreRing";
 import { VerdictBadge } from "@/components/verdict/VerdictBadge";
 import { ChecksList } from "@/components/verdict/ChecksList";
-import { Button } from "@/components/ui/Button";
 import { provenanceSignal } from "@/lib/provenance";
 import { formatRelative } from "@/lib/utils";
 import type { ResultItem } from "@/lib/api/types";
@@ -45,7 +44,7 @@ export function DecisionDrawer({
           <div
             className={`mb-4 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium ${
               written
-                ? "bg-verdict-clear-bg text-verdict-clear-fg"
+                ? "bg-surface-2 text-text-secondary"
                 : "bg-verdict-unassessed-bg text-verdict-unassessed-fg"
             }`}
           >
@@ -98,8 +97,11 @@ export function DecisionDrawer({
           </section>
 
           <div className="mt-4 flex gap-2">
-            <Link href={`/verdict/${result.id}`} className="flex-1">
-              <Button className="w-full">Open full record</Button>
+            <Link
+              href={`/verdict/${result.id}`}
+              className="flex-1 inline-flex h-10 min-h-[44px] w-full items-center justify-center gap-2 rounded-md px-4 text-body-sm font-medium transition-colors border border-border-strong bg-surface text-text hover:bg-surface-2 disabled:opacity-50 sm:min-h-0"
+            >
+              Open full record
             </Link>
           </div>
           <p className="mt-2 text-center text-[11px] text-text-muted">

@@ -1,5 +1,5 @@
 // frontend/src/components/decision/DecisionDrawer.test.tsx
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { DecisionDrawer } from "./DecisionDrawer";
 import type { ResultItem } from "@/lib/api/types";
