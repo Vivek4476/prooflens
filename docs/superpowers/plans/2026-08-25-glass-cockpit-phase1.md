@@ -166,44 +166,71 @@ git commit -m "feat(engine): deterministic copilot summary generator"
 **Files:**
 - Modify: `src/prooflens/db/models.py` (Result model, ~line 140-169)
 - Create: `src/prooflens/db/migrations/versions/<rev>_add_copilot_summary.py`
-- Modify: `src/prooflens/service/repo.py` (Repo protocol `record_result`, ~line 52) and `src/prooflens/db/repo.py` (`record_result`, ~line 122; `list_results`/`get_result` view mapping)
+- Modify: `src/prooflens/service/repo.py` — BOTH the `Repo` protocol `record_result` (~line 52) AND the `InMemoryRepo.record_result` impl (class at ~line 121; this is what the unit tests use).
+- Modify: `src/prooflens/db/repo.py` — `PostgresRepo.record_result` (~line 122) AND `PostgresRepo._to_view` (the pure static mapper that builds a `ResultView` from a `Result` ORM row).
 - Modify: `src/prooflens/service/views.py` (ResultView + `to_dict`)
 - Modify: `src/prooflens/api/scoring.py` (`score_bytes`, ~line 78-155) and `src/prooflens/service/processor.py` (`process_job`, ~line 67-72)
 - Test: `tests/unit/test_result_summary_persist.py`
 
 **Interfaces:**
 - Consumes: `summarize_decision` (Task 1).
-- Produces: `Result.copilot_summary: str | None`; `record_result(..., copilot_summary: str | None = None)`; `ResultView.to_dict()["copilot_summary"]`.
+- Produces: `Result.copilot_summary: str | None`; `record_result(..., copilot_summary: str | None = None)` on both repos; `ResultView.copilot_summary` surfaced in `to_dict()["copilot_summary"]`.
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Write the failing test** (mirror the real pattern in `tests/unit/test_result_source.py`: `InMemoryRepo` round-trip + `PostgresRepo._to_view` pure mapper — there is NO `repo`/`tenant_id` conftest fixture)
 
 ```python
 # tests/unit/test_result_summary_persist.py
-# Uses the existing in-memory/sqlite repo fixture pattern from tests/conftest.py.
-from prooflens.engine.types import Verdict, CheckOutcome
+from __future__ import annotations
+
+import uuid
+from datetime import UTC, datetime
+
+from prooflens.db.models import Result
+from prooflens.db.repo import PostgresRepo
+from prooflens.engine.scoring_config import ScoringConfig
+from prooflens.engine.types import CheckOutcome, Verdict
+from prooflens.service.repo import InMemoryRepo
+from prooflens.service.views import TenantView
 
 
-def _verdict():
-    return Verdict(score=18, band="Suspect", reason="Reused image", reason_code="recycled",
-                   checks=[CheckOutcome(name="uniqueness", available=True, score=5,
-                                        summary="near-duplicate of 3 prior")],
-                   rubric_version="v3")
+def _repo() -> InMemoryRepo:
+    t = TenantView(id="t1", slug="dev", webhook_secret="s", field_map={}, scoring=ScoringConfig())
+    return InMemoryRepo([t])
 
 
-def test_record_result_persists_copilot_summary(repo, tenant_id):
-    rid = repo.record_result(tenant_id, None, _verdict(), copilot_summary="Scored Suspect because reused.")
-    view = repo.get_result(rid, tenant_id=tenant_id)
+def _verdict() -> Verdict:
+    return Verdict(band="Suspect", score=18.0, reason="Reused image", reason_code="recycled",
+                   rubric_version="v3",
+                   checks=[CheckOutcome(name="uniqueness", available=True, score=5.0,
+                                        summary="near-duplicate of 3 prior", metric=None,
+                                        data={}, latency_ms=1.0)])
+
+
+def test_inmemory_persists_copilot_summary():
+    repo = _repo()
+    rid = repo.record_result("t1", None, _verdict(), copilot_summary="Scored Suspect because reused.")
+    view = repo.get_result(rid, tenant_id="t1")
     assert view is not None
     assert view.to_dict()["copilot_summary"] == "Scored Suspect because reused."
 
 
-def test_copilot_summary_defaults_none(repo, tenant_id):
-    rid = repo.record_result(tenant_id, None, _verdict())
-    view = repo.get_result(rid, tenant_id=tenant_id)
+def test_inmemory_copilot_summary_defaults_none():
+    repo = _repo()
+    rid = repo.record_result("t1", None, _verdict())
+    view = repo.get_result(rid, tenant_id="t1")
     assert view.to_dict()["copilot_summary"] is None
-```
 
-> Note: reuse the `repo` and `tenant_id` fixtures already defined in `tests/conftest.py` (the same ones `tests/integration/test_scoring_api.py` uses). If they are not module-visible, import/replicate them from conftest.
+
+def test_postgres_to_view_reads_stored_summary():
+    row = Result(
+        id=uuid.uuid4(), tenant_id=uuid.uuid4(), job_id=None, rep_id=None, opportunity_id=None,
+        band="Suspect", score=18, reason="Reused image", reason_code="recycled",
+        rubric_version="v3", checks=[], created_at=datetime.now(UTC), source="direct",
+        copilot_summary="Scored Suspect because reused.",
+    )
+    view = PostgresRepo._to_view(row, job=None)
+    assert view.to_dict()["copilot_summary"] == "Scored Suspect because reused."
+```
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -220,27 +247,27 @@ In `src/prooflens/db/models.py`, inside `class Result`, after the `checks` colum
 
 (Confirm `Text` is imported at the top of `models.py`; `Job.last_error` already uses `Text`, so it is.)
 
-- [ ] **Step 3b: Extend the Repo protocol and Postgres impl**
+- [ ] **Step 3b: Extend the protocol + BOTH repo impls**
 
-In `src/prooflens/service/repo.py`, add `copilot_summary: str | None = None` to the `record_result` signature (keyword-only, after `source`).
+In `src/prooflens/service/repo.py`:
+- add `copilot_summary: str | None = None` (keyword-only, after `source`) to the `Repo` protocol's `record_result`.
+- in `InMemoryRepo.record_result`, add the same parameter and store it on the in-memory record so `get_result`/`list_results` return it. (Match how `InMemoryRepo` already stores `source`; whatever object/dict it builds the `ResultView` from must carry `copilot_summary`.)
 
-In `src/prooflens/db/repo.py` `record_result`, add to the `Result(...)` constructor:
+In `src/prooflens/db/repo.py` `PostgresRepo.record_result`, add `copilot_summary: str | None = None` (keyword-only, after `source`) and pass it into the `Result(...)` constructor:
 
 ```python
         copilot_summary=copilot_summary,
 ```
 
-and add `copilot_summary: str | None = None` to its signature (keyword-only, after `source`).
+- [ ] **Step 3c: Expose on the view + both mappers**
 
-- [ ] **Step 3c: Expose on the view**
-
-In `src/prooflens/service/views.py`, add `copilot_summary: str | None` to `ResultView` and include it in `to_dict()`:
+In `src/prooflens/service/views.py`, add `copilot_summary: str | None = None` to `ResultView` and include it in `to_dict()`:
 
 ```python
             "copilot_summary": self.copilot_summary,
 ```
 
-Wherever `db/repo.py` builds a `ResultView` from a `Result` row (in `get_result` and `list_results`), pass `copilot_summary=row.copilot_summary`.
+In `src/prooflens/db/repo.py`, in the `PostgresRepo._to_view` static mapper, pass `copilot_summary=row.copilot_summary` when constructing the `ResultView`. Confirm `InMemoryRepo` likewise passes `copilot_summary` when it builds its `ResultView` (Step 3b).
 
 - [ ] **Step 3d: Generate the migration**
 
