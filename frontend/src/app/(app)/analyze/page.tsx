@@ -2,6 +2,7 @@
 
 import { useMutation } from "@tanstack/react-query";
 import { AlertCircle, RotateCcw, Sparkles } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { ImageUploader } from "@/components/analyze/ImageUploader";
@@ -73,6 +74,14 @@ export default function AnalyzePage() {
       <PageHeader
         title="Analyze a photo"
         description="Score a photo against the live pipeline and see exactly why — band first, then the evidence behind it."
+        actions={
+          <Link
+            href="/present"
+            className="inline-flex h-10 items-center gap-2 rounded-md border border-border-strong bg-surface px-4 text-body-sm font-medium text-text transition-colors hover:bg-surface-2"
+          >
+            Present mode
+          </Link>
+        }
       />
 
       <div className="grid gap-6 lg:grid-cols-2">
