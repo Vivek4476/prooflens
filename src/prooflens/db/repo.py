@@ -154,6 +154,7 @@ class PostgresRepo:
         self, *, tenant_id: str, limit: int = 50, offset: int = 0, band: str | None = None,
         review: str | None = None, reason: str | None = None, rep_id: str | None = None,
         start: datetime | None = None, end: datetime | None = None,
+        dim: str | None = None, node: str | None = None,
     ) -> tuple[list[ResultView], int]:
         from ..service.ids import normalize_id
 
@@ -172,10 +173,24 @@ class PostgresRepo:
             query = query.filter(Result.created_at >= start)
         if end is not None:
             query = query.filter(Result.created_at < end)
-        total = query.count()
-        rows = (
-            query.order_by(Result.created_at.desc()).offset(offset).limit(limit).all()
-        )
+        if dim and node:
+            from ..api.analytics import GROUP_BY_FIELD
+            from ..service.hierarchy import node_match
+            field = GROUP_BY_FIELD.get(dim)
+            all_rows = query.order_by(Result.created_at.desc()).all()
+            if field and field != "agent":
+                hier = self.get_hierarchy_rows(tenant_id)
+                all_rows = [
+                    r for r in all_rows
+                    if node_match(hier, r.rep_id, r.created_at.date(), field, node)
+                ]
+            total = len(all_rows)
+            rows = all_rows[offset : offset + limit]
+        else:
+            total = query.count()
+            rows = (
+                query.order_by(Result.created_at.desc()).offset(offset).limit(limit).all()
+            )
         # Pull the trail (rep/opportunity) from the originating job when present.
         job_ids = [r.job_id for r in rows if r.job_id is not None]
         jobs = (

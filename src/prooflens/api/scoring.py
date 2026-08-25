@@ -183,9 +183,14 @@ def list_results(
     rep_id: str | None = Query(None),
     from_: str | None = Query(None, alias="from"),
     to: str | None = Query(None, alias="to"),
+    dim: str | None = Query(None),
+    node: str | None = Query(None),
     repo: Repo = Depends(get_repo),
     tenant: TenantView = Depends(require_tenant),
 ) -> dict:
+    from .analytics import GROUP_BY_FIELD
+    if dim is not None and (dim not in GROUP_BY_FIELD or dim == "agent"):
+        raise HTTPException(status_code=400, detail=f"invalid dim: {dim}")
     # from/to only constrain the range when provided; absent => no date filter
     # (preserves the existing unfiltered default).
     start = end = None
@@ -196,7 +201,7 @@ def list_results(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
     items, total = repo.list_results(
         tenant_id=tenant.id, limit=limit, offset=offset, band=band, review=review,
-        reason=reason, rep_id=rep_id, start=start, end=end,
+        reason=reason, rep_id=rep_id, start=start, end=end, dim=dim, node=node,
     )
     return {
         "items": [r.to_dict() for r in items],
@@ -244,8 +249,13 @@ def analytics_summary(
     group_by: Literal[
         "none", "zone", "srsm", "rsm", "sm", "branch", "city", "agent"
     ] = Query(default="none"),
+    dim: str | None = Query(default=None),
+    node: str | None = Query(default=None),
     tenant: TenantView = Depends(require_tenant),
 ) -> dict:
+    from .analytics import GROUP_BY_FIELD
+    if dim is not None and (dim not in GROUP_BY_FIELD or dim == "agent"):
+        raise HTTPException(status_code=400, detail=f"invalid dim: {dim}")
     # `from`/`to` are aliases of start_date/end_date; the explicit ones win if both given.
     start_arg = start_date if start_date is not None else from_
     end_arg = end_date if end_date is not None else to
@@ -255,7 +265,7 @@ def analytics_summary(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     items, total = repo.list_results(
-        limit=5000, offset=0, start=start, end=end, tenant_id=tenant.id
+        limit=5000, offset=0, start=start, end=end, tenant_id=tenant.id, dim=dim, node=node,
     )
 
     bands = Counter(r.band for r in items)
@@ -281,7 +291,8 @@ def analytics_summary(
         prev_start_date.year, prev_start_date.month, prev_start_date.day, tzinfo=UTC
     )
     prev_items, _ = repo.list_results(
-        limit=5000, offset=0, start=prev_start, end=prev_end, tenant_id=tenant.id
+        limit=5000, offset=0, start=prev_start, end=prev_end, tenant_id=tenant.id,
+        dim=dim, node=node,
     )
 
     rows = repo.get_hierarchy_rows(tenant.id)

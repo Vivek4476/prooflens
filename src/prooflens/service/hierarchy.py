@@ -36,6 +36,16 @@ def resolve_node(rows: list[dict], agent_id: str | None, scored_date: date) -> d
     return best
 
 
+def node_match(
+    rows: list[dict], rep_id: str | None, scored_date: date, dim_field: str, node: str
+) -> bool:
+    """True if rep_id's effective hierarchy row at scored_date has dim_field == node."""
+    resolved = resolve_node(rows, rep_id, scored_date)
+    if resolved is None:
+        return False
+    return resolved.get(dim_field) == node
+
+
 def agent_display_name(rows: list[dict], rep_id: str | None) -> str:
     """The DSE's display name for `rep_id`: the hierarchy's `agent_name` when any
     row for this agent carries one (across all effective-dated versions, newest

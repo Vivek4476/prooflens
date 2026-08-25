@@ -69,11 +69,14 @@ class Repo(Protocol):
         self, *, tenant_id: str, limit: int = 50, offset: int = 0, band: str | None = None,
         review: str | None = None, reason: str | None = None, rep_id: str | None = None,
         start: datetime | None = None, end: datetime | None = None,
+        dim: str | None = None, node: str | None = None,
     ) -> tuple[list[ResultView], int]:
         """Newest-first page of results + total matching count, scoped to tenant_id.
         review="pending" => undecided only; other value => exact review_status match.
         reason filters exact reason_code; rep_id filters normalized-exact rep_id.
-        start/end are a half-open range: created_at >= start AND created_at < end."""
+        start/end are a half-open range: created_at >= start AND created_at < end.
+        dim+node restrict to results whose rep maps to that hierarchy node at the
+        result's scored date (effective-dated)."""
         ...
 
     def get_result(self, result_id: str, *, tenant_id: str) -> ResultView | None:
@@ -233,6 +236,7 @@ class InMemoryRepo:
         self, *, tenant_id: str, limit: int = 50, offset: int = 0, band: str | None = None,
         review: str | None = None, reason: str | None = None, rep_id: str | None = None,
         start: datetime | None = None, end: datetime | None = None,
+        dim: str | None = None, node: str | None = None,
     ) -> tuple[list[ResultView], int]:
         rows = [r for r in self.results if r.tenant_id == tenant_id]
         rows = [r for r in rows if band is None or r.band == band]
@@ -255,6 +259,20 @@ class InMemoryRepo:
                 r for r in rows
                 if r.created_at and datetime.fromisoformat(r.created_at) < end
             ]
+        if dim and node:
+            from ..api.analytics import GROUP_BY_FIELD
+            from .hierarchy import node_match
+            field = GROUP_BY_FIELD.get(dim)
+            if field and field != "agent":
+                hier = self._hierarchy.get(tenant_id, [])
+                rows = [
+                    r for r in rows
+                    if node_match(
+                        hier, r.rep_id,
+                        datetime.fromisoformat(r.created_at).date(),
+                        field, node,
+                    )
+                ]
         rows = list(reversed(rows))  # newest first
         return rows[offset : offset + limit], len(rows)
 
