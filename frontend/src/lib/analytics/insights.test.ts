@@ -156,47 +156,15 @@ describe("computeInsights — dominantReason rule", () => {
   });
 });
 
-describe("computeInsights — avgScoreShift rule", () => {
-  it("does not fire when previous.total=29 regardless of diff (small-sample guard)", () => {
-    const a = makeSummary({
-      avg_score: 90,
-      previous: { clear: 20, doubtful: 5, suspect: 4, unassessed: 0, total: 29, avg_score: 50 },
-    });
-    const insights = computeInsights(a, null);
-    expect(insights.find((i) => i.id === "avg-score-shift")).toBeUndefined();
-  });
-
-  it("fires when previous.total=30 and diff=5.0 (boundary inclusive)", () => {
-    const a = makeSummary({
-      avg_score: 80,
-      previous: { clear: 20, doubtful: 5, suspect: 5, unassessed: 0, total: 30, avg_score: 75 },
-    });
-    const insights = computeInsights(a, null);
-    const hit = insights.find((i) => i.id === "avg-score-shift");
-    expect(hit).toBeDefined();
-    expect(hit?.severity).toBe("info");
-    expect(hit?.text).toContain("improved");
-  });
-
-  it("does not fire when previous.total=30 and diff=4.9", () => {
-    const a = makeSummary({
-      avg_score: 79.9,
-      previous: { clear: 20, doubtful: 5, suspect: 5, unassessed: 0, total: 30, avg_score: 75 },
-    });
-    const insights = computeInsights(a, null);
-    expect(insights.find((i) => i.id === "avg-score-shift")).toBeUndefined();
-  });
-
-  it("fires with warn severity and 'dropped' wording when avg score falls by >= 5 pts", () => {
+describe("computeInsights — avgScoreShift rule (removed)", () => {
+  it("never emits avg-score-shift insight (rule has been deleted)", () => {
+    // avgScoreShift was removed from computeInsights; avg_score no longer surfaces here.
     const a = makeSummary({
       avg_score: 65,
       previous: { clear: 20, doubtful: 5, suspect: 5, unassessed: 0, total: 30, avg_score: 75 },
     });
     const insights = computeInsights(a, null);
-    const hit = insights.find((i) => i.id === "avg-score-shift");
-    expect(hit).toBeDefined();
-    expect(hit?.severity).toBe("warn");
-    expect(hit?.text).toContain("dropped");
+    expect(insights.find((i) => i.id === "avg-score-shift")).toBeUndefined();
   });
 });
 
@@ -289,7 +257,7 @@ describe("computeInsights — fallback, ordering, and cap", () => {
       band_distribution: { Clear: 60, Doubtful: 20, Suspect: 20, Unassessed: 0 },
       avg_score: 60,
       duplicates_caught: 5,
-      previous: { clear: 80, doubtful: 12, suspect: 8, unassessed: 0, total: 100, avg_score: 75 }, // avg-score-shift: falling -> warn
+      previous: { clear: 80, doubtful: 12, suspect: 8, unassessed: 0, total: 100, avg_score: 75 },
       top_reasons: [
         // dominant-reason -> warn
         reason({ reason_code: "blur", short_label: "Blurry", count: 30 }),
@@ -364,14 +332,13 @@ describe("computeInsights — drill-down href", () => {
     expect(hit?.href).toBe("/history?reason=recycled&from=2026-06-09&to=2026-07-08");
   });
 
-  it("avg-score-shift has no href — /v1/results has no avg-score filter to honour", () => {
+  it("avg-score-shift insight is never emitted (rule deleted — no avg-score filter in /v1/results)", () => {
     const a = makeSummary({
       avg_score: 65,
       previous: { clear: 20, doubtful: 5, suspect: 5, unassessed: 0, total: 30, avg_score: 75 },
     });
     const hit = computeInsights(a, null).find((i) => i.id === "avg-score-shift");
-    expect(hit).toBeDefined();
-    expect(hit?.href).toBeUndefined();
+    expect(hit).toBeUndefined();
   });
 });
 

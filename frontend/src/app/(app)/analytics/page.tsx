@@ -112,11 +112,7 @@ function AnalyticsPageInner() {
         >
           {/* Main column: KPIs → charts → reasons/teams (Pain 7 order). */}
           <div className="space-y-8">
-            <KpiRow
-              analytics={a}
-              prevDuplicatesCaught={prevDuplicatesCaught}
-              prevDuplicatesUnavailable={prevDuplicatesUnavailable}
-            />
+            <KpiRow analytics={a} />
             {/* Two quiet system-health signals under the KPIs (Pain 9). */}
             {a.system_health && <SystemHealthLine health={a.system_health} />}
             {/* Below xl the insights rail is a full-width block directly after the KPIs. */}
