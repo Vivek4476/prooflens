@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { ImageUploader } from "@/components/analyze/ImageUploader";
 import { Button } from "@/components/ui/Button";
@@ -17,8 +17,19 @@ export default function PresentPage() {
   const [preview, setPreview] = useState<string | null>(null);
   const mutation = useMutation({ mutationFn: (f: File) => api.score(f) });
 
+  // Object URL lifecycle for the preview.
+  useEffect(() => {
+    if (!file) {
+      setPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
   function pick(f: File) {
-    setFile(f); setPreview(URL.createObjectURL(f));
+    setFile(f);
   }
   async function scoreSample(src: string) {
     const blob = await (await fetch(src)).blob();
