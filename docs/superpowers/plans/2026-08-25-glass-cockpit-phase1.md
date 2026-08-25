@@ -999,41 +999,41 @@ git commit -m "feat(fe): Mission Control page — live stream, KPIs, alerts, mix
 
 **Files:**
 - Create: `frontend/src/app/(app)/ledger/page.tsx`
-- Test: covered by build/tsc + reuse of already-tested `ResultsTable`.
+- Test: covered by tsc + build; reuses the already-tested `ResultsTable`.
 
 **Interfaces:**
-- Consumes: `useResults`, `ResultsTable` (`components/history/ResultsTable`), `DecisionDrawer`, `PageHeader`, `Card`, `EmptyState`, `TableSkeleton`, `BAND_META`.
-- Produces: `LedgerPage` default export — filterable, immutable record; row click opens the same read-only drawer.
+- Consumes: `useResults`, `ResultsTable` (`components/history/ResultsTable` — its rows ALREADY navigate to `/verdict/{id}` via an internal `onClick`), `PageHeader`, `Card`, `EmptyState`, `TableSkeleton`.
+- Produces: `LedgerPage` default export — a filterable, immutable record. Selecting a row opens its full `/verdict/{id}` record via ResultsTable's EXISTING navigation. **No drawer here** — the drawer is Mission Control's quick-peek; the Ledger goes deep to the full record. `ResultsTable` is reused **UNMODIFIED** (do not add `data-result-id`, do not wrap in `onClickCapture` — that would fight the row's own `onClick`).
 
-- [ ] **Step 1: Implement the page (reuses the tested `ResultsTable` + `useResults`)**
+- [ ] **Step 1: Implement the page (reuses `ResultsTable`'s built-in row navigation + `useResults`)**
 
 ```tsx
 // frontend/src/app/(app)/ledger/page.tsx
 "use client";
 
 import { useState } from "react";
+import { FileSearch } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { TableSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ResultsTable } from "@/components/history/ResultsTable";
-import { DecisionDrawer } from "@/components/decision/DecisionDrawer";
 import { useResults } from "@/lib/api/hooks";
 import type { Band } from "@/lib/api/types";
-import type { ResultItem } from "@/lib/api/types";
-import { FileSearch } from "lucide-react";
 
 const BANDS: (Band | "all")[] = ["all", "Suspect", "Doubtful", "Clear", "Unassessed"];
 
 export default function LedgerPage() {
   const [band, setBand] = useState<Band | "all">("all");
-  const [selected, setSelected] = useState<ResultItem | null>(null);
   const q = useResults({ limit: 100, band: band === "all" ? undefined : band });
   const items = q.data?.items ?? [];
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Audit Ledger" description="Every automated decision, immutable and searchable." />
+      <PageHeader
+        title="Audit Ledger"
+        description="Every automated decision, immutable and searchable. Select a row to open its full record."
+      />
 
       <div className="flex gap-2">
         {BANDS.map((b) => (
@@ -1053,24 +1053,15 @@ export default function LedgerPage() {
         ) : items.length === 0 ? (
           <EmptyState icon={FileSearch} title="No decisions" what="No decisions match this filter yet." />
         ) : (
-          <div onClickCapture={(e) => {
-            const row = (e.target as HTMLElement).closest("[data-result-id]");
-            const id = row?.getAttribute("data-result-id");
-            const hit = items.find((x) => x.id === id);
-            if (hit) setSelected(hit);
-          }}>
-            <ResultsTable items={items} />
-          </div>
+          <ResultsTable items={items} />
         )}
       </Card>
-
-      <DecisionDrawer result={selected} onClose={() => setSelected(null)} />
     </div>
   );
 }
 ```
 
-> `ResultsTable` must expose `data-result-id` on each row for the click-capture to resolve. If it does not, add `data-result-id={item.id}` to its row element (`components/history/ResultsTable.tsx`) — a one-line, backward-compatible change — and note it in the commit.
+> `ResultsTable` rows already carry their own `onClick` navigation to `/verdict/{id}`, so the Ledger reuses it as-is. Do NOT add a drawer or modify `ResultsTable`.
 
 - [ ] **Step 2: Typecheck + build**
 
@@ -1080,8 +1071,8 @@ Run: `npm run build` → succeeds, route `/ledger` present
 - [ ] **Step 3: Commit**
 
 ```bash
-git add frontend/src/app/(app)/ledger/ frontend/src/components/history/ResultsTable.tsx
-git commit -m "feat(fe): Audit Ledger page over /v1/results with read-only drawer"
+git add frontend/src/app/(app)/ledger/
+git commit -m "feat(fe): Audit Ledger page over /v1/results (reuses ResultsTable navigation)"
 ```
 
 ---
