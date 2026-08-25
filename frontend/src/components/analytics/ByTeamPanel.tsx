@@ -50,6 +50,8 @@ export function ByTeamPanel({ startDate, endDate }: { startDate?: string; endDat
   function onRowSelect(g: AnalyticsGroup) {
     if (dimension === "agent" && g.agent_id) {
       router.push(`/dse?agent=${encodeURIComponent(g.agent_id)}`);
+    } else if (dimension !== "agent") {
+      router.push(`/team?dim=${encodeURIComponent(dimension)}&node=${encodeURIComponent(g.node)}`);
     }
   }
 
