@@ -177,13 +177,14 @@ class PostgresRepo:
             from ..api.analytics import GROUP_BY_FIELD
             from ..service.hierarchy import node_match
             field = GROUP_BY_FIELD.get(dim)
+            if field is None or field == "agent":
+                return [], 0
             all_rows = query.order_by(Result.created_at.desc()).all()
-            if field and field != "agent":
-                hier = self.get_hierarchy_rows(tenant_id)
-                all_rows = [
-                    r for r in all_rows
-                    if node_match(hier, r.rep_id, r.created_at.date(), field, node)
-                ]
+            hier = self.get_hierarchy_rows(tenant_id)
+            all_rows = [
+                r for r in all_rows
+                if node_match(hier, r.rep_id, r.created_at.date(), field, node)
+            ]
             total = len(all_rows)
             rows = all_rows[offset : offset + limit]
         else:

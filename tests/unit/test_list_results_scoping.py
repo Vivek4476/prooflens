@@ -100,6 +100,21 @@ def test_node_match_false_for_unmapped_rep() -> None:
     assert node_match(_hier_rows(), "GHOST", datetime.now(UTC).date(), "branch", "North") is False
 
 
+def test_node_match_is_effective_dated_across_team_change() -> None:
+    today = datetime.now(UTC).date()
+    rows = [
+        {"agent_id": "A1", "sm": "SM-North", "rsm": None, "srsm": None, "zonal_head": None,
+         "branch": None, "city": None, "valid_from": today - timedelta(days=60)},
+        {"agent_id": "A1", "sm": "SM-South", "rsm": None, "srsm": None, "zonal_head": None,
+         "branch": None, "city": None, "valid_from": today - timedelta(days=5)},
+    ]
+    scored_30d_ago = today - timedelta(days=30)   # rep was still in SM-North then
+    assert node_match(rows, "A1", scored_30d_ago, "sm", "SM-North") is True
+    assert node_match(rows, "A1", scored_30d_ago, "sm", "SM-South") is False
+    scored_today = today                          # rep is now in SM-South
+    assert node_match(rows, "A1", scored_today, "sm", "SM-South") is True
+
+
 # ---------------------------------------------------------------------------
 # InMemoryRepo.list_results dim+node filter tests
 # ---------------------------------------------------------------------------

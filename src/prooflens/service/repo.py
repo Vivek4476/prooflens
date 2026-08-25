@@ -263,16 +263,17 @@ class InMemoryRepo:
             from ..api.analytics import GROUP_BY_FIELD
             from .hierarchy import node_match
             field = GROUP_BY_FIELD.get(dim)
-            if field and field != "agent":
-                hier = self._hierarchy.get(tenant_id, [])
-                rows = [
-                    r for r in rows
-                    if node_match(
-                        hier, r.rep_id,
-                        datetime.fromisoformat(r.created_at).date(),
-                        field, node,
-                    )
-                ]
+            if field is None or field == "agent":
+                return [], 0
+            hier = self._hierarchy.get(tenant_id, [])
+            rows = [
+                r for r in rows
+                if r.created_at and node_match(
+                    hier, r.rep_id,
+                    datetime.fromisoformat(r.created_at).date(),
+                    field, node,
+                )
+            ]
         rows = list(reversed(rows))  # newest first
         return rows[offset : offset + limit], len(rows)
 
