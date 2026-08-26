@@ -68,21 +68,6 @@ function dominantReason(a: AnalyticsSummary): Insight | null {
   };
 }
 
-/** Rule 3: avg-score delta >= 5 pts AND previous-period n >= 30. */
-function avgScoreShift(a: AnalyticsSummary): Insight | null {
-  if (a.previous.total < 30) return null;
-  const diff = a.avg_score - a.previous.avg_score;
-  if (Math.abs(diff) < 5) return null;
-  const rising = diff > 0;
-  return {
-    id: "avg-score-shift",
-    severity: rising ? "info" : "warn",
-    text: rising
-      ? `Average score improved ${diff.toFixed(1)} pts vs the previous period.`
-      : `Average score dropped ${Math.abs(diff).toFixed(1)} pts vs the previous period.`,
-  };
-}
-
 /**
  * Rule 4: duplicates_caught relative delta >= 20% (needs previous.duplicates_caught —
  * passed in explicitly since it isn't on `previous`). `prevN` is the same
@@ -119,7 +104,6 @@ export function computeInsights(
   const candidates = [
     suspectRateShift(a),
     dominantReason(a),
-    avgScoreShift(a),
     prevDuplicatesCaught == null
       ? null
       : duplicatesShift(a.duplicates_caught, prevDuplicatesCaught, a.previous.total, a.period),

@@ -12,6 +12,8 @@ import { CardsSkeleton, TableSkeleton } from "@/components/ui/Skeleton";
 import { ResultsTable } from "@/components/history/ResultsTable";
 import { useAnalytics, useResults } from "@/lib/api/hooks";
 import { formatMs } from "@/lib/utils";
+import { formatPct } from "@/lib/format";
+import { bandRate } from "@/lib/analytics/bandRates";
 
 export default function DashboardPage() {
   const analytics = useAnalytics();
@@ -53,7 +55,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
               <MetricCard label="Images today" value={a.images_today} />
               <MetricCard label="Suspect %" value={a.suspect_pct} suffix="%" accent sub="of all verdicts" />
-              <MetricCard label="Avg score" value={a.avg_score} suffix="/100" />
+              <MetricCard label="Unassessed" value={formatPct(bandRate(a.band_distribution, a.total, "Unassessed"))} />
               <MetricCard label="Avg processing" value={formatMs(a.avg_processing_ms)} />
               <MetricCard label="Duplicates caught" value={a.duplicates_caught} className="col-span-2 md:col-span-1" />
             </div>

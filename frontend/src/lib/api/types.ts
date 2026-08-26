@@ -170,6 +170,8 @@ export interface AnalyticsParams {
   end_date?: string; // YYYY-MM-DD
   bucket?: Bucket;
   group_by?: GroupBy;
+  dim?: string;
+  node?: string;
 }
 
 export interface ScoringConfig {

@@ -118,7 +118,7 @@ function DsePageInner() {
                 </p>
               )}
 
-              <DseKpiRow total={data.total} suspectRate={data.suspect_rate} avgScore={data.avg_score} />
+              <DseKpiRow total={data.total} suspectRate={data.suspect_rate} bandDistribution={data.band_distribution} />
 
               <div className="grid gap-6 lg:grid-cols-2">
                 <DseSuspectTrend trend={data.trend} />

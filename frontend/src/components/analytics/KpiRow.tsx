@@ -1,46 +1,36 @@
 "use client";
 import { MetricCard } from "@/components/ui/MetricCard";
-import { formatCount, formatPct, formatScore } from "@/lib/format";
+import { formatCount, formatPct } from "@/lib/format";
 import { computeDelta } from "@/lib/analytics/deltas";
+import { bandRate } from "@/lib/analytics/bandRates";
 import type { AnalyticsSummary } from "@/lib/api/types";
 
-// `prevDuplicatesCaught` sourcing (wired in Task 9): the page-level component runs a
-// SECOND `useAnalytics({ start_date: previous_period.from, end_date: previous_period.to,
-// bucket: "daily" })` query (previous_period bounds come from this same `analytics`
-// response) and passes its `.data?.duplicates_caught ?? null` down to both `KpiRow` and
-// `InsightsPanel` — the primary AnalyticsSummary has no server-side
-// `previous.duplicates_caught` field, so this is the only way to get a comparable prior
-// value. That params object must be memoized (useMemo) like the primary query's, or the
-// 300ms debounce in `useAnalytics` never settles (see Task 3/4 carry-forward note).
-export function KpiRow({
-  analytics,
-  prevDuplicatesCaught,
-  prevDuplicatesUnavailable = false,
-}: {
-  analytics: AnalyticsSummary;
-  prevDuplicatesCaught: number | null;
-  prevDuplicatesUnavailable?: boolean;
-}) {
+export function KpiRow({ analytics }: { analytics: AnalyticsSummary }) {
   const a = analytics;
+
   const totalDelta = computeDelta(a.total, a.previous.total, a.previous.total, {
     higherIsBad: false,
     unit: "count",
   });
+
   const suspectRateDelta = computeDelta(a.suspect_pct, ratePct(a.previous), a.previous.total, {
     higherIsBad: true,
     unit: "pts",
   });
-  const avgScoreDelta = computeDelta(a.avg_score, a.previous.avg_score, a.previous.total, {
-    higherIsBad: false,
-    unit: "pts",
-  });
-  const dupDelta =
-    prevDuplicatesCaught == null
-      ? null
-      : computeDelta(a.duplicates_caught, prevDuplicatesCaught, a.previous.total, {
-          higherIsBad: true,
-          unit: "count",
-        });
+
+  const doubtfulRateDelta = computeDelta(
+    bandRate(a.band_distribution, a.total, "Doubtful"),
+    a.previous.total ? (a.previous.doubtful / a.previous.total) * 100 : 0,
+    a.previous.total,
+    { higherIsBad: true, unit: "pts" },
+  );
+
+  const unassessedRateDelta = computeDelta(
+    bandRate(a.band_distribution, a.total, "Unassessed"),
+    a.previous.total ? (a.previous.unassessed / a.previous.total) * 100 : 0,
+    a.previous.total,
+    { higherIsBad: true, unit: "pts" },
+  );
 
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -58,23 +48,16 @@ export function KpiRow({
         accent
       />
       <MetricCard
-        label="Avg score"
-        value={formatScore(a.avg_score)}
-        suffix="/ 100"
-        sub={deltaSub(avgScoreDelta)}
-        subDirection={avgScoreDelta.direction}
+        label="Doubtful rate"
+        value={formatPct(bandRate(a.band_distribution, a.total, "Doubtful"))}
+        sub={deltaSub(doubtfulRateDelta)}
+        subDirection={doubtfulRateDelta.direction}
       />
       <MetricCard
-        label="Duplicates caught"
-        value={formatCount(a.duplicates_caught)}
-        sub={
-          dupDelta
-            ? deltaSub(dupDelta)
-            : prevDuplicatesUnavailable
-              ? "Comparison unavailable"
-              : "Loading previous period…"
-        }
-        subDirection={dupDelta ? dupDelta.direction : undefined}
+        label="Unassessed rate"
+        value={formatPct(bandRate(a.band_distribution, a.total, "Unassessed"))}
+        sub={deltaSub(unassessedRateDelta)}
+        subDirection={unassessedRateDelta.direction}
       />
     </div>
   );

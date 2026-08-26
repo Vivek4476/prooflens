@@ -23,7 +23,7 @@ describe("bucketsToCsv", () => {
   it("emits a header row plus one row per bucket", () => {
     const csv = bucketsToCsv([bucket({}), bucket({ bucket_label: "Week 2" })]);
     const lines = csv.trimEnd().split("\n");
-    expect(lines[0]).toBe("bucket,start,end,clear,doubtful,suspect,total,avg_score,suspect_rate_pct,incomplete");
+    expect(lines[0]).toBe("bucket,start,end,clear,doubtful,suspect,total,suspect_rate_pct,incomplete");
     expect(lines).toHaveLength(3);
   });
 
@@ -51,7 +51,7 @@ describe("bucketsToCsv", () => {
 
   it("ends with a trailing newline and handles an empty series", () => {
     expect(bucketsToCsv([])).toBe(
-      "bucket,start,end,clear,doubtful,suspect,total,avg_score,suspect_rate_pct,incomplete\n",
+      "bucket,start,end,clear,doubtful,suspect,total,suspect_rate_pct,incomplete\n",
     );
   });
 });

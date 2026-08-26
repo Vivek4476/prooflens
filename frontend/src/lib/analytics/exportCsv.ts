@@ -22,7 +22,6 @@ const HEADERS = [
   "doubtful",
   "suspect",
   "total",
-  "avg_score",
   "suspect_rate_pct",
   "incomplete",
 ] as const;
@@ -47,7 +46,6 @@ export function bucketsToCsv(buckets: AnalyticsBucket[]): string {
       b.doubtful,
       b.suspect,
       b.total,
-      b.avg_score,
       suspectRatePct(b),
       b.incomplete,
     ]),
@@ -81,7 +79,6 @@ export function analyticsToCsv(a: AnalyticsSummary): string {
   lines.push(csvRow(["Summary metric", "value"]));
   lines.push(csvRow(["Total scored", a.total]));
   lines.push(csvRow(["Suspect rate (%)", a.suspect_pct]));
-  lines.push(csvRow(["Avg score", a.avg_score]));
   lines.push(csvRow(["Duplicates caught", a.duplicates_caught]));
   if (a.system_health) {
     lines.push(csvRow(["Scored without content check (%)", a.system_health.scored_without_content_pct ?? ""]));
@@ -102,7 +99,6 @@ export function analyticsToCsv(a: AnalyticsSummary): string {
         b.doubtful,
         b.suspect,
         b.total,
-        b.avg_score,
         suspectRatePct(b),
         b.incomplete,
       ]),

@@ -27,7 +27,7 @@ import { cn } from "@/lib/utils";
  *  fallback (before useSearchParams resolves) and the first-load state below. */
 function AnalyticsSkeleton() {
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <Skeleton className="h-24 w-full" />
       {/* grid matches KpiRow exactly (grid-cols-2 lg:grid-cols-4, no md: step) so the
           loading state doesn't reflow once real data replaces the skeleton. */}
@@ -66,7 +66,7 @@ function AnalyticsPageInner() {
   const prevDuplicatesUnavailable = prevEnabled && prevIsError;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
         title="Analytics"
         description="Is capture risk trending up, and where should you look?"
@@ -111,12 +111,8 @@ function AnalyticsPageInner() {
           )}
         >
           {/* Main column: KPIs → charts → reasons/teams (Pain 7 order). */}
-          <div className="space-y-8">
-            <KpiRow
-              analytics={a}
-              prevDuplicatesCaught={prevDuplicatesCaught}
-              prevDuplicatesUnavailable={prevDuplicatesUnavailable}
-            />
+          <div className="space-y-6">
+            <KpiRow analytics={a} />
             {/* Two quiet system-health signals under the KPIs (Pain 9). */}
             {a.system_health && <SystemHealthLine health={a.system_health} />}
             {/* Below xl the insights rail is a full-width block directly after the KPIs. */}
