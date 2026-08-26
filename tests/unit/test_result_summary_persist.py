@@ -26,7 +26,9 @@ def _verdict() -> Verdict:
 
 def test_inmemory_persists_copilot_summary():
     repo = _repo()
-    rid = repo.record_result("t1", None, _verdict(), copilot_summary="Scored Suspect because reused.")
+    rid = repo.record_result(
+        "t1", None, _verdict(), copilot_summary="Scored Suspect because reused."
+    )
     view = repo.get_result(rid, tenant_id="t1")
     assert view is not None
     assert view.to_dict()["copilot_summary"] == "Scored Suspect because reused."
