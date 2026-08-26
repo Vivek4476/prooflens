@@ -3,6 +3,6 @@
 export const CHART_THEME = {
   grid: "var(--border)",
   axis: "var(--text-muted)",
-  series: ["var(--accent)", "var(--brand-gold)", "var(--text-secondary)"],
+  series: ["var(--accent)", "var(--accent-hover)", "var(--text-secondary)"],
   areaFill: (color: string) => `color-mix(in srgb, ${color} 14%, transparent)`,
 };

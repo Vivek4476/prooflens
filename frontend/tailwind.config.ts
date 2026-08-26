@@ -72,7 +72,6 @@ const config: Config = {
         h2: ["1.0625rem", { lineHeight: "1.4rem", fontWeight: "600" }],
         body: ["0.9375rem", { lineHeight: "1.4rem" }],
         "body-sm": ["0.8125rem", { lineHeight: "1.2rem" }],
-        label: ["0.6875rem", { lineHeight: "1rem", letterSpacing: "0.08em", fontWeight: "600" }],
         caption: ["0.75rem", { lineHeight: "1rem", letterSpacing: "0.01em" }],
       },
       transitionDuration: { DEFAULT: "180ms" },
