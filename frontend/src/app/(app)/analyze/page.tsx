@@ -95,7 +95,7 @@ export default function AnalyzePage() {
             disabled={mutation.isPending}
           />
           <p className="flex items-center gap-1.5 text-caption text-text-muted">
-            <Sparkles size={13} className="text-brand-crimson" />
+            <Sparkles size={13} className="text-accent" />
             Scored by Live AI — a real vision model.
           </p>
           <div className="flex items-center gap-3">

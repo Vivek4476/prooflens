@@ -85,7 +85,7 @@ export function ImageUploader({
       }}
       className={cn(
         "flex min-h-[300px] cursor-pointer flex-col items-center justify-center gap-3 rounded-[var(--radius)] border-2 border-dashed bg-surface px-6 py-12 text-center transition-colors",
-        dragging ? "border-brand-crimson bg-surface-2" : "border-border-strong hover:bg-surface-2",
+        dragging ? "border-accent bg-surface-2" : "border-border-strong hover:bg-surface-2",
       )}
     >
       <div className="grid h-14 w-14 place-items-center rounded-full bg-surface-2 text-text-secondary">

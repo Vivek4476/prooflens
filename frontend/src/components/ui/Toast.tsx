@@ -82,7 +82,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                         t.action?.onClick();
                         setToasts((prev) => prev.filter((x) => x.id !== t.id));
                       }}
-                      className="mt-1.5 text-body-sm font-medium text-brand-crimson"
+                      className="mt-1.5 text-body-sm font-medium text-accent"
                     >
                       {t.action.label}
                     </button>

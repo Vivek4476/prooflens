@@ -2,8 +2,7 @@
 
 import { useReducedMotion } from "framer-motion";
 import { VerdictBadge } from "@/components/verdict/VerdictBadge";
-import { formatRelative } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+import { cn, formatRelative } from "@/lib/utils";
 import type { ResultItem } from "@/lib/api/types";
 
 export function DecisionStream({

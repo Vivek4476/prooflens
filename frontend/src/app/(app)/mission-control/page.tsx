@@ -28,7 +28,7 @@ export default function MissionControlPage() {
         title="Mission Control"
         description="Automated decisions, live — watch, trust, audit."
         actions={
-          <span className="flex items-center gap-2 text-[12px] text-text-secondary">
+          <span className="flex items-center gap-2 text-caption text-text-secondary">
             <span
               className="inline-block h-2 w-2 rounded-full bg-verdict-clear animate-pulse-dot"
               style={{ ["--pulse-color" as string]: "rgba(31,157,87,0.5)" }}
