@@ -24,7 +24,20 @@ export default function MissionControlPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Mission Control" description="Automated decisions, live — watch, trust, audit." />
+      <PageHeader
+        title="Mission Control"
+        description="Automated decisions, live — watch, trust, audit."
+        actions={
+          <span className="flex items-center gap-2 text-[12px] text-text-secondary">
+            <span
+              className="inline-block h-2 w-2 rounded-full bg-verdict-clear animate-pulse-dot"
+              style={{ ["--pulse-color" as string]: "rgba(31,157,87,0.5)" }}
+              aria-hidden
+            />
+            Live
+          </span>
+        }
+      />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <MetricCard label="Decisions today" value={a?.images_today ?? "—"} />
@@ -34,21 +47,21 @@ export default function MissionControlPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.55fr_1fr]">
-        <Card>
-          <CardHeader title="Live decision stream" subtitle="auto-scored & written to LSQ" />
+        <Card glow>
+          <CardHeader serif title="Live decision stream" subtitle="auto-scored & written to LSQ" />
           <DecisionStream items={items} newIds={newIds} onSelect={setSelected} />
         </Card>
         <div className="space-y-6">
           <Card>
-            <CardHeader title="Alerts" subtitle="system-level" />
+            <CardHeader serif title="Alerts" subtitle="system-level" />
             <AlertsPanel a={a} />
           </Card>
           <Card>
-            <CardHeader title="Decision mix" subtitle="today" />
+            <CardHeader serif title="Decision mix" subtitle="today" />
             <div className="p-4"><DecisionMixBar dist={a?.band_distribution} /></div>
           </Card>
           <Card>
-            <CardHeader title="Provenance coverage" />
+            <CardHeader serif title="Provenance coverage" />
             <div className="p-4">
               {/* TODO(provenance-engine): replace with real coverage */}
               <ProvenanceGauge pct={64} />
