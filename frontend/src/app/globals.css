@@ -42,6 +42,24 @@
     border-radius: var(--radius);
     box-shadow: var(--shadow-1);
   }
+  /* Cockpit Noir: cards become glass — inset top-highlight over deeper ground */
+  .dark .card {
+    box-shadow: var(--shadow-2), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+  /* Opt-in emphasis surface (flagship panels): faint indigo bloom in dark */
+  .card-glow {
+    box-shadow: var(--shadow-2);
+  }
+  .dark .card-glow {
+    box-shadow: var(--shadow-3), 0 0 40px -12px color-mix(in srgb, var(--accent) 40%, transparent),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+  /* Uppercase tracked label helper */
+  .u-label {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
   /* Skeleton shimmer */
   .skeleton {
     position: relative;
