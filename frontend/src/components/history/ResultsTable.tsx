@@ -134,7 +134,7 @@ export function ResultsTable({
       {/* Desktop: the full table at sm and up */}
       <div className="hidden overflow-x-auto sm:block">
         <table className="w-full border-collapse text-body-sm">
-        <thead>
+        <thead className="sticky top-0 z-10 bg-surface">
           <tr className="border-b border-border">
             <Th label="Verdict" k="band" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
             <Th label="Score" k="score" sortKey={sortKey} sortDir={sortDir} onSort={onSort} align="right" />
@@ -159,24 +159,24 @@ export function ResultsTable({
               aria-label={`Open verdict ${r.band}, score ${Math.round(r.score)}`}
               className="cursor-pointer border-b border-border last:border-0 hover:bg-surface-2/60 focus-visible:bg-surface-2"
             >
-              <td className="px-4 py-3">
+              <td className="px-4 py-2.5">
                 <VerdictBadge band={r.band} size="sm" />
               </td>
-              <td className="px-4 py-3 text-right tabular-nums text-text">{Math.round(r.score)}</td>
-              <td className="px-4 py-3 text-text-secondary">{r.reason}</td>
-              {!compact && <td className="px-4 py-3 tabular-nums text-text-secondary">{r.rep_id ?? "—"}</td>}
+              <td data-cell="score" className="px-4 py-2.5 text-right font-mono tabular-nums text-text">{Math.round(r.score)}</td>
+              <td className="px-4 py-2.5 text-text-secondary">{r.reason}</td>
+              {!compact && <td className="px-4 py-2.5 tabular-nums text-text-secondary">{r.rep_id ?? "—"}</td>}
               {!compact && (
-                <td className="px-4 py-3 tabular-nums text-text-secondary">{r.opportunity_id ?? "—"}</td>
+                <td className="px-4 py-2.5 tabular-nums text-text-secondary">{r.opportunity_id ?? "—"}</td>
               )}
               {!compact && (
-                <td className="px-4 py-3">
+                <td className="px-4 py-2.5">
                   <span className="rounded bg-surface-2 px-1.5 py-0.5 text-caption text-text-muted">
                     {r.source}
                   </span>
                 </td>
               )}
-              <td className="px-4 py-3 text-right tabular-nums text-text-muted">{formatMs(r.processing_ms)}</td>
-              <td className="whitespace-nowrap px-4 py-3 text-right text-text-muted">
+              <td className="px-4 py-2.5 text-right font-mono tabular-nums text-text-muted">{formatMs(r.processing_ms)}</td>
+              <td className="whitespace-nowrap px-4 py-2.5 text-right font-mono tabular-nums text-text-muted">
                 {formatDateTime(r.created_at)}
               </td>
             </tr>
