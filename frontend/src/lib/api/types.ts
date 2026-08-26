@@ -35,6 +35,7 @@ export interface ScoreResponse extends Verdict {
   // Set when the requested vision backend was unavailable and scoring fell back
   // to the stub (fail-open). Null on the normal path.
   backend_note?: string | null;
+  copilot_summary?: string | null;
 }
 
 export interface ResultItem {

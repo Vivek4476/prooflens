@@ -1,25 +1,16 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import { motion } from "framer-motion";
-import { AlertCircle, ArrowRight, Clock, RotateCcw, Sparkles } from "lucide-react";
+import { AlertCircle, RotateCcw, Sparkles } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { ImageUploader } from "@/components/analyze/ImageUploader";
-import { PipelineStepper, type StageState } from "@/components/analyze/PipelineStepper";
+import { ScoreStage } from "@/components/analyze/ScoreStage";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
-import { Card, CardHeader } from "@/components/ui/Card";
-import { ChecksList } from "@/components/verdict/ChecksList";
-import { ScoreRing } from "@/components/verdict/ScoreRing";
-import { VerdictBadge } from "@/components/verdict/VerdictBadge";
+import { Card } from "@/components/ui/Card";
 import { api } from "@/lib/api/client";
-import type { ScoreResponse } from "@/lib/api/types";
-import { formatMs } from "@/lib/utils";
-import { PIPELINE_STAGES, bandState, checkState } from "@/lib/verdict";
-
-const REVEAL_MS = 260;
 
 /** Pull the backend's exact reason (FastAPI `detail`) out of an axios error, so
  * operators see e.g. "Live AI (openrouter) is unavailable: … 429 …" not a generic
@@ -43,7 +34,6 @@ function isTransient(err: unknown): boolean {
 export default function AnalyzePage() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
-  const [revealed, setRevealed] = useState(-1); // -1 => not revealing yet
 
   const mutation = useMutation({
     // No backend param — the server always uses its configured Live AI provider
@@ -55,9 +45,7 @@ export default function AnalyzePage() {
     // score self-heals as "Scoring…" once the instance finishes waking.
     retry: (failureCount, error) => failureCount < 8 && isTransient(error),
     retryDelay: (attempt) => Math.min(8_000, 2_000 + 2_000 * attempt), // 2,4,6,8,8…
-    onSuccess: () => setRevealed(-1),
   });
-  const result = mutation.data;
 
   // Pre-warm the free-tier API on mount so the first score isn't a cold start —
   // by the time the user uploads and clicks Analyze, the instance is awake.
@@ -76,62 +64,9 @@ export default function AnalyzePage() {
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
-  // Sequentially reveal the stepper against the REAL checks[] once we have them.
-  const revealTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  useEffect(() => {
-    if (!result) return;
-    setRevealed(-1);
-    revealTimer.current = setInterval(() => {
-      setRevealed((r) => {
-        if (r >= PIPELINE_STAGES.length - 1) {
-          if (revealTimer.current) clearInterval(revealTimer.current);
-          return r;
-        }
-        return r + 1;
-      });
-    }, REVEAL_MS);
-    return () => {
-      if (revealTimer.current) clearInterval(revealTimer.current);
-    };
-  }, [result]);
-
-  const realStates = useMemo(() => {
-    if (!result) return [];
-    return PIPELINE_STAGES.map((stage) => {
-      if (stage.key === "fusion") return bandState(result.band);
-      const c = result.checks.find((x) => x.name === stage.key);
-      return c ? checkState(c) : "skip";
-    });
-  }, [result]);
-
-  const stepperStates: StageState[] = useMemo(() => {
-    if (mutation.isPending) {
-      // In-flight: the content (vision) call is the real bottleneck.
-      return PIPELINE_STAGES.map((s) => (s.key === "content" ? "active" : "pending"));
-    }
-    if (result) {
-      return PIPELINE_STAGES.map((_, i) =>
-        i <= revealed ? realStates[i] : i === revealed + 1 ? "active" : "pending",
-      );
-    }
-    return PIPELINE_STAGES.map(() => "pending");
-  }, [mutation.isPending, result, revealed, realStates]);
-
-  const revealing = !!result && revealed < PIPELINE_STAGES.length - 1;
-  const showResult = !!result && !revealing;
-  const showStepper = mutation.isPending || revealing;
-
-  // Once the verdict is revealed, move focus to the result panel so keyboard and
-  // screen-reader users are taken to the fresh verdict instead of left on Analyze.
-  const resultRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (showResult) resultRef.current?.focus({ preventScroll: false });
-  }, [showResult]);
-
   function reset() {
     mutation.reset();
     setFile(null);
-    setRevealed(-1);
   }
 
   return (
@@ -139,6 +74,14 @@ export default function AnalyzePage() {
       <PageHeader
         title="Analyze a photo"
         description="Score a photo against the live pipeline and see exactly why — band first, then the evidence behind it."
+        actions={
+          <Link
+            href="/present"
+            className="inline-flex h-10 items-center gap-2 rounded-md border border-border-strong bg-surface px-4 text-body-sm font-medium text-text transition-colors hover:bg-surface-2"
+          >
+            Present mode
+          </Link>
+        }
       />
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -165,7 +108,7 @@ export default function AnalyzePage() {
               <Sparkles size={16} />
               {mutation.isPending ? "Scoring…" : "Analyze"}
             </Button>
-            {(file || result) && (
+            {(file || mutation.data) && (
               <Button variant="ghost" onClick={reset} disabled={mutation.isPending}>
                 <RotateCcw size={15} />
                 Reset
@@ -176,7 +119,7 @@ export default function AnalyzePage() {
 
         {/* Right: stepper / result / empty */}
         <div>
-          {mutation.isError && (
+          {mutation.isError ? (
             <Card className="p-5">
               <div className="flex items-start gap-3">
                 <AlertCircle size={18} className="mt-0.5 text-danger" />
@@ -204,20 +147,11 @@ export default function AnalyzePage() {
                 </div>
               </div>
             </Card>
+          ) : (
+            <ScoreStage result={mutation.data ?? null} pending={mutation.isPending} />
           )}
 
-          {showStepper && (
-            <Card className="p-4">
-              <CardHeader title="Running the pipeline" subtitle="Cheap checks first; the vision call last." />
-              <div className="p-2">
-                <PipelineStepper states={stepperStates} />
-              </div>
-            </Card>
-          )}
-
-          {showResult && result && <ResultPanel result={result} panelRef={resultRef} />}
-
-          {!showStepper && !showResult && !mutation.isError && (
+          {!mutation.data && !mutation.isPending && !mutation.isError && (
             <div className="flex h-full min-h-[300px] flex-col items-center justify-center rounded-[var(--radius)] border border-dashed border-border-strong px-6 text-center">
               <p className="text-body-sm text-text-secondary">The verdict will appear here.</p>
               <p className="mt-1 text-caption text-text-muted">
@@ -227,76 +161,6 @@ export default function AnalyzePage() {
           )}
         </div>
       </div>
-
-      {/* Explainability spans full width under the fold */}
-      {showResult && result && (
-        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-          <Card>
-            <CardHeader
-              title="Why this verdict"
-              subtitle="Every check the pipeline ran — what was found and how confident."
-            />
-            <ChecksList checks={result.checks} rubricVersion={result.rubric_version} />
-          </Card>
-        </motion.div>
-      )}
     </div>
-  );
-}
-
-function ResultPanel({
-  result,
-  panelRef,
-}: {
-  result: ScoreResponse;
-  panelRef?: React.Ref<HTMLDivElement>;
-}) {
-  return (
-    <motion.div
-      ref={panelRef}
-      tabIndex={-1}
-      className="outline-none"
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.22 }}
-    >
-      <Card className="p-6">
-        {/* Verdict FIRST: band word + colour */}
-        <div className="mb-5 flex items-center justify-between">
-          <VerdictBadge band={result.band} size="lg" />
-          <div className="flex items-center gap-1.5 text-caption text-text-muted">
-            <Clock size={13} />
-            {formatMs(result.processing_ms)}
-          </div>
-        </div>
-
-        <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:gap-6">
-          <ScoreRing score={result.score} band={result.band} />
-          <div className="flex-1">
-            {/* Reason string VERBATIM from the backend vocabulary */}
-            <p className="text-h2 leading-snug text-text">{result.reason}</p>
-            <p className="mt-3 text-caption text-text-muted">
-              Scored by{" "}
-              <span className="font-medium text-text-secondary">{result.backend}</span>
-              {result.backend_is_real ? "" : " (deterministic demo model)"}
-            </p>
-            {result.backend_note && (
-              <p className="mt-2 flex items-start gap-1.5 text-caption text-warn">
-                <AlertCircle size={13} className="mt-0.5 shrink-0" />
-                {result.backend_note}
-              </p>
-            )}
-            {/* The verdict is persisted — link to its permanent, shareable page. */}
-            <Link
-              href={`/verdict/${result.result_id}`}
-              className="mt-3 inline-flex items-center gap-1 text-caption font-medium text-text-secondary hover:text-text"
-            >
-              View saved report
-              <ArrowRight size={13} />
-            </Link>
-          </div>
-        </div>
-      </Card>
-    </motion.div>
   );
 }
