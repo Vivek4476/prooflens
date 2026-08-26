@@ -30,9 +30,9 @@ export function MetricCard({
 }) {
   return (
     <div className={cn("card flex flex-col gap-2 p-4", accent && "ring-1 ring-border-strong", className)}>
-      <span className="text-caption font-medium text-text-muted">{label}</span>
+      <span className="u-label text-caption font-medium">{label}</span>
       <div className="flex items-baseline gap-1">
-        <span className="text-display leading-none tabular-nums text-text">{value}</span>
+        <span className="text-display font-mono leading-none tabular-nums text-text">{value}</span>
         {suffix && <span className="text-body-sm text-text-muted">{suffix}</span>}
       </div>
       {sub && (
