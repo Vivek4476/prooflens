@@ -10,6 +10,7 @@ import { toDseTrendData } from "@/lib/dse/scorecard";
 import type { DseTrendPoint } from "@/lib/api/types";
 import { formatCount, formatPct } from "@/lib/format";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
+import { CHART_THEME } from "@/lib/charts/theme";
 
 /** ≤400ms per BRAND.md §11's chart draw-in ceiling — same as CaptureRiskTrend. */
 const ANIMATION_DURATION_MS = 350;
@@ -44,12 +45,12 @@ export function DseSuspectTrend({ trend }: { trend: DseTrendPoint[] }) {
                 <stop offset="92%" stopColor="var(--accent)" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="2 4" stroke="var(--border)" vertical={false} />
+            <CartesianGrid strokeDasharray="2 4" stroke={CHART_THEME.grid} vertical={false} />
             <XAxis
               dataKey="label"
               tickLine={false}
-              axisLine={{ stroke: "var(--border)" }}
-              tick={{ fontSize: 11, fill: "var(--text-muted)" }}
+              axisLine={{ stroke: CHART_THEME.grid }}
+              tick={{ fontSize: 11, fill: CHART_THEME.axis }}
               minTickGap={28}
             />
             <YAxis
@@ -57,13 +58,13 @@ export function DseSuspectTrend({ trend }: { trend: DseTrendPoint[] }) {
               tickLine={false}
               axisLine={false}
               width={40}
-              tick={{ fontSize: 11, fill: "var(--text-muted)" }}
+              tick={{ fontSize: 11, fill: CHART_THEME.axis }}
             />
             <Tooltip content={<DseTrendTooltip />} cursor={{ stroke: "var(--border-strong)", strokeWidth: 1 }} />
             <Area
               type="monotone"
               dataKey="rate"
-              stroke="var(--accent)"
+              stroke={CHART_THEME.series[0]}
               strokeWidth={2}
               fill="url(#dseSuspectFill)"
               dot={(props: DotProps & { payload?: TrendPoint; key?: Key }) => {
@@ -72,7 +73,7 @@ export function DseSuspectTrend({ trend }: { trend: DseTrendPoint[] }) {
                 const { key, ...rest } = props;
                 return <DseTrendDot key={key} {...rest} />;
               }}
-              activeDot={{ r: 4, fill: "var(--accent)", stroke: "var(--surface)", strokeWidth: 2 }}
+              activeDot={{ r: 4, fill: CHART_THEME.series[0], stroke: "var(--surface)", strokeWidth: 2 }}
               isAnimationActive={!reducedMotion}
               animationDuration={ANIMATION_DURATION_MS}
             />
@@ -95,7 +96,7 @@ function DseTrendDot(props: DotProps & { payload?: TrendPoint }) {
       cy={cy}
       r={4}
       fill="var(--surface)"
-      stroke="var(--accent)"
+      stroke={CHART_THEME.series[0]}
       strokeWidth={2}
       opacity={0.9}
     />

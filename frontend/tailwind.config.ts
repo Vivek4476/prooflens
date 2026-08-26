@@ -50,16 +50,23 @@ const config: Config = {
         warn: "var(--warn)",
         danger: "var(--danger)",
       },
+      fontFamily: {
+        sans: ["var(--font-geist-sans)", "system-ui", "sans-serif"],
+        mono: ["var(--font-geist-mono)", "ui-monospace", "monospace"],
+        serif: ["var(--font-newsreader)", "ui-serif", "Georgia", "serif"],
+      },
       boxShadow: {
+        0: "var(--shadow-0)",
         1: "var(--shadow-1)",
         2: "var(--shadow-2)",
+        3: "var(--shadow-3)",
       },
       borderRadius: {
         DEFAULT: "var(--radius)",
         sm: "var(--radius-sm)",
       },
       fontSize: {
-        // 1 display, 2 heading, 2 body, 1 caption
+        "display-lg": ["2.75rem", { lineHeight: "1.05", letterSpacing: "-0.02em", fontWeight: "560" }],
         display: ["2rem", { lineHeight: "2.4rem", letterSpacing: "-0.02em", fontWeight: "600" }],
         h1: ["1.375rem", { lineHeight: "1.75rem", letterSpacing: "-0.01em", fontWeight: "600" }],
         h2: ["1.0625rem", { lineHeight: "1.4rem", fontWeight: "600" }],
@@ -70,20 +77,22 @@ const config: Config = {
       transitionDuration: { DEFAULT: "180ms" },
       keyframes: {
         "fade-in": { from: { opacity: "0" }, to: { opacity: "1" } },
-        "slide-up": {
-          from: { opacity: "0", transform: "translateY(6px)" },
-          to: { opacity: "1", transform: "translateY(0)" },
-        },
-        "tooltip-in": {
-          from: { opacity: "0", transform: "translateY(2px)" },
-          to: { opacity: "1", transform: "translateY(0)" },
-        },
+        "slide-up": { from: { opacity: "0", transform: "translateY(6px)" }, to: { opacity: "1", transform: "translateY(0)" } },
+        "tooltip-in": { from: { opacity: "0", transform: "translateY(2px)" }, to: { opacity: "1", transform: "translateY(0)" } },
         shimmer: { "100%": { transform: "translateX(100%)" } },
+        "cascade-in": { from: { opacity: "0", transform: "translateY(-6px)" }, to: { opacity: "1", transform: "none" } },
+        "pulse-dot": {
+          "0%": { boxShadow: "0 0 0 0 var(--pulse-color, rgba(31,157,87,0.5))" },
+          "70%": { boxShadow: "0 0 0 7px transparent" },
+          "100%": { boxShadow: "0 0 0 0 transparent" },
+        },
       },
       animation: {
         "fade-in": "fade-in 180ms ease-out",
         "slide-up": "slide-up 200ms ease-out",
         "tooltip-in": "tooltip-in 120ms ease-out",
+        "cascade-in": "cascade-in 320ms cubic-bezier(0.2,0.7,0.2,1)",
+        "pulse-dot": "pulse-dot 2.2s infinite",
       },
     },
   },

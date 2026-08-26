@@ -16,13 +16,13 @@ export function AlertsPanel({ a }: { a: AnalyticsSummary | undefined }) {
     }
   }
   if (alerts.length === 0)
-    return <p className="px-4 py-6 text-sm text-text-muted">No active alerts. System nominal.</p>;
+    return <p className="px-4 py-6 text-body-sm text-text-muted">No active alerts. System nominal.</p>;
   return (
     <div className="flex flex-col">
       {alerts.map((al, i) => (
         <div key={i} className="border-b border-border px-4 py-3 last:border-b-0">
-          <b className={`text-[12.5px] ${al.cls}`}>{al.title}</b>
-          <p className="mt-0.5 text-[11.5px] text-text-secondary">{al.body}</p>
+          <b className={`text-caption font-semibold ${al.cls}`}>{al.title}</b>
+          <p className="mt-0.5 text-caption text-text-secondary">{al.body}</p>
         </div>
       ))}
     </div>

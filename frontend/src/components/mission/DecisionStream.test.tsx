@@ -19,4 +19,30 @@ describe("DecisionStream", () => {
     fireEvent.click(screen.getByText("Amit").closest("button")!);
     expect(onSelect).toHaveBeenCalledWith(items[0]);
   });
+
+  it("applies cascade-in to fresh rows only", () => {
+    const freshItems = [
+      { id: "a", band: "Clear", score: 86, rep_id: "Fresh", opportunity_id: "OPP-A",
+        created_at: "2026-08-25T10:00:00Z", checks: [] },
+    ] as unknown as ResultItem[];
+    const { container } = render(
+      <DecisionStream items={freshItems} newIds={new Set(["a"])} onSelect={() => {}} />
+    );
+    const row = container.querySelector('[data-decision-id="a"]')!;
+    expect(row).toBeTruthy();
+    expect(row.className).toContain("animate-cascade-in");
+  });
+
+  it("does not apply cascade-in to stale rows", () => {
+    const staleItems = [
+      { id: "b", band: "Suspect", score: 18, rep_id: "Stale", opportunity_id: "OPP-B",
+        created_at: "2026-08-25T09:59:00Z", checks: [] },
+    ] as unknown as ResultItem[];
+    const { container } = render(
+      <DecisionStream items={staleItems} newIds={new Set()} onSelect={() => {}} />
+    );
+    const row = container.querySelector('[data-decision-id="b"]')!;
+    expect(row).toBeTruthy();
+    expect(row.className).not.toContain("animate-cascade-in");
+  });
 });

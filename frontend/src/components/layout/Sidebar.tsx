@@ -36,7 +36,7 @@ export function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
               className={cn(
                 "flex items-center gap-3 rounded-md px-3 py-2 text-body-sm font-medium transition-colors",
                 active
-                  ? "bg-surface-2 text-accent"
+                  ? "relative bg-surface-2 text-accent before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:rounded-full before:bg-accent"
                   : "text-text-secondary hover:bg-surface-2 hover:text-text",
               )}
             >

@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ResultsTable } from "@/components/history/ResultsTable";
 import { useResults } from "@/lib/api/hooks";
 import type { Band } from "@/lib/api/types";
+import { cn } from "@/lib/utils";
 
 const BANDS: (Band | "all")[] = ["all", "Suspect", "Doubtful", "Clear", "Unassessed"];
 
@@ -29,7 +30,10 @@ export default function LedgerPage() {
           <button
             key={b}
             onClick={() => setBand(b)}
-            className={`rounded-full border px-3 py-1 text-xs ${band === b ? "border-text bg-text text-canvas" : "border-border text-text-secondary hover:border-border-strong"}`}
+            className={cn(
+              "rounded-full border px-3 py-1 text-caption transition-colors",
+              band === b ? "border-text bg-text text-canvas" : "border-border text-text-secondary hover:border-border-strong",
+            )}
           >
             {b === "all" ? "All" : b}
           </button>

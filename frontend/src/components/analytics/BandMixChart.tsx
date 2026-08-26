@@ -11,6 +11,7 @@ import { effectiveBucket, isOverridden } from "@/lib/analytics/cardOverride";
 import { BANDMIX_AGG_PARAM, useCardAggOverride } from "@/lib/analytics/useCardAggOverride";
 import { formatCount } from "@/lib/format";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
+import { CHART_THEME } from "@/lib/charts/theme";
 
 /** ≤400ms per BRAND.md §11's chart draw-in ceiling. */
 const ANIMATION_DURATION_MS = 350;
@@ -107,12 +108,12 @@ export function BandMixChart({
               barCategoryGap={data.length > 20 ? "8%" : "24%"}
               maxBarSize={40}
             >
-              <CartesianGrid strokeDasharray="2 4" stroke="var(--border)" vertical={false} />
+              <CartesianGrid strokeDasharray="2 4" stroke={CHART_THEME.grid} vertical={false} />
               <XAxis
                 dataKey="label"
                 tickLine={false}
-                axisLine={{ stroke: "var(--border)" }}
-                tick={{ fontSize: 11, fill: "var(--text-muted)" }}
+                axisLine={{ stroke: CHART_THEME.grid }}
+                tick={{ fontSize: 11, fill: CHART_THEME.axis }}
                 minTickGap={24}
               />
               <YAxis
@@ -122,7 +123,7 @@ export function BandMixChart({
                 tickLine={false}
                 axisLine={false}
                 width={42}
-                tick={{ fontSize: 11, fill: "var(--text-muted)" }}
+                tick={{ fontSize: 11, fill: CHART_THEME.axis }}
               />
               <Tooltip content={<BandMixTooltip />} cursor={{ fill: "var(--text-muted)", opacity: 0.08 }} />
               <Legend
