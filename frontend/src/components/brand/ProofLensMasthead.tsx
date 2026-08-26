@@ -14,6 +14,8 @@ export function ProofLensMasthead() {
       <div className="min-w-0 leading-tight">
         <div className="text-body font-semibold text-text">ProofLens</div>
         <div className="text-caption text-text-muted">Capture Integrity</div>
+        {/* The single sanctioned gold accent — 2px underline under the product mark. */}
+        <span data-hairline="gold" className="mt-1 block h-0.5 w-9 rounded-full" style={{ background: "var(--hairline-gold)" }} />
       </div>
     </div>
   );
