@@ -16,7 +16,10 @@ export function ScoreRing({ score, band, size = 160 }: { score: number; band: Ba
   const finalOffset = c * (1 - pct);
 
   return (
-    <div className="relative" style={{ width: size, height: size }}>
+    <div
+      className="relative"
+      style={{ width: size, height: size, filter: `drop-shadow(0 0 10px color-mix(in srgb, ${color} 35%, transparent))` }}
+    >
       <svg width={size} height={size} className="-rotate-90">
         <circle
           cx={size / 2}
