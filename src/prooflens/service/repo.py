@@ -58,6 +58,7 @@ class Repo(Protocol):
         opportunity_id: str | None = None,
         rep_id: str | None = None,
         source: str | None = None,
+        copilot_summary: str | None = None,
     ) -> str:
         """Persist a result and return its id. job_id None => a direct /v1/score.
         source defaults from job_id ("webhook" if set else "direct") unless a
@@ -205,6 +206,7 @@ class InMemoryRepo:
         opportunity_id: str | None = None,
         rep_id: str | None = None,
         source: str | None = None,
+        copilot_summary: str | None = None,
     ) -> str:
         rid = str(next(self._ids))
         self.results.append(
@@ -222,6 +224,7 @@ class InMemoryRepo:
                 source=source or ("webhook" if job_id else "direct"),
                 opportunity_id=opportunity_id,
                 rep_id=normalize_id(rep_id),
+                copilot_summary=copilot_summary,
             )
         )
         return rid

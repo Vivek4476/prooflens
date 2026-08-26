@@ -71,6 +71,9 @@ def process_job(job: JobView, *, repo: Repo, lsq: LSQClient, settings: Settings)
     if opportunity_id:
         lsq.update_custom_fields(opportunity_id, _ordered_updates(tenant, verdict))
 
+    from ..engine.summarize import summarize_decision
+    copilot_summary = summarize_decision(verdict)
+
     # source defaults from job_id ("webhook" since job.id is set here); no
     # override needed — only the seed script passes source explicitly.
     repo.record_result(
@@ -79,6 +82,7 @@ def process_job(job: JobView, *, repo: Repo, lsq: LSQClient, settings: Settings)
         verdict,
         opportunity_id=job.payload.get("opportunity_id"),
         rep_id=job.payload.get("rep_id"),
+        copilot_summary=copilot_summary,
     )
     # A verdict is always producible (fail-open): NO_CONTENT_ANALYSIS is a valid
     # outcome, not an error.

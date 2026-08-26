@@ -128,6 +128,7 @@ class PostgresRepo:
         opportunity_id: str | None = None,
         rep_id: str | None = None,
         source: str | None = None,
+        copilot_summary: str | None = None,
     ) -> str:
         from ..service.ids import normalize_id
 
@@ -143,6 +144,7 @@ class PostgresRepo:
             rubric_version=verdict.rubric_version,
             checks=[c.to_dict() for c in verdict.checks],
             source=source or ("webhook" if job_id else "direct"),
+            copilot_summary=copilot_summary,
         )
         self._session.add(row)
         self._session.flush()
@@ -372,6 +374,7 @@ class PostgresRepo:
             review_note=r.review_note,
             reviewed_at=r.reviewed_at.isoformat() if r.reviewed_at else None,
             reviewer=r.reviewer,
+            copilot_summary=r.copilot_summary,
         )
 
     def commit(self) -> None:

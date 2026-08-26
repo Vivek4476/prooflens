@@ -103,3 +103,5 @@
   --warn: #f0a83c;
   --danger: #f0596e;
 }
+
+@keyframes fadein { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }

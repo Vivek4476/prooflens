@@ -52,6 +52,7 @@ export interface ResultItem {
   checks: CheckOutcome[];
   // Present once a moderator has actioned this result; null/absent while pending.
   review?: ReviewBlock | null;
+  copilot_summary?: string | null;
 }
 
 export interface ResultsPage {

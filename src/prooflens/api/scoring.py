@@ -141,9 +141,12 @@ def score_bytes(
 
     # Keeper verdict — remember the hash now, then persist.
     _remember_hash(ctx, verdict)
+    from ..engine.summarize import summarize_decision
+    copilot_summary = summarize_decision(verdict)
     result_id = repo.record_result(
         tenant_view.id, None, verdict,
         opportunity_id=opportunity_id, rep_id=rep_id, source=source,
+        copilot_summary=copilot_summary,
     )
 
     payload = verdict.to_dict()
